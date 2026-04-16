@@ -1,6 +1,8 @@
-import type { ExtensionMessage, MessageResponse, StateData, LoginData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, TabRecord } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
+import { generateUUID, nowISO } from '../shared/utils/tab-utils'
+import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 
 /**
@@ -28,9 +30,17 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return { success: true }
 
     case 'GET_TABS':
+      return handleGetTabs(message.payload)
+
     case 'CLOSE_TAB':
+      return handleCloseTab(message.payload.tabId)
+
     case 'CLOSE_TABS_BATCH':
+      return handleCloseTabsBatch(message.payload.tabIds)
+
     case 'REOPEN_TAB':
+      return handleReopenTab(message.payload.url)
+
     case 'GET_WORKSPACES':
     case 'CREATE_WORKSPACE':
     case 'UPDATE_WORKSPACE':
@@ -139,5 +149,85 @@ async function handleOpenDashboard(): Promise<MessageResponse> {
     await chrome.tabs.create({ url: dashboardUrl })
   }
 
+  return { success: true }
+}
+
+// ============ 标签页操作 ============
+
+/** 获取标签页列表（支持筛选） */
+async function handleGetTabs(
+  filters?: { status?: string; search?: string; deviceId?: string; workspaceId?: string },
+): Promise<MessageResponse<TabsData>> {
+  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  let tabs = Object.values(tabRecords)
+
+  if (filters?.status) {
+    tabs = tabs.filter(t => t.status === filters.status)
+  }
+  if (filters?.deviceId) {
+    tabs = tabs.filter(t => t.deviceId === filters.deviceId)
+  }
+  if (filters?.workspaceId) {
+    tabs = tabs.filter(t => t.workspaceIds.includes(filters.workspaceId!))
+  }
+  if (filters?.search) {
+    const keyword = filters.search.toLowerCase()
+    tabs = tabs.filter(
+      t => t.title.toLowerCase().includes(keyword) || t.url.toLowerCase().includes(keyword),
+    )
+  }
+
+  // 按最近访问时间倒序
+  tabs.sort((a, b) => new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime())
+
+  return { success: true, data: { tabs } }
+}
+
+/** 关闭本地标签页，保留远端记录 */
+async function handleCloseTab(tabId: string): Promise<MessageResponse> {
+  const records = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  const record = records[tabId]
+  if (!record) {
+    return { success: false, error: '标签页不存在' }
+  }
+
+  if (record.status === 'open') {
+    try {
+      await chrome.tabs.remove(record.chromeTabId)
+    } catch {
+      // 标签页可能已经被用户手动关闭
+    }
+  }
+
+  return { success: true }
+}
+
+/** 批量关闭标签页 */
+async function handleCloseTabsBatch(tabIds: string[]): Promise<MessageResponse> {
+  const records = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  const chromeTabIds: number[] = []
+
+  for (const tabId of tabIds) {
+    const record = records[tabId]
+    if (record && record.status === 'open') {
+      chromeTabIds.push(record.chromeTabId)
+    }
+  }
+
+  if (chromeTabIds.length > 0) {
+    try {
+      await chrome.tabs.remove(chromeTabIds)
+    } catch {
+      // 部分标签页可能已经关闭
+    }
+  }
+
+  return { success: true }
+}
+
+/** 重新打开标签页 */
+async function handleReopenTab(url: string): Promise<MessageResponse> {
+  await chrome.tabs.create({ url })
+  logger.info('Reopened tab:', url)
   return { success: true }
 }

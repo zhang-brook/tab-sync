@@ -1,15 +1,26 @@
 import { handleMessage } from './message-handler'
+import { initTabMonitor, scanAllTabs } from './tab-monitor'
 import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
 
 logger.info('Service Worker started')
 
+// 注册标签页事件监听（必须在顶层同步注册，SW 重启时也能正确绑定）
+initTabMonitor()
+
 // 扩展安装/更新时初始化
 chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Extension installed/updated:', details.reason)
-  // 确保设备 ID 已生成
   const deviceId = await getOrCreateDeviceId()
   logger.info('Device ID:', deviceId)
+  // 全量扫描当前已打开的标签页
+  await scanAllTabs()
+})
+
+// 浏览器启动时也做一次全量扫描
+chrome.runtime.onStartup.addListener(async () => {
+  logger.info('Browser startup')
+  await scanAllTabs()
 })
 
 // 监听来自 popup/sidepanel/dashboard 的消息
