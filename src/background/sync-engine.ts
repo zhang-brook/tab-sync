@@ -4,7 +4,7 @@ import { nowISO } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
 import { syncEvents, syncFull, syncPull } from '../shared/api/sync'
 import { SYNC_MAX_RETRIES, SYNC_RETRY_BASE_DELAY_MS } from '../shared/constants'
-import type { SyncState, TabEvent, TabRecord } from '../shared/types'
+import type { SyncState, TabEvent } from '../shared/types'
 
 /**
  * 同步引擎

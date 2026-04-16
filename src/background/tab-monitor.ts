@@ -147,7 +147,7 @@ async function handleTabRemoved(tabId: number) {
 }
 
 /** 标签页激活（切换到某标签页） */
-async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
+async function handleTabActivated(activeInfo: chrome.tabs.OnActivatedInfo) {
   const idMap = await storage.get(STORAGE_KEYS.TAB_ID_MAP)
   const uuid = idMap[activeInfo.tabId]
   if (!uuid) return
@@ -195,7 +195,7 @@ const debouncedUpdate = createKeyedDebounce<{ tabId: number; tab: chrome.tabs.Ta
   TAB_EVENT_DEBOUNCE_MS,
 )
 
-function handleTabUpdated(tabId: number, _changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
+function handleTabUpdated(tabId: number, _changeInfo: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) {
   debouncedUpdate(String(tabId), { tabId, tab })
 }
 

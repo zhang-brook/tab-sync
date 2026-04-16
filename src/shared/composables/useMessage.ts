@@ -13,6 +13,14 @@ export function sendMessage<T = unknown>(message: ExtensionMessage): Promise<Mes
         })
         return
       }
+      // 如果 Service Worker 尚未就绪或未返回响应，response 可能为 undefined
+      if (!response) {
+        resolve({
+          success: false,
+          error: 'Service Worker 未响应，请重试',
+        })
+        return
+      }
       resolve(response)
     })
   })
