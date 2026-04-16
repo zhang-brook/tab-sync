@@ -133,6 +133,8 @@ export interface StateData {
   auth: AuthState
   syncStatus: SyncStatus
   lastSyncAt: string | null
+  /** 待同步事件数量 */
+  pendingCount: number
   tabCount: {
     open: number
     closed: number

@@ -66,6 +66,7 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
   ])
 
   const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  const pendingEvents = await storage.get(STORAGE_KEYS.PENDING_EVENTS)
   const tabs = Object.values(tabRecords)
   const openCount = tabs.filter(t => t.status === 'open').length
   const closedCount = tabs.filter(t => t.status === 'closed').length
@@ -80,6 +81,7 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
       },
       syncStatus: sync_state.status,
       lastSyncAt: sync_state.lastSyncAt,
+      pendingCount: pendingEvents.length,
       tabCount: { open: openCount, closed: closedCount },
     },
   }
