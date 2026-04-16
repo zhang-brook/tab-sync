@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@crxjs/vite-plugin": "^2.4.0",
-    "vue": "^3.5.32"
+    "element-plus": "^2.13.7",
+    "vue": "^3.5.32",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
