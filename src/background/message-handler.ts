@@ -1,4 +1,6 @@
-import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, WorkspacesData } from '../shared/types'
+import type { Workspace, TabReference } from '../shared/types'
+import { generateUUID, nowISO } from '../shared/utils/tab-utils'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { logger } from '../shared/utils/logger'
@@ -43,12 +45,19 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return handleReopenTab(message.payload.url)
 
     case 'GET_WORKSPACES':
+      return handleGetWorkspaces()
+
     case 'CREATE_WORKSPACE':
+      return handleCreateWorkspace(message.payload)
+
     case 'UPDATE_WORKSPACE':
+      return handleUpdateWorkspace(message.payload)
+
     case 'DELETE_WORKSPACE':
+      return handleDeleteWorkspace(message.payload.id)
+
     case 'OPEN_WORKSPACE':
-      // 后续阶段实现
-      return { success: false, error: `${message.action} 尚未实现` }
+      return handleOpenWorkspace(message.payload)
 
     default:
       return { success: false, error: '未知的消息类型' }
@@ -238,5 +247,186 @@ async function handleCloseTabsBatch(tabIds: string[]): Promise<MessageResponse> 
 async function handleReopenTab(url: string): Promise<MessageResponse> {
   await chrome.tabs.create({ url })
   logger.info('Reopened tab:', url)
+  return { success: true }
+}
+
+// ============ 工作组操作 ============
+
+/** 获取所有工作组 */
+async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
+  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
+  return { success: true, data: { workspaces } }
+}
+
+/** 创建工作组 */
+async function handleCreateWorkspace(
+  payload: { name: string; color: string; icon?: string; tabIds: string[] },
+): Promise<MessageResponse> {
+  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
+  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  const now = nowISO()
+
+  // 根据 tabIds 构建 TabReference 快照
+  const tabs: TabReference[] = payload.tabIds
+    .map((id) => {
+      const record = tabRecords[id]
+      if (!record) return null
+      return {
+        tabId: id,
+        url: record.url,
+        title: record.title,
+        favIconUrl: record.favIconUrl,
+        addedAt: now,
+      }
+    })
+    .filter((t): t is TabReference => t !== null)
+
+  const workspace: Workspace = {
+    id: generateUUID(),
+    name: payload.name,
+    color: payload.color,
+    icon: payload.icon,
+    tabs,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  workspaces.push(workspace)
+  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
+
+  // 更新关联标签页的 workspaceIds
+  for (const tabRef of tabs) {
+    const record = tabRecords[tabRef.tabId]
+    if (record && !record.workspaceIds.includes(workspace.id)) {
+      record.workspaceIds.push(workspace.id)
+    }
+  }
+  await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
+
+  logger.info('Workspace created:', workspace.name)
+  return { success: true, data: { workspace } }
+}
+
+/** 更新工作组 */
+async function handleUpdateWorkspace(
+  payload: { id: string; name?: string; color?: string; icon?: string; tabIds?: string[] },
+): Promise<MessageResponse> {
+  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
+  const idx = workspaces.findIndex((w) => w.id === payload.id)
+  if (idx === -1) {
+    return { success: false, error: '工作组不存在' }
+  }
+
+  const workspace = workspaces[idx]
+  const now = nowISO()
+
+  if (payload.name !== undefined) workspace.name = payload.name
+  if (payload.color !== undefined) workspace.color = payload.color
+  if (payload.icon !== undefined) workspace.icon = payload.icon
+
+  // 如果更新了标签页列表
+  if (payload.tabIds !== undefined) {
+    const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+
+    // 移除旧关联
+    for (const oldRef of workspace.tabs) {
+      const record = tabRecords[oldRef.tabId]
+      if (record) {
+        record.workspaceIds = record.workspaceIds.filter((id) => id !== workspace.id)
+      }
+    }
+
+    // 构建新的 TabReference 列表
+    workspace.tabs = payload.tabIds
+      .map((id) => {
+        const record = tabRecords[id]
+        if (!record) return null
+        return {
+          tabId: id,
+          url: record.url,
+          title: record.title,
+          favIconUrl: record.favIconUrl,
+          addedAt: now,
+        }
+      })
+      .filter((t): t is TabReference => t !== null)
+
+    // 添加新关联
+    for (const tabRef of workspace.tabs) {
+      const record = tabRecords[tabRef.tabId]
+      if (record && !record.workspaceIds.includes(workspace.id)) {
+        record.workspaceIds.push(workspace.id)
+      }
+    }
+
+    await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
+  }
+
+  workspace.updatedAt = now
+  workspaces[idx] = workspace
+  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
+
+  logger.info('Workspace updated:', workspace.name)
+  return { success: true }
+}
+
+/** 删除工作组 */
+async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
+  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
+  const idx = workspaces.findIndex((w) => w.id === id)
+  if (idx === -1) {
+    return { success: false, error: '工作组不存在' }
+  }
+
+  const workspace = workspaces[idx]
+
+  // 清除关联标签页的 workspaceIds
+  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  for (const tabRef of workspace.tabs) {
+    const record = tabRecords[tabRef.tabId]
+    if (record) {
+      record.workspaceIds = record.workspaceIds.filter((wid) => wid !== id)
+    }
+  }
+  await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
+
+  workspaces.splice(idx, 1)
+  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
+
+  logger.info('Workspace deleted:', workspace.name)
+  return { success: true }
+}
+
+/** 打开工作组中的标签页 */
+async function handleOpenWorkspace(
+  payload: { id: string; tabIds?: string[]; newWindow?: boolean },
+): Promise<MessageResponse> {
+  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
+  const workspace = workspaces.find((w) => w.id === payload.id)
+  if (!workspace) {
+    return { success: false, error: '工作组不存在' }
+  }
+
+  // 确定要打开的标签页
+  const tabsToOpen = payload.tabIds
+    ? workspace.tabs.filter((t) => payload.tabIds!.includes(t.tabId))
+    : workspace.tabs
+
+  if (tabsToOpen.length === 0) {
+    return { success: false, error: '没有可打开的标签页' }
+  }
+
+  if (payload.newWindow) {
+    // 在新窗口中打开
+    const urls = tabsToOpen.map((t) => t.url)
+    await chrome.windows.create({ url: urls })
+  } else {
+    // 在当前窗口中打开
+    for (const tab of tabsToOpen) {
+      await chrome.tabs.create({ url: tab.url })
+    }
+  }
+
+  logger.info(`Opened ${tabsToOpen.length} tabs from workspace: ${workspace.name}`)
   return { success: true }
 }
