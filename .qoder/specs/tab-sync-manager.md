@@ -262,6 +262,54 @@ Chrome 标签页事件 (onCreated/onUpdated/onRemoved/onActivated)
 | 同步策略 | 事件队列 + 定期全量对账 | 事件驱动保证实时性，全量对账保证一致性 |
 | UI 组件库 | Element Plus 按需导入 | `unplugin-vue-components` 自动导入，减少打包体积 |
 | Service Worker 状态 | 全部持久化到 chrome.storage.local | MV3 SW 空闲 30s 可能被终止，不能依赖内存 |
+| 工作组标签页恢复 | 复用已有 TabRecord + URL 预注册机制 | 避免多次点击"打开工作组"产生重复标签页和重复记录 |
+
+### 3.5 工作组标签页恢复去重机制
+
+当用户点击"打开工作组"时，需要实现智能去重，避免多次点击导致重复打开标签页：
+
+```
+用户点击 "打开工作组"
+       │
+       ▼
+┌──────────────────────────┐
+│ 遍历工作组中每个 TabReference │
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────────────────┐
+│ 1. 通过 tabRef.tabId 查找 TabRecord  │
+│ 2. 检查 TabRecord.status 是否为 'open' │
+└──────────┬──────────────┬────────────┘
+           │              │
+        是(open)       否(closed/不存在)
+           │              │
+           ▼              ▼
+┌─────────────────┐  ┌──────────────────────────┐
+│ 尝试激活已打开的  │  │ 预注册 URL → 已有 UUID    │
+│ Chrome 标签页     │  │ 调用 chrome.tabs.create() │
+│ (chrome.tabs.    │  │ tab-monitor 中 handleTab  │
+│  update active)  │  │ Created 检测到预注册，     │
+└────────┬────────┘  │ 复用已有 TabRecord 而非    │
+         │           │ 创建新记录                  │
+      成功/失败       └──────────┬─────────────────┘
+         │                      │
+         ▼                      ▼
+┌─────────────────┐  ┌─────────────────────────┐
+│ 成功: 跳过       │  │ 更新 TabRecord:           │
+│ 失败: 转入重新   │  │  - chromeTabId = 新 tabId │
+│ 打开流程 ─────────│─►│  - status = 'open'       │
+└─────────────────┘  │  - 清除 closedAt          │
+                     │  - 更新 lastAccessedAt     │
+                     │ 更新 TAB_ID_MAP 映射       │
+                     └─────────────────────────┘
+```
+
+**核心要点**:
+1. **已打开检测**: 通过 TabRecord 的 status 字段和 chromeTabId 判断标签页是否已打开，避免重复创建
+2. **URL 预注册**: 在 `tab-monitor.ts` 中维护一个内存级 `pendingReopens` Map (URL → UUID[])，在调用 `chrome.tabs.create()` 前注册，使 `handleTabCreated` 事件处理器能识别这是"恢复打开"而非"全新创建"
+3. **TabRecord 复用**: 恢复打开的标签页复用原有 TabRecord (同一 UUID)，仅更新 chromeTabId / status / lastAccessedAt 等字段
+4. **响应反馈**: OPEN_WORKSPACE 的响应中返回 `opened`(新打开数) 和 `alreadyOpen`(已存在数)，UI 展示友好提示
 
 ---
 
@@ -284,7 +332,7 @@ Background Service Worker 的消息处理分发表：
 | `CREATE_WORKSPACE` | Dashboard | 创建工作组 |
 | `UPDATE_WORKSPACE` | Dashboard | 更新工作组 |
 | `DELETE_WORKSPACE` | Dashboard | 删除工作组 |
-| `OPEN_WORKSPACE` | SidePanel/Dashboard | 打开工作组 (全部/部分) |
+| `OPEN_WORKSPACE` | SidePanel/Dashboard | 一键恢复打开工作组标签页 (去重: 已打开的直接激活，已关闭的复用原记录重新打开) |
 | `OPEN_DASHBOARD` | Popup/SidePanel | 在新标签页中打开 Dashboard |
 
 ---
@@ -616,10 +664,11 @@ export default defineManifest({
 1. 创建工作组: 命名 + 颜色 + 选择标签页
 2. 编辑工作组: 添加/移除标签页，重命名
 3. 打开工作组: "全部打开" (新窗口) / "选择性打开" (勾选后打开)
-4. 工作组同步到后端，跨设备共享
-5. 工作组 API 集成
+4. **一键恢复去重**: 打开工作组时，已打开的标签页直接激活不重复创建，已关闭的标签页通过 URL 预注册机制复用原有 TabRecord (参见 3.5)
+5. 工作组同步到后端，跨设备共享
+6. 工作组 API 集成
 
-**关键文件**: `src/dashboard/components/workspaces/*.vue`, `src/shared/api/workspaces.ts`
+**关键文件**: `src/dashboard/components/workspaces/*.vue`, `src/shared/api/workspaces.ts`, `src/background/tab-monitor.ts`, `src/background/message-handler.ts`
 
 ### 阶段 10: 多设备支持与收尾
 

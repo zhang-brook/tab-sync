@@ -6,6 +6,42 @@ import { logger } from '../shared/utils/logger'
 import { TAB_EVENT_DEBOUNCE_MS } from '../shared/constants'
 import type { TabRecord, TabEvent, TabEventType } from '../shared/types'
 
+// ============ 工作组恢复预注册机制 ============
+
+/**
+ * 预注册表：URL → 已有 TabRecord UUID 队列
+ * 当工作组恢复打开标签页时，先在此注册 URL → UUID 映射，
+ * 使 handleTabCreated 能识别这是"恢复打开"并复用已有 TabRecord。
+ * 使用队列（数组）以支持同一 URL 在工作组中出现多次的情况。
+ */
+const pendingReopens = new Map<string, string[]>()
+
+/**
+ * 注册一个即将通过 chrome.tabs.create() 恢复打开的标签页。
+ * 必须在调用 chrome.tabs.create() 之前调用。
+ * @param url 标签页 URL
+ * @param existingUUID 已有的 TabRecord.id，用于复用
+ */
+export function registerPendingReopen(url: string, existingUUID: string) {
+  const list = pendingReopens.get(url) || []
+  list.push(existingUUID)
+  pendingReopens.set(url, list)
+  logger.debug('Registered pending reopen:', url, '→', existingUUID)
+
+  // 安全兜底：5 秒后清除未匹配的条目，防止内存泄漏
+  setTimeout(() => {
+    const current = pendingReopens.get(url)
+    if (current) {
+      const idx = current.indexOf(existingUUID)
+      if (idx !== -1) {
+        current.splice(idx, 1)
+        if (current.length === 0) pendingReopens.delete(url)
+        logger.debug('Cleaned up stale pending reopen:', url, '→', existingUUID)
+      }
+    }
+  }, 5000)
+}
+
 /**
  * 初始化标签页监控
  * - 注册 Chrome 标签页事件监听
@@ -86,8 +122,49 @@ async function handleTabCreated(tab: chrome.tabs.Tab) {
   if (tab.id == null) return
 
   const deviceId = await getOrCreateDeviceId()
-  const uuid = generateUUID()
   const now = nowISO()
+
+  // 检查是否为工作组恢复打开（预注册匹配）
+  const tabUrl = tab.pendingUrl || tab.url || ''
+  const pendingList = pendingReopens.get(tabUrl)
+
+  if (pendingList && pendingList.length > 0) {
+    // 取出队列中的第一个 UUID（先注册先匹配）
+    const existingUUID = pendingList.shift()!
+    if (pendingList.length === 0) pendingReopens.delete(tabUrl)
+
+    // 复用已有 TabRecord 而非创建新记录
+    const records = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+    const idMap = await storage.get(STORAGE_KEYS.TAB_ID_MAP)
+    const record = records[existingUUID]
+
+    if (record) {
+      record.chromeTabId = tab.id
+      record.windowId = tab.windowId
+      record.url = tab.url || record.url
+      record.title = tab.title || record.title
+      record.favIconUrl = tab.favIconUrl || record.favIconUrl
+      record.status = 'open'
+      delete record.closedAt
+      record.lastAccessedAt = now
+      records[existingUUID] = record
+      idMap[tab.id] = existingUUID
+
+      await storage.setMultiple({
+        [STORAGE_KEYS.TAB_RECORDS]: records,
+        [STORAGE_KEYS.TAB_ID_MAP]: idMap,
+      })
+
+      await pushEvent('created', record, deviceId)
+      logger.debug('Tab reopened (reused record):', tab.id, '→', existingUUID, tabUrl)
+      return
+    }
+    // 如果 record 不存在（异常情况），走正常创建流程
+    logger.warn('Pending reopen record not found, falling back to new creation:', existingUUID)
+  }
+
+  // 正常的新标签页创建流程
+  const uuid = generateUUID()
 
   const record: TabRecord = {
     id: uuid,

@@ -260,12 +260,19 @@ async function handleDelete(ws: Workspace) {
 }
 
 async function handleOpenWorkspace(id: string, newWindow: boolean) {
-  const res = await sendMessage({
+  const res = await sendMessage<{ opened: number; alreadyOpen: number }>({
     action: 'OPEN_WORKSPACE',
     payload: { id, newWindow },
   })
   if (res.success) {
-    ElMessage.success('标签页已打开')
+    const data = res.data
+    if (data && data.alreadyOpen > 0 && data.opened === 0) {
+      ElMessage.info(`所有 ${data.alreadyOpen} 个标签页均已打开`)
+    } else if (data && data.alreadyOpen > 0) {
+      ElMessage.success(`已打开 ${data.opened} 个标签页，另有 ${data.alreadyOpen} 个已存在`)
+    } else {
+      ElMessage.success(`已打开 ${data?.opened ?? 0} 个标签页`)
+    }
   } else {
     ElMessage.error(res.error || '打开失败')
   }

@@ -8,6 +8,7 @@ import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { triggerSync } from './sync-engine'
 import { startAlarms, stopAlarms } from './alarm-manager'
+import { registerPendingReopen } from './tab-monitor'
 
 /**
  * 统一消息处理分发器
@@ -402,7 +403,7 @@ async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
   return { success: true }
 }
 
-/** 打开工作组中的标签页 */
+/** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */
 async function handleOpenWorkspace(
   payload: { id: string; tabIds?: string[]; newWindow?: boolean },
 ): Promise<MessageResponse> {
@@ -421,19 +422,77 @@ async function handleOpenWorkspace(
     return { success: false, error: '没有可打开的标签页' }
   }
 
-  if (payload.newWindow) {
-    // 在新窗口中打开
-    const urls = tabsToOpen.map((t) => t.url)
-    await chrome.windows.create({ url: urls })
-  } else {
-    // 在当前窗口中打开
-    for (const tab of tabsToOpen) {
-      await chrome.tabs.create({ url: tab.url })
+  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  let opened = 0
+  let alreadyOpen = 0
+
+  // 分类: 已打开的标签页 vs 需要重新打开的标签页
+  const toActivate: { chromeTabId: number; windowId: number }[] = []
+  const toReopen: TabReference[] = []
+
+  for (const tabRef of tabsToOpen) {
+    const record = tabRecords[tabRef.tabId]
+    if (record && record.status === 'open') {
+      // 尝试确认 Chrome 标签页是否真的还存在
+      try {
+        await chrome.tabs.get(record.chromeTabId)
+        toActivate.push({ chromeTabId: record.chromeTabId, windowId: record.windowId })
+        continue
+      } catch {
+        // Chrome 标签页已不存在（可能被用户关闭但事件未捕获），转入重新打开
+      }
+    }
+    toReopen.push(tabRef)
+  }
+
+  // 1) 激活已打开的标签页（当前窗口模式下才激活，新窗口模式下跳过）
+  if (!payload.newWindow) {
+    for (const item of toActivate) {
+      try {
+        await chrome.tabs.update(item.chromeTabId, { active: true })
+        if (item.windowId != null) {
+          await chrome.windows.update(item.windowId, { focused: true })
+        }
+      } catch {
+        // 忽略激活失败
+      }
+    }
+  }
+  alreadyOpen = toActivate.length
+
+  // 2) 重新打开已关闭/不存在的标签页
+  if (toReopen.length > 0) {
+    if (payload.newWindow) {
+      // 新窗口模式: 逐个创建以确保每个标签页都能正确预注册
+      // 先创建窗口
+      const firstTab = toReopen[0]
+      registerPendingReopen(firstTab.url, firstTab.tabId)
+      const win = await chrome.windows.create({ url: firstTab.url })
+      opened++
+
+      // 剩余标签页在该窗口中创建
+      for (let i = 1; i < toReopen.length; i++) {
+        registerPendingReopen(toReopen[i].url, toReopen[i].tabId)
+        await chrome.tabs.create({ url: toReopen[i].url, windowId: win?.id })
+        opened++
+      }
+    } else {
+      // 当前窗口模式
+      for (const tabRef of toReopen) {
+        registerPendingReopen(tabRef.url, tabRef.tabId)
+        await chrome.tabs.create({ url: tabRef.url })
+        opened++
+      }
     }
   }
 
-  logger.info(`Opened ${tabsToOpen.length} tabs from workspace: ${workspace.name}`)
-  return { success: true }
+  logger.info(
+    `Workspace "${workspace.name}": opened=${opened}, alreadyOpen=${alreadyOpen}`,
+  )
+  return {
+    success: true,
+    data: { opened, alreadyOpen },
+  }
 }
 
 // ============ 设备操作 ============
