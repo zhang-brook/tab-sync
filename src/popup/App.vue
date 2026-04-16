@@ -114,11 +114,11 @@ onMounted(() => {
 async function loadState() {
   const res = await sendMessage<StateData>({ action: 'GET_STATE' })
   if (res.success && res.data) {
-    authenticated.value = res.data.auth.authenticated
-    userName.value = res.data.auth.user?.username || ''
-    tabCount.value = res.data.tabCount
-    syncStatus.value = res.data.syncStatus
-    lastSyncAt.value = res.data.lastSyncAt
+    authenticated.value = res.data.auth?.authenticated ?? false
+    userName.value = res.data.auth?.user?.username || ''
+    tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
+    syncStatus.value = res.data.syncStatus ?? 'idle'
+    lastSyncAt.value = res.data.lastSyncAt ?? null
     pendingCount.value = res.data.pendingCount ?? 0
   }
 }

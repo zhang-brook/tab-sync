@@ -34,6 +34,12 @@ chrome.runtime.onStartup.addListener(async () => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   logger.debug('Received message:', message.action)
   // handleMessage 是异步的，需要返回 true 保持消息通道
-  handleMessage(message).then(sendResponse)
+  // 必须添加 .catch 确保 sendResponse 始终被调用，否则前端收到 undefined
+  handleMessage(message)
+    .then(sendResponse)
+    .catch((err) => {
+      logger.error('Message handler error:', err)
+      sendResponse({ success: false, error: String(err) })
+    })
   return true
 })
