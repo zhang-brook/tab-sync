@@ -81,44 +81,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Monitor } from '@element-plus/icons-vue'
-import { storage, STORAGE_KEYS } from '../../shared/storage'
 import { sendMessage } from '../../shared/composables/useMessage'
-import { getBrowserInfo, getOSInfo } from '../../shared/utils/device-fingerprint'
-import type { Device, StateData } from '../../shared/types'
+import type { Device, DevicesData, StateData } from '../../shared/types'
 
-const currentDevice = ref<Device>({
-  id: '',
-  name: '',
-  browser: '',
-  os: '',
-  lastSeen: new Date().toISOString(),
+const allDevices = ref<Device[]>([])
+const tabCount = ref({ open: 0, closed: 0 })
+const loading = ref(true)
+
+/** 当前设备（列表中第一个） */
+const currentDevice = computed(() => allDevices.value[0] ?? {
+  id: '', name: '', browser: '', os: '', lastSeen: '',
 })
 
-const remoteDevices = ref<Device[]>([])
-const tabCount = ref({ open: 0, closed: 0 })
+/** 远端设备（列表中第一个以外的） */
+const remoteDevices = computed(() => allDevices.value.slice(1))
 
 onMounted(async () => {
-  // 读取当前设备信息
-  const deviceId = (await storage.get(STORAGE_KEYS.DEVICE_ID)) || ''
-  const deviceName = (await storage.get(STORAGE_KEYS.DEVICE_NAME)) || ''
-
-  currentDevice.value = {
-    id: deviceId,
-    name: deviceName,
-    browser: getBrowserInfo(),
-    os: getOSInfo(),
-    lastSeen: new Date().toISOString(),
+  // 通过 GET_DEVICES 消息从 background 获取设备列表
+  const devRes = await sendMessage<DevicesData>({ action: 'GET_DEVICES' })
+  if (devRes.success && devRes.data) {
+    allDevices.value = devRes.data.devices
   }
 
   // 获取标签页统计
-  const res = await sendMessage<StateData>({ action: 'GET_STATE' })
-  if (res.success && res.data) {
-    tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
+  const stateRes = await sendMessage<StateData>({ action: 'GET_STATE' })
+  if (stateRes.success && stateRes.data) {
+    tabCount.value = stateRes.data.tabCount ?? { open: 0, closed: 0 }
   }
 
-  // TODO: 后端连接后，从 API 获取其他设备列表
+  loading.value = false
 })
 
 /** 格式化时间 */

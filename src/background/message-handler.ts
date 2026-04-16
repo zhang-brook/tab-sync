@@ -1,8 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, WorkspacesData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, WorkspacesData, DevicesData } from '../shared/types'
 import type { Workspace, TabReference } from '../shared/types'
 import { generateUUID, nowISO } from '../shared/utils/tab-utils'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
+import { getDevices } from '../shared/api/devices'
+import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { triggerSync } from './sync-engine'
 import { startAlarms, stopAlarms } from './alarm-manager'
@@ -58,6 +60,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'OPEN_WORKSPACE':
       return handleOpenWorkspace(message.payload)
+
+    case 'GET_DEVICES':
+      return handleGetDevices()
 
     default:
       return { success: false, error: '未知的消息类型' }
@@ -429,4 +434,41 @@ async function handleOpenWorkspace(
 
   logger.info(`Opened ${tabsToOpen.length} tabs from workspace: ${workspace.name}`)
   return { success: true }
+}
+
+// ============ 设备操作 ============
+
+/** 获取设备列表（当前设备 + 远端设备） */
+async function handleGetDevices(): Promise<MessageResponse<DevicesData>> {
+  const deviceId = (await storage.get(STORAGE_KEYS.DEVICE_ID)) || ''
+  const deviceName = (await storage.get(STORAGE_KEYS.DEVICE_NAME)) || ''
+
+  // 当前设备信息
+  const currentDevice = {
+    id: deviceId,
+    name: deviceName,
+    browser: getBrowserInfo(),
+    os: getOSInfo(),
+    lastSeen: new Date().toISOString(),
+  }
+
+  // 尝试从后端获取设备列表
+  const token = await storage.get(STORAGE_KEYS.AUTH_TOKEN)
+  if (token) {
+    const res = await getDevices()
+    if (res.ok && res.data) {
+      // 后端返回的列表中可能已包含当前设备，确保当前设备排在最前面
+      const remoteDevices = res.data.devices.filter((d) => d.id !== deviceId)
+      return {
+        success: true,
+        data: { devices: [currentDevice, ...remoteDevices] },
+      }
+    }
+  }
+
+  // 未登录或后端不可用，仅返回当前设备
+  return {
+    success: true,
+    data: { devices: [currentDevice] },
+  }
 }

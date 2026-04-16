@@ -23,6 +23,7 @@ export type MessageAction =
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
   | 'OPEN_DASHBOARD'
+  | 'GET_DEVICES'
 
 // ============ 请求消息定义 ============
 
@@ -101,6 +102,10 @@ export interface OpenDashboardMessage {
   action: 'OPEN_DASHBOARD'
 }
 
+export interface GetDevicesMessage {
+  action: 'GET_DEVICES'
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -118,6 +123,7 @@ export type ExtensionMessage =
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
   | OpenDashboardMessage
+  | GetDevicesMessage
 
 // ============ 响应定义 ============
 

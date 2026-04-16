@@ -21,6 +21,7 @@
         :key="ws.id"
         shadow="hover"
         class="workspace-card"
+        :style="{ borderLeftColor: ws.color }"
       >
         <template #header>
           <div class="ws-header">

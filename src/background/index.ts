@@ -2,7 +2,9 @@ import { handleMessage } from './message-handler'
 import { initTabMonitor, scanAllTabs } from './tab-monitor'
 import { initAlarmManager, startAlarms } from './alarm-manager'
 import { logger } from '../shared/utils/logger'
-import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
+import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
+import { registerDevice } from '../shared/api/devices'
+import { storage, STORAGE_KEYS } from '../shared/storage'
 
 logger.info('Service Worker started')
 
@@ -16,11 +18,14 @@ initAlarmManager()
 chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Extension installed/updated:', details.reason)
   const deviceId = await getOrCreateDeviceId()
-  logger.info('Device ID:', deviceId)
+  const deviceName = await getDeviceName()
+  logger.info('Device ID:', deviceId, 'Name:', deviceName)
   // 全量扫描当前已打开的标签页
   await scanAllTabs()
   // 启动定时同步和心跳
   await startAlarms()
+  // 尝试向后端注册设备（后端未部署时静默失败）
+  await tryRegisterDevice(deviceId)
 })
 
 // 浏览器启动时也做一次全量扫描并启动定时器
@@ -28,6 +33,9 @@ chrome.runtime.onStartup.addListener(async () => {
   logger.info('Browser startup')
   await scanAllTabs()
   await startAlarms()
+  // 尝试注册/更新设备
+  const deviceId = await getOrCreateDeviceId()
+  await tryRegisterDevice(deviceId)
 })
 
 // 监听来自 popup/sidepanel/dashboard 的消息
@@ -43,3 +51,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     })
   return true
 })
+
+/**
+ * 尝试向后端注册当前设备
+ * 后端未部署时静默失败，不影响扩展正常使用
+ */
+async function tryRegisterDevice(deviceId: string) {
+  const token = await storage.get(STORAGE_KEYS.AUTH_TOKEN)
+  if (!token) return // 未登录，跳过
+
+  const name = (await storage.get(STORAGE_KEYS.DEVICE_NAME)) || 'Unknown'
+  const browser = getBrowserInfo()
+  const os = getOSInfo()
+
+  const res = await registerDevice({ deviceId, name, browser, os })
+  if (res.ok) {
+    logger.info('Device registered/updated on server')
+  } else {
+    logger.debug('Device registration skipped (server unavailable):', res.error)
+  }
+}
