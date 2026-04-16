@@ -4,6 +4,8 @@ import { loginWithCredentials, verifyToken, logout as apiLogout } from '../share
 import { generateUUID, nowISO } from '../shared/utils/tab-utils'
 import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
+import { triggerSync } from './sync-engine'
+import { startAlarms, stopAlarms } from './alarm-manager'
 
 /**
  * 统一消息处理分发器
@@ -26,7 +28,8 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return handleOpenDashboard()
 
     case 'SYNC_NOW':
-      // 同步引擎尚未实现，先返回成功
+      // 手动触发一次完整同步（增量上传 + 拉取远端变更）
+      await triggerSync()
       return { success: true }
 
     case 'GET_TABS':
@@ -100,6 +103,8 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
 
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Token login success:', res.data.user.username)
+  // 登录成功后启动定时同步和心跳
+  await startAlarms()
   return { success: true, data: { user: res.data.user } }
 }
 
@@ -119,6 +124,8 @@ async function handleLoginWithCredentials(
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, res.data.token)
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Credentials login success:', res.data.user.username)
+  // 登录成功后启动定时同步和心跳
+  await startAlarms()
   return { success: true, data: { user: res.data.user } }
 }
 
@@ -129,6 +136,8 @@ async function handleLogout(): Promise<MessageResponse> {
 
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
   await storage.set(STORAGE_KEYS.AUTH_USER, null)
+  // 登出后停止定时同步和心跳
+  await stopAlarms()
   logger.info('Logged out')
   return { success: true }
 }
