@@ -5,6 +5,7 @@ import { logger } from '../utils/logger'
  * 基于 fetch 的 API 客户端封装
  * - 自动附加 Authorization header
  * - 自动附加 X-Device-Id header
+ * - 自动解包 CommonReturn 响应 (取 data 字段)
  * - 统一错误处理
  */
 
@@ -58,6 +59,8 @@ async function request<T>(
       body: body != null ? JSON.stringify(body) : undefined,
     })
 
+    const json = await res.json().catch(() => null)
+
     if (res.status === 401) {
       logger.warn('Token 无效或已过期，清除认证状态')
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
@@ -65,14 +68,23 @@ async function request<T>(
       return { ok: false, status: 401, error: 'Token 无效或已过期' }
     }
 
-    const data = await res.json().catch(() => null)
+    // 解包 CommonReturn 响应: { code, success, data, message, developerMessage, traceId }
+    if (json && typeof json === 'object' && 'success' in json) {
+      if (!json.success) {
+        const errorMsg = json.message || json.developerMessage || `请求失败 (${res.status})`
+        return { ok: false, status: res.status, error: errorMsg }
+      }
+      // 成功时取 data 字段作为实际数据
+      return { ok: true, status: res.status, data: json.data as T }
+    }
 
+    // 非 CommonReturn 格式的响应 (兼容)
     if (!res.ok) {
-      const errorMsg = data?.error?.message || `请求失败 (${res.status})`
+      const errorMsg = json?.error?.message || `请求失败 (${res.status})`
       return { ok: false, status: res.status, error: errorMsg }
     }
 
-    return { ok: true, status: res.status, data: data as T }
+    return { ok: true, status: res.status, data: json as T }
   } catch (err) {
     const message = err instanceof Error ? err.message : '网络请求失败'
     logger.error('API request failed:', method, path, message)
