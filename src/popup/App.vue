@@ -4,8 +4,13 @@
       <h3>SpiderMemos Tab Sync</h3>
     </div>
 
+    <!-- 加载中：避免闪现登录页 -->
+    <div v-if="loading" class="loading-state">
+      <el-icon class="is-loading"><Loading /></el-icon>
+    </div>
+
     <!-- 未登录：显示登录面板 -->
-    <LoginPanel v-if="!authenticated" @login-success="loadState" />
+    <LoginPanel v-else-if="!authenticated" @login-success="loadState" />
 
     <!-- 已登录：显示状态和操作 -->
     <div v-else class="popup-body">
@@ -69,10 +74,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { Loading } from '@element-plus/icons-vue'
 import LoginPanel from './components/LoginPanel.vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import type { StateData } from '../shared/types'
 
+const loading = ref(true)
 const authenticated = ref(false)
 const userName = ref('')
 const tabCount = ref({ open: 0, closed: 0 })
@@ -112,14 +119,18 @@ onMounted(() => {
 })
 
 async function loadState() {
-  const res = await sendMessage<StateData>({ action: 'GET_STATE' })
-  if (res.success && res.data) {
-    authenticated.value = res.data.auth?.authenticated ?? false
-    userName.value = res.data.auth?.user?.username || ''
-    tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
-    syncStatus.value = res.data.syncStatus ?? 'idle'
-    lastSyncAt.value = res.data.lastSyncAt ?? null
-    pendingCount.value = res.data.pendingCount ?? 0
+  try {
+    const res = await sendMessage<StateData>({ action: 'GET_STATE' })
+    if (res.success && res.data) {
+      authenticated.value = res.data.auth?.authenticated ?? false
+      userName.value = res.data.auth?.user?.username || ''
+      tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
+      syncStatus.value = res.data.syncStatus ?? 'idle'
+      lastSyncAt.value = res.data.lastSyncAt ?? null
+      pendingCount.value = res.data.pendingCount ?? 0
+    }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -155,6 +166,15 @@ function openSidePanel() {
 .popup-container {
   width: 320px;
   padding: 16px;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60px;
+  font-size: 24px;
+  color: #409eff;
 }
 
 .popup-header {
