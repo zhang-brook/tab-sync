@@ -21,6 +21,10 @@
           <el-icon><Plus /></el-icon>
           创建工作组 ({{ selectedTabs.length }})
         </el-button>
+        <el-button type="success" :disabled="selectedTabs.length === 0" @click="showAddToWorkspaceDialog">
+          <el-icon><FolderAdd /></el-icon>
+          加入现有工作组 ({{ selectedTabs.length }})
+        </el-button>
         <el-button :disabled="selectedTabs.length === 0" type="danger" @click="handleBatchClose">
           <el-icon><Close /></el-icon>
           批量关闭 ({{ selectedTabs.length }})
@@ -122,7 +126,7 @@
         :page-size="pageSize"
         :total="filteredTabs.length"
         layout="prev, pager, next"
-        small
+        type="small"
         background
       />
     </div>
@@ -165,15 +169,64 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 加入现有工作组对话框 -->
+    <el-dialog
+      v-model="addToWsDialogVisible"
+      title="加入现有工作组"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form label-width="80px" label-position="left">
+        <el-form-item label="目标工作组" required>
+          <el-select v-model="addToWsTargetId" placeholder="请选择工作组" style="width: 100%">
+            <el-option
+              v-for="ws in availableWorkspaces"
+              :key="ws.id"
+              :label="ws.name"
+              :value="ws.id"
+            >
+              <span class="ws-option">
+                <span class="ws-color-dot" :style="{ backgroundColor: ws.color }" />
+                <span>{{ ws.name }}</span>
+                <el-tag size="small" type="info" style="margin-left: auto">{{ ws.tabs.length }} 个标签页</el-tag>
+              </span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="选中标签页">
+          <div class="tab-selector">
+            <div v-for="tab in selectedTabs" :key="tab.chromeTabId" class="tab-checkbox-item">
+              <img
+                v-if="tab.favIconUrl"
+                :src="tab.favIconUrl"
+                class="tab-favicon"
+                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+              />
+              <div v-else class="tab-favicon-placeholder" />
+              <span class="tab-checkbox-title" :title="tab.title">{{ tab.title || '(无标题)' }}</span>
+            </div>
+            <el-empty v-if="selectedTabs.length === 0" :image-size="40" description="请在表格中选择标签页" />
+          </div>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="addToWsDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="addingToWs" :disabled="!addToWsTargetId" @click="handleAddToWorkspace">
+          加入
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Search, Refresh, Close, View, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Close, View, Plus, FolderAdd } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
-import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../../shared/types'
+import type { WorkspaceTabsSummaryData, WorkspaceTabPayload, Workspace, WorkspacesData } from '../../shared/types'
 
 /** 扩展的标签页行数据 */
 interface TabRow {
@@ -198,6 +251,12 @@ const pageSize = 25
 const dialogVisible = ref(false)
 const saving = ref(false)
 const wsForm = ref({ name: '', color: '#409EFF' })
+
+// 加入现有工作组对话框
+const addToWsDialogVisible = ref(false)
+const addingToWs = ref(false)
+const addToWsTargetId = ref('')
+const availableWorkspaces = ref<Workspace[]>([])
 
 const presetColors = [
   '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
@@ -360,6 +419,76 @@ async function handleBatchClose() {
 function showCreateWorkspaceDialog() {
   wsForm.value = { name: '', color: '#409EFF' }
   dialogVisible.value = true
+}
+
+/** 显示加入现有工作组对话框 */
+async function showAddToWorkspaceDialog() {
+  addToWsTargetId.value = ''
+  addToWsDialogVisible.value = true
+  // 加载工作组列表
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  if (res.success && res.data) {
+    availableWorkspaces.value = res.data.workspaces
+  } else {
+    ElMessage.warning(res.error || '获取工作组列表失败')
+  }
+}
+
+/** 将选中标签页加入指定工作组 */
+async function handleAddToWorkspace() {
+  if (!addToWsTargetId.value) {
+    ElMessage.warning('请选择目标工作组')
+    return
+  }
+  if (selectedTabs.value.length === 0) {
+    ElMessage.warning('请选择至少一个标签页')
+    return
+  }
+
+  addingToWs.value = true
+  const tabs: WorkspaceTabPayload[] = selectedTabs.value.map(t => ({
+    url: t.url,
+    title: t.title,
+    favIconUrl: t.favIconUrl,
+    chromeTabId: t.chromeTabId,
+  }))
+
+  const res = await sendMessage<{ added: number; skipped: number }>({
+    action: 'ADD_TABS_TO_WORKSPACE',
+    payload: {
+      workspaceId: addToWsTargetId.value,
+      tabs,
+    },
+  })
+
+  addingToWs.value = false
+  if (res.success) {
+    const data = res.data
+    if (data && data.added === 0 && (data.skipped ?? 0) > 0) {
+      ElMessage.info('所选标签页均已存在于该工作组中')
+    } else {
+      ElMessage.success(`已将 ${data?.added ?? tabs.length} 个标签页加入工作组`)
+    }
+    addToWsDialogVisible.value = false
+    selectedTabs.value = []
+    // 询问是否关闭已保存的标签页
+    try {
+      await ElMessageBox.confirm(
+        `已加入工作组，是否关闭这 ${tabs.length} 个标签页？`,
+        '关闭标签页',
+        { confirmButtonText: '关闭', cancelButtonText: '保留', type: 'info' },
+      )
+      const tabIds = tabs.map(t => t.chromeTabId)
+      try {
+        await chrome.tabs.remove(tabIds)
+      } catch { /* ignore */ }
+      await loadTabs()
+    } catch {
+      await loadTabs() // 刷新以显示新的 tag
+    }
+  } else {
+    ElMessage.error(res.error || '加入失败')
+  }
 }
 
 /** 创建工作组 */
@@ -540,5 +669,20 @@ function switchToWorkspaces(workspaceId: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
+}
+
+/* 加入工作组选择器 */
+.ws-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ws-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 </style>

@@ -58,6 +58,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'OPEN_WORKSPACE':
       return handleOpenWorkspace(message.payload)
 
+    case 'ADD_TABS_TO_WORKSPACE':
+      return handleAddTabsToWorkspace(message.payload)
+
     case 'GET_DEVICES':
       return handleGetDevices()
 
@@ -317,6 +320,59 @@ async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
   }
   logger.warn('deleteWorkspace API failed:', res.error)
   return { success: false, error: res.error || '删除工作组失败', authError: res.status === 401 }
+}
+
+/** 将选中的标签页加入现有工作组（去重后合并） */
+async function handleAddTabsToWorkspace(
+  payload: { workspaceId: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
+): Promise<MessageResponse> {
+  // 1. 获取所有工作组
+  const res = await getWorkspaces()
+  if (!res.ok || !res.data) {
+    logger.warn('addTabsToWorkspace: getWorkspaces failed:', res.error)
+    return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
+  }
+
+  // 2. 找到目标工作组
+  const workspace = res.data.workspaces.find(w => w.id === payload.workspaceId)
+  if (!workspace) {
+    return { success: false, error: '工作组不存在' }
+  }
+
+  // 3. 获取已有标签页 URL 集合（用于去重）
+  const existingUrls = new Set(workspace.tabs.map(t => t.url))
+
+  // 4. 过滤新标签页，只保留不在工作组中的
+  const newTabs = payload.tabs.filter(t => !existingUrls.has(t.url))
+  if (newTabs.length === 0) {
+    // 所有标签页已存在
+    return { success: true, data: { added: 0, skipped: payload.tabs.length } }
+  }
+
+  // 5. 将已有 TabReference 转为 WorkspaceTabPayload（chromeTabId=0 表示未知）
+  const existingTabPayloads = workspace.tabs.map(t => ({
+    url: t.url,
+    title: t.title,
+    favIconUrl: t.favIconUrl,
+    chromeTabId: 0,
+  }))
+
+  // 6. 合并后调用更新 API
+  const allTabs = [...existingTabPayloads, ...newTabs]
+  const updateRes = await updateWorkspace(payload.workspaceId, { tabs: allTabs })
+  if (updateRes.ok) {
+    // 将新增标签页的 chromeTabId → UUID 映射写入 session storage
+    if (updateRes.data?.mappings) {
+      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+      Object.assign(mappings, updateRes.data.mappings)
+      await chrome.storage.session.set({ tab_id_mappings: mappings })
+    }
+    logger.info(`Added ${newTabs.length} tabs to workspace "${workspace.name}"`)
+    return { success: true, data: { added: newTabs.length, skipped: payload.tabs.length - newTabs.length } }
+  }
+  logger.warn('addTabsToWorkspace: updateWorkspace failed:', updateRes.error)
+  return { success: false, error: updateRes.error || '更新工作组失败', authError: updateRes.status === 401 }
 }
 
 /** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */

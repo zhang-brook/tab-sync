@@ -20,6 +20,7 @@ export type MessageAction =
   | 'UPDATE_WORKSPACE'
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
+  | 'ADD_TABS_TO_WORKSPACE'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
   | 'GET_WORKSPACE_TABS_SUMMARY'
@@ -114,6 +115,12 @@ export interface GetWorkspaceTabsSummaryMessage {
   action: 'GET_WORKSPACE_TABS_SUMMARY'
 }
 
+/** 将选中的标签页加入现有工作组 */
+export interface AddTabsToWorkspaceMessage {
+  action: 'ADD_TABS_TO_WORKSPACE'
+  payload: { workspaceId: string; tabs: WorkspaceTabPayload[] }
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -129,6 +136,7 @@ export type ExtensionMessage =
   | UpdateWorkspaceMessage
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
+  | AddTabsToWorkspaceMessage
   | OpenDashboardMessage
   | GetDevicesMessage
   | GetWorkspaceTabsSummaryMessage
