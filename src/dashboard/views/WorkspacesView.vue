@@ -66,26 +66,38 @@
           </div>
         </template>
 
-        <!-- 标签页列表 -->
+        <!-- 标签页列表（可拖拽排序） -->
         <div v-if="ws.tabs.length > 0" class="ws-tabs">
-          <div v-for="tab in ws.tabs" :key="tab.tabId" class="ws-tab-item">
-            <img
-              v-if="tab.favIconUrl"
-              :src="tab.favIconUrl"
-              class="tab-favicon"
-              @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-            />
-            <div v-else class="tab-favicon-placeholder" />
-            <div class="tab-text">
-              <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
-              <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
-            </div>
-            <el-tooltip content="在新标签页中打开" placement="top">
-              <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
-                <el-icon><View /></el-icon>
-              </el-button>
-            </el-tooltip>
-          </div>
+          <draggable
+            :list="ws.tabs"
+            item-key="tabId"
+            handle=".drag-handle"
+            ghost-class="tab-ghost"
+            :animation="200"
+            @end="handleTabSort(ws.id)"
+          >
+            <template #item="{ element: tab }">
+              <div class="ws-tab-item">
+                <span class="drag-handle" title="拖拽排序">⋮⋮</span>
+                <img
+                  v-if="tab.favIconUrl"
+                  :src="tab.favIconUrl"
+                  class="tab-favicon"
+                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                />
+                <div v-else class="tab-favicon-placeholder" />
+                <div class="tab-text">
+                  <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
+                  <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                </div>
+                <el-tooltip content="在新标签页中打开" placement="top">
+                  <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
+                    <el-icon><View /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </div>
+            </template>
+          </draggable>
         </div>
         <el-empty v-else :image-size="60" description="工作组内暂无标签页" />
 
@@ -147,6 +159,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Edit, Delete, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
 import type { Workspace, WorkspacesData, WorkspaceTabPayload } from '../../shared/types'
 
@@ -317,6 +330,22 @@ function openSingleTab(url: string) {
   chrome.tabs.create({ url })
 }
 
+/** 拖拽排序完成后，将新顺序同步到后端 */
+async function handleTabSort(workspaceId: string) {
+  const ws = workspaces.value.find(w => w.id === workspaceId)
+  if (!ws) return
+
+  const tabOrder = ws.tabs.map(t => t.tabId)
+  try {
+    await sendMessage({
+      action: 'SORT_WORKSPACE_TABS',
+      payload: { workspaceId, tabOrder },
+    })
+  } catch {
+    // 排序 API 失败不回滚 UI，保留乐观更新
+  }
+}
+
 function formatTime(iso: string): string {
   if (!iso) return '--'
   const d = new Date(iso)
@@ -480,5 +509,31 @@ function formatTime(iso: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
+}
+
+/* 拖拽排序 */
+.drag-handle {
+  cursor: grab;
+  color: #c0c4cc;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+.drag-handle:hover {
+  color: #909399;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.tab-ghost {
+  opacity: 0.4;
+  background: #e6f7ff;
+  border: 1px dashed #409eff;
 }
 </style>

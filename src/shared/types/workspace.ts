@@ -22,6 +22,8 @@ export interface TabReference {
   title: string
   /** 图标快照 */
   favIconUrl: string
+  /** 排序序号 */
+  sortOrder: number
   /** 加入工作组的时间 */
   addedAt: string
 }

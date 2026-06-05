@@ -34,3 +34,8 @@ export function deleteWorkspace(id: string) {
 export function getWorkspaceTabsSummary() {
   return apiClient.get<WorkspaceTabsSummaryData>('/v1/tab-sync/workspaces/tabs-summary')
 }
+
+/** 重新排序工作组内的标签页 */
+export function reorderWorkspaceTabs(workspaceId: string, tabOrder: string[]) {
+  return apiClient.put<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/reorder`, { tabOrder })
+}

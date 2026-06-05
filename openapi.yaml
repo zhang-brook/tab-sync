@@ -443,6 +443,53 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  # ============ Workspaces ============
+  /v1/tab-sync/workspaces/{id}/reorder:
+    put:
+      tags: [Sync]
+      summary: 重新排序工作组内的标签页
+      description: 传入按新顺序排列的 tabId 列表，批量更新 sort_order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 工作组 UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tabOrder]
+              properties:
+                tabOrder:
+                  type: array
+                  items:
+                    type: string
+                  description: 按新顺序排列的标签页 UUID 列表
+      responses:
+        '200':
+          description: 重排成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:

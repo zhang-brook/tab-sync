@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { getDevices } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, reorderWorkspaceTabs } from '../shared/api/workspaces'
 import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
@@ -60,6 +60,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'ADD_TABS_TO_WORKSPACE':
       return handleAddTabsToWorkspace(message.payload)
+
+    case 'SORT_WORKSPACE_TABS':
+      return handleSortWorkspaceTabs(message.payload)
 
     case 'GET_DEVICES':
       return handleGetDevices()
@@ -478,6 +481,19 @@ async function handleOpenWorkspace(
     success: true,
     data: { opened, alreadyOpen },
   }
+}
+
+/** 重新排序工作组内的标签页 */
+async function handleSortWorkspaceTabs(
+  payload: { workspaceId: string; tabOrder: string[] },
+): Promise<MessageResponse> {
+  const res = await reorderWorkspaceTabs(payload.workspaceId, payload.tabOrder)
+  if (res.ok) {
+    logger.info('Workspace tabs reordered:', payload.workspaceId)
+    return { success: true }
+  }
+  logger.warn('reorderWorkspaceTabs API failed:', res.error)
+  return { success: false, error: res.error || '排序失败', authError: res.status === 401 }
 }
 
 // ============ 设备操作 ============

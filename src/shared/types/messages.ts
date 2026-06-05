@@ -20,6 +20,7 @@ export type MessageAction =
   | 'UPDATE_WORKSPACE'
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
+  | 'SORT_WORKSPACE_TABS'
   | 'ADD_TABS_TO_WORKSPACE'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
@@ -103,6 +104,12 @@ export interface OpenWorkspaceMessage {
   payload: { id: string; tabIds?: string[]; newWindow?: boolean }
 }
 
+/** 重新排序工作组内的标签页 */
+export interface SortWorkspaceTabsMessage {
+  action: 'SORT_WORKSPACE_TABS'
+  payload: { workspaceId: string; tabOrder: string[] }
+}
+
 export interface OpenDashboardMessage {
   action: 'OPEN_DASHBOARD'
 }
@@ -136,6 +143,7 @@ export type ExtensionMessage =
   | UpdateWorkspaceMessage
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
+  | SortWorkspaceTabsMessage
   | AddTabsToWorkspaceMessage
   | OpenDashboardMessage
   | GetDevicesMessage
