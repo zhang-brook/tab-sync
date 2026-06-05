@@ -2,30 +2,6 @@
   <div class="login-panel">
     <!-- Tab 切换：Token / 账号密码 -->
     <el-tabs v-model="loginMode" class="login-tabs">
-      <el-tab-pane label="Token 登录" name="token">
-        <el-form @submit.prevent="handleTokenLogin">
-          <el-form-item>
-            <el-input
-              v-model="tokenInput"
-              placeholder="粘贴 Token"
-              type="password"
-              show-password
-              clearable
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button
-              type="primary"
-              :loading="loading"
-              style="width: 100%"
-              @click="handleTokenLogin"
-            >
-              登录
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </el-tab-pane>
-
       <el-tab-pane label="账号密码" name="credentials">
         <el-form @submit.prevent="handleCredentialsLogin">
           <el-form-item>
@@ -50,6 +26,30 @@
               :loading="loading"
               style="width: 100%"
               @click="handleCredentialsLogin"
+            >
+              登录
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
+
+      <el-tab-pane label="Token 登录" name="token">
+        <el-form @submit.prevent="handleTokenLogin">
+          <el-form-item>
+            <el-input
+              v-model="tokenInput"
+              placeholder="粘贴 Token"
+              type="password"
+              show-password
+              clearable
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button
+              type="primary"
+              :loading="loading"
+              style="width: 100%"
+              @click="handleTokenLogin"
             >
               登录
             </el-button>
@@ -84,7 +84,7 @@ const emit = defineEmits<{
   (e: 'login-success'): void
 }>()
 
-const loginMode = ref<'token' | 'credentials'>('token')
+const loginMode = ref<'credentials' | 'token'>('credentials')
 const tokenInput = ref('')
 const username = ref('')
 const password = ref('')
