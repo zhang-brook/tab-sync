@@ -1,5 +1,6 @@
 import { storage, STORAGE_KEYS } from '../storage'
 import { logger } from '../utils/logger'
+import { getOrCreateDeviceId } from '../utils/device-fingerprint'
 
 /**
  * 基于 fetch 的 API 客户端封装
@@ -26,10 +27,8 @@ async function getHeaders(): Promise<Record<string, string>> {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const deviceId = await storage.get(STORAGE_KEYS.DEVICE_ID)
-  if (deviceId) {
-    headers['X-Device-Id'] = deviceId
-  }
+  const deviceId = await getOrCreateDeviceId()
+  headers['X-Device-Id'] = deviceId
 
   return headers
 }
