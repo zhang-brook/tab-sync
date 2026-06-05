@@ -1,6 +1,6 @@
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
-import { nowISO } from '../shared/utils/tab-utils'
+import { nowISO, sanitizeFavIconUrl } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
 import { syncEvents, syncStartup, syncPull } from '../shared/api/sync'
 import { SYNC_MAX_RETRIES, SYNC_RETRY_BASE_DELAY_MS } from '../shared/constants'
@@ -75,7 +75,7 @@ export async function performStartupSync(): Promise<Record<string, string>> {
       url: tab.url || tab.pendingUrl || '',
       title: tab.title || '',
       windowId: tab.windowId ?? 0,
-      favIconUrl: tab.favIconUrl || '',
+      favIconUrl: sanitizeFavIconUrl(tab.favIconUrl),
     })
   }
 

@@ -1,5 +1,5 @@
 import { createKeyedDebounce } from '../shared/utils/debounce'
-import { generateUUID, nowISO } from '../shared/utils/tab-utils'
+import { generateUUID, nowISO, sanitizeFavIconUrl } from '../shared/utils/tab-utils'
 import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { TAB_EVENT_DEBOUNCE_MS } from '../shared/constants'
@@ -84,7 +84,7 @@ async function handleTabCreated(tab: chrome.tabs.Tab) {
       windowId: tab.windowId ?? 0,
       url: tab.url || '',
       title: tab.title || '',
-      favIconUrl: tab.favIconUrl || '',
+      favIconUrl: sanitizeFavIconUrl(tab.favIconUrl),
       status: 'open',
       openedAt: now,
       lastAccessedAt: now,
@@ -112,7 +112,7 @@ async function handleTabCreated(tab: chrome.tabs.Tab) {
     windowId: tab.windowId ?? 0,
     url: tab.url || '',
     title: tab.title || '',
-    favIconUrl: tab.favIconUrl || '',
+    favIconUrl: sanitizeFavIconUrl(tab.favIconUrl),
     status: 'open',
     openedAt: now,
     lastAccessedAt: now,
@@ -201,7 +201,7 @@ const debouncedUpdate = createKeyedDebounce<{ tabId: number; tab: chrome.tabs.Ta
       windowId: tab.windowId ?? 0,
       url: tab.url || '',
       title: tab.title || '',
-      favIconUrl: tab.favIconUrl || '',
+      favIconUrl: sanitizeFavIconUrl(tab.favIconUrl),
       status: 'open',
       openedAt: '',
       lastAccessedAt: nowISO(),

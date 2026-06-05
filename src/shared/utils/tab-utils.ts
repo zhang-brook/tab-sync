@@ -7,3 +7,14 @@ export function generateUUID(): string {
 export function nowISO(): string {
   return new Date().toISOString()
 }
+
+/**
+ * 清洗 favIconUrl，过滤 data: URI 等内联图片数据
+ * 避免 data:image/svg+xml 等超大内联数据撑大报文
+ */
+export function sanitizeFavIconUrl(url: string | undefined): string {
+  if (!url) return ''
+  // 过滤 data: URI（data:image/png、data:image/svg+xml 等）
+  if (url.startsWith('data:')) return ''
+  return url
+}
