@@ -3,12 +3,9 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { getDevices } from '../shared/api/devices'
-import { getTabs } from '../shared/api/tabs'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary } from '../shared/api/workspaces'
 import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
-import { triggerSync } from './sync-engine'
-import { startAlarms, stopAlarms } from './alarm-manager'
 import { registerPendingReopen } from './tab-monitor'
 
 /**
@@ -31,10 +28,8 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'OPEN_DASHBOARD':
       return handleOpenDashboard()
 
-    case 'SYNC_NOW':
-      // 手动触发一次完整同步（增量上传 + 拉取远端变更）
-      await triggerSync()
-      return { success: true }
+    case 'GET_WORKSPACE_TABS_SUMMARY':
+      return handleGetWorkspaceTabsSummary()
 
     case 'GET_TABS':
       return handleGetTabs(message.payload)
@@ -78,25 +73,9 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
     STORAGE_KEYS.AUTH_USER,
   ])
 
-  const lastSyncAt = await storage.get(STORAGE_KEYS.LAST_SYNC_AT)
-
-  // 从 session storage 获取待同步事件数
-  const sessionData = await chrome.storage.session.get('pending_events')
-  const pendingEvents: unknown[] = (sessionData['pending_events'] as unknown[]) || []
-
-  // 尝试从后端获取标签页计数（后端不可用时降级为 0）
-  let openCount = 0
-  let closedCount = 0
-  if (auth_token) {
-    try {
-      const openRes = await getTabs({ status: 'open', limit: 1 })
-      if (openRes.ok && openRes.data) openCount = openRes.data.total
-      const closedRes = await getTabs({ status: 'closed', limit: 1 })
-      if (closedRes.ok && closedRes.data) closedCount = closedRes.data.total
-    } catch {
-      // 后端不可用，降级处理
-    }
-  }
+  // 从浏览器获取当前打开的标签页数量
+  const chromeTabs = await chrome.tabs.query({})
+  const openCount = chromeTabs.length
 
   return {
     success: true,
@@ -106,10 +85,7 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
         token: auth_token,
         user: auth_user,
       },
-      syncStatus: pendingEvents.length > 0 ? 'syncing' : 'idle',
-      lastSyncAt: lastSyncAt || null,
-      pendingCount: pendingEvents.length,
-      tabCount: { open: openCount, closed: closedCount },
+      tabCount: { open: openCount, closed: 0 },
     },
   }
 }
@@ -132,9 +108,6 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
 
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Token login success:', res.data.user.username)
-  // 登录成功后异步启动定时同步和心跳（不阻塞登录响应）
-  // 数据量较大时 startup sync 可能较慢，后台执行避免登录界面长时间等待
-  startAlarms().catch(err => logger.error('Start alarms failed:', err))
   return { success: true, data: { user: res.data.user } }
 }
 
@@ -155,9 +128,6 @@ async function handleLoginWithCredentials(
   await storage.set(STORAGE_KEYS.REFRESH_TOKEN, res.data.refreshToken)
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Credentials login success:', res.data.user.username)
-  // 登录成功后异步启动定时同步和心跳（不阻塞登录响应）
-  // 数据量较大时 startup sync 可能较慢，后台执行避免登录界面长时间等待
-  startAlarms().catch(err => logger.error('Start alarms failed:', err))
   return { success: true, data: { user: res.data.user } }
 }
 
@@ -172,8 +142,6 @@ async function handleLogout(): Promise<MessageResponse> {
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
   await storage.set(STORAGE_KEYS.REFRESH_TOKEN, null)
   await storage.set(STORAGE_KEYS.AUTH_USER, null)
-  // 登出后停止定时同步和心跳
-  await stopAlarms()
   logger.info('Logged out')
   return { success: true }
 }
@@ -199,17 +167,41 @@ async function handleOpenDashboard(): Promise<MessageResponse> {
 
 // ============ 标签页操作 ============
 
-/** 获取标签页列表（支持筛选，从后端 API 获取） */
+/** 获取标签页列表（筛选，默认从浏览器直接查询当前打开的标签页） */
 async function handleGetTabs(
   filters?: { status?: string; search?: string; deviceId?: string; workspaceId?: string },
 ): Promise<MessageResponse<TabsData>> {
-  const res = await getTabs({ ...filters })
-  if (res.ok && res.data) {
-    return { success: true, data: { tabs: res.data.tabs } }
+  // 查询浏览器当前所有标签页
+  const chromeTabs = await chrome.tabs.query({})
+  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+
+  let tabs = chromeTabs.map(tab => ({
+    id: mappings[String(tab.id)] || '',
+    chromeTabId: tab.id ?? 0,
+    windowId: tab.windowId ?? 0,
+    url: tab.url || tab.pendingUrl || '',
+    title: tab.title || '',
+    favIconUrl: tab.favIconUrl || '',
+    status: 'open' as const,
+    openedAt: '',
+    lastAccessedAt: '',
+    deviceId: '',
+    workspaceIds: [] as string[],
+  }))
+
+  // 状态筛选
+  if (filters?.status && filters.status !== 'open') {
+    tabs = [] // 浏览器中只有 open 的标签页
   }
-  // 后端不可用时返回空列表
-  logger.warn('getTabs API failed:', res.error)
-  return { success: true, data: { tabs: [] } }
+
+  // 搜索筛选
+  if (filters?.search) {
+    const keyword = filters.search.toLowerCase()
+    tabs = tabs.filter(t => t.title.toLowerCase().includes(keyword) || t.url.toLowerCase().includes(keyword))
+  }
+
+  return { success: true, data: { tabs } }
 }
 
 /** 关闭本地标签页（通过 session storage 查找 chromeTabId） */
@@ -274,14 +266,22 @@ async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
   return { success: false, error: res.error || '获取工作组失败' }
 }
 
-/** 创建工作组（通过后端 API） */
+/** 创建工作组（通过后端 API）
+ * 前端直接传入标签页完整数据，后端为每个标签页分配 UUID */
 async function handleCreateWorkspace(
-  payload: { name: string; color: string; icon?: string; tabIds: string[] },
+  payload: { name: string; color: string; icon?: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const res = await createWorkspace(payload)
   if (res.ok && res.data) {
+    // 将后端返回的 chromeTabId → UUID 映射存入 session storage
+    if (res.data.mappings) {
+      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+      Object.assign(mappings, res.data.mappings)
+      await chrome.storage.session.set({ tab_id_mappings: mappings })
+    }
     logger.info('Workspace created:', payload.name)
-    return { success: true, data: { workspace: res.data.workspace } }
+    return { success: true, data: { workspace: res.data.workspace, mappings: res.data.mappings } }
   }
   logger.warn('createWorkspace API failed:', res.error)
   return { success: false, error: res.error || '创建工作组失败' }
@@ -289,11 +289,18 @@ async function handleCreateWorkspace(
 
 /** 更新工作组（通过后端 API） */
 async function handleUpdateWorkspace(
-  payload: { id: string; name?: string; color?: string; icon?: string; tabIds?: string[] },
+  payload: { id: string; name?: string; color?: string; icon?: string; tabs?: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const { id, ...updatePayload } = payload
   const res = await updateWorkspace(id, updatePayload)
   if (res.ok) {
+    // 将更新的 mappings 存入 session storage
+    if (res.data?.mappings) {
+      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+      Object.assign(mappings, res.data.mappings)
+      await chrome.storage.session.set({ tab_id_mappings: mappings })
+    }
     logger.info('Workspace updated:', id)
     return { success: true }
   }
@@ -418,6 +425,16 @@ async function handleOpenWorkspace(
 }
 
 // ============ 设备操作 ============
+
+/** 获取所有工作组的标签页摘要（url + workspace 信息，用于 TabsView 交叉比对打 tag） */
+async function handleGetWorkspaceTabsSummary(): Promise<MessageResponse> {
+  const res = await getWorkspaceTabsSummary()
+  if (res.ok && res.data) {
+    return { success: true, data: res.data }
+  }
+  logger.warn('getWorkspaceTabsSummary API failed:', res.error)
+  return { success: true, data: { summaries: [] } }
+}
 
 /** 获取设备列表（当前设备 + 远端设备） */
 async function handleGetDevices(): Promise<MessageResponse<DevicesData>> {

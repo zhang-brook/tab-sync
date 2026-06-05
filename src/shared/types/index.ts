@@ -3,18 +3,6 @@ export type { Workspace, TabReference } from './workspace'
 export type { Device } from './device'
 export type { AuthState, AuthUser, LoginRequest, LoginResponse, VerifyTokenResponse } from './auth'
 export type {
-  SyncStatus,
-  SyncEventsRequest,
-  SyncEventsResponse,
-  StartupRequest,
-  StartupTab,
-  StartupResponse,
-  RebuildRequest,
-  RebuildTab,
-  RebuildResponse,
-  SyncPullResponse,
-} from './sync'
-export type {
   MessageAction,
   ExtensionMessage,
   MessageResponse,
@@ -23,4 +11,6 @@ export type {
   WorkspacesData,
   LoginData,
   DevicesData,
+  WorkspaceTabPayload,
+  WorkspaceTabsSummaryData,
 } from './messages'

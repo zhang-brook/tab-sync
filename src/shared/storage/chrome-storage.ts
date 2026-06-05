@@ -9,8 +9,6 @@ interface StorageSchema {
   [STORAGE_KEYS.DEVICE_ID]: string | null
   [STORAGE_KEYS.DEVICE_NAME]: string | null
   [STORAGE_KEYS.API_BASE_URL]: string
-  [STORAGE_KEYS.SYNC_INTERVAL]: number
-  [STORAGE_KEYS.LAST_SYNC_AT]: string | null
 }
 
 /** 默认值 */
@@ -21,8 +19,6 @@ const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,
   [STORAGE_KEYS.API_BASE_URL]: '',
-  [STORAGE_KEYS.SYNC_INTERVAL]: 5,
-  [STORAGE_KEYS.LAST_SYNC_AT]: null,
 }
 
 /**

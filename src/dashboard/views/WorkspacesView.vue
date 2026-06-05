@@ -2,22 +2,33 @@
   <div class="workspaces-view">
     <!-- 工具栏 -->
     <div class="toolbar">
-      <el-button type="primary" @click="showCreateDialog">
-        <el-icon><Plus /></el-icon>
-        新建工作组
-      </el-button>
-      <el-button @click="loadWorkspaces">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
+      <div class="toolbar-left">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索工作组名称..."
+          clearable
+          style="width: 240px"
+          :prefix-icon="Search"
+        />
+      </div>
+      <div class="toolbar-right">
+        <el-button type="primary" @click="showCreateDialog">
+          <el-icon><Plus /></el-icon>
+          新建工作组
+        </el-button>
+        <el-button @click="loadWorkspaces">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+      </div>
     </div>
 
     <!-- 工作组列表 -->
     <div v-loading="loading" class="workspace-list">
-      <el-empty v-if="workspaces.length === 0 && !loading" description="暂无工作组，点击上方按钮创建" />
+      <el-empty v-if="filteredWorkspaces.length === 0 && !loading" description="暂无工作组，请先在标签页视图中选择标签页并创建" />
 
       <el-card
-        v-for="ws in workspaces"
+        v-for="ws in filteredWorkspaces"
         :key="ws.id"
         shadow="hover"
         class="workspace-card"
@@ -36,7 +47,7 @@
                   <el-icon><FolderOpened /></el-icon>
                 </el-button>
               </el-tooltip>
-              <el-tooltip content="在新窗口中打开" placement="top">
+              <el-tooltip content="在新窗口中打开所有" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(ws.id, true)">
                   <el-icon><CopyDocument /></el-icon>
                 </el-button>
@@ -69,6 +80,11 @@
               <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
               <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
             </div>
+            <el-tooltip content="在新标签页中打开" placement="top">
+              <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
+                <el-icon><View /></el-icon>
+              </el-button>
+            </el-tooltip>
           </div>
         </div>
         <el-empty v-else :image-size="60" description="工作组内暂无标签页" />
@@ -84,7 +100,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEditing ? '编辑工作组' : '新建工作组'"
-      width="560px"
+      width="600px"
       destroy-on-close
     >
       <el-form label-width="80px" label-position="left">
@@ -96,9 +112,9 @@
         </el-form-item>
         <el-form-item label="选择标签页">
           <div class="tab-selector">
-            <el-checkbox-group v-model="formData.tabIds">
-              <div v-for="tab in allOpenTabs" :key="tab.id" class="tab-checkbox-item">
-                <el-checkbox :value="tab.id">
+            <el-checkbox-group v-model="formData.checkIds">
+              <div v-for="tab in currentOpenTabs" :key="tab.chromeTabId" class="tab-checkbox-item">
+                <el-checkbox :value="tab.chromeTabId">
                   <div class="tab-checkbox-content">
                     <img
                       v-if="tab.favIconUrl"
@@ -112,7 +128,7 @@
                 </el-checkbox>
               </div>
             </el-checkbox-group>
-            <el-empty v-if="allOpenTabs.length === 0" :image-size="40" description="暂无打开的标签页" />
+            <el-empty v-if="currentOpenTabs.length === 0" :image-size="40" description="暂无打开的标签页" />
           </div>
         </el-form-item>
       </el-form>
@@ -128,32 +144,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Plus, Refresh, FolderOpened, CopyDocument, Edit, Delete } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Edit, Delete, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
-import type { TabRecord, TabsData, Workspace, WorkspacesData } from '../../shared/types'
+import type { Workspace, WorkspacesData, WorkspaceTabPayload } from '../../shared/types'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
+const searchKeyword = ref('')
 
-// 对话框相关
+// 对话框
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const saving = ref(false)
 const editingId = ref('')
-const allOpenTabs = ref<TabRecord[]>([])
+const currentOpenTabs = ref<Array<{ chromeTabId: number; url: string; title: string; favIconUrl: string }>>([])
 
 const formData = ref({
   name: '',
   color: '#409EFF',
-  tabIds: [] as string[],
+  checkIds: [] as number[],
 })
 
 const presetColors = [
   '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
   '#909399', '#00BCD4', '#9C27B0', '#FF5722',
 ]
+
+const filteredWorkspaces = computed(() => {
+  if (!searchKeyword.value.trim()) return workspaces.value
+  const kw = searchKeyword.value.trim().toLowerCase()
+  return workspaces.value.filter(w => w.name.toLowerCase().includes(kw))
+})
 
 onMounted(() => {
   loadWorkspaces()
@@ -168,18 +191,21 @@ async function loadWorkspaces() {
   loading.value = false
 }
 
-async function loadOpenTabs() {
-  const res = await sendMessage<TabsData>({ action: 'GET_TABS', payload: { status: 'open' } })
-  if (res.success && res.data) {
-    allOpenTabs.value = res.data.tabs
-  }
+async function loadOpenTabsForDialog() {
+  const chromeTabs = await chrome.tabs.query({})
+  currentOpenTabs.value = chromeTabs.map(tab => ({
+    chromeTabId: tab.id ?? 0,
+    url: tab.url || tab.pendingUrl || '',
+    title: tab.title || '',
+    favIconUrl: tab.favIconUrl || '',
+  }))
 }
 
 function showCreateDialog() {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: '#409EFF', tabIds: [] }
-  loadOpenTabs()
+  formData.value = { name: '', color: '#409EFF', checkIds: [] }
+  loadOpenTabsForDialog()
   dialogVisible.value = true
 }
 
@@ -189,9 +215,9 @@ function showEditDialog(ws: Workspace) {
   formData.value = {
     name: ws.name,
     color: ws.color,
-    tabIds: ws.tabs.map((t) => t.tabId),
+    checkIds: [],
   }
-  loadOpenTabs()
+  loadOpenTabsForDialog()
   dialogVisible.value = true
 }
 
@@ -203,6 +229,15 @@ async function handleSave() {
 
   saving.value = true
 
+  // 构建标签页数据
+  const selectedTabs = currentOpenTabs.value.filter(t => formData.value.checkIds.includes(t.chromeTabId))
+  const tabs: WorkspaceTabPayload[] = selectedTabs.map(t => ({
+    url: t.url,
+    title: t.title,
+    favIconUrl: t.favIconUrl,
+    chromeTabId: t.chromeTabId,
+  }))
+
   if (isEditing.value) {
     const res = await sendMessage({
       action: 'UPDATE_WORKSPACE',
@@ -210,7 +245,7 @@ async function handleSave() {
         id: editingId.value,
         name: formData.value.name.trim(),
         color: formData.value.color,
-        tabIds: formData.value.tabIds,
+        tabs,
       },
     })
     if (res.success) {
@@ -224,7 +259,7 @@ async function handleSave() {
       payload: {
         name: formData.value.name.trim(),
         color: formData.value.color,
-        tabIds: formData.value.tabIds,
+        tabs,
       },
     })
     if (res.success) {
@@ -242,12 +277,12 @@ async function handleSave() {
 async function handleDelete(ws: Workspace) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除工作组"${ws.name}"吗？标签页本身不会被关闭。`,
+      `确定要删除工作组"${ws.name}"吗？`,
       '删除工作组',
       { type: 'warning' },
     )
   } catch {
-    return // 用户取消
+    return
   }
 
   const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: ws.id } })
@@ -278,7 +313,10 @@ async function handleOpenWorkspace(id: string, newWindow: boolean) {
   }
 }
 
-/** 格式化时间 */
+function openSingleTab(url: string) {
+  chrome.tabs.create({ url })
+}
+
 function formatTime(iso: string): string {
   if (!iso) return '--'
   const d = new Date(iso)
@@ -296,6 +334,15 @@ function formatTime(iso: string): string {
 
 .toolbar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
@@ -408,7 +455,6 @@ function formatTime(iso: string): string {
   color: #c0c4cc;
 }
 
-/* 对话框内标签页选择器 */
 .tab-selector {
   max-height: 300px;
   overflow-y: auto;

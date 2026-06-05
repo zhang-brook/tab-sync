@@ -2,7 +2,6 @@ import type { TabRecord } from './tab'
 import type { Workspace } from './workspace'
 import type { Device } from './device'
 import type { AuthState, AuthUser } from './auth'
-import type { SyncStatus } from './sync'
 
 // ============ 消息 Action 定义 ============
 
@@ -12,7 +11,6 @@ export type MessageAction =
   | 'LOGIN_WITH_TOKEN'
   | 'LOGIN_WITH_CREDENTIALS'
   | 'LOGOUT'
-  | 'SYNC_NOW'
   | 'GET_TABS'
   | 'CLOSE_TAB'
   | 'CLOSE_TABS_BATCH'
@@ -24,6 +22,7 @@ export type MessageAction =
   | 'OPEN_WORKSPACE'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
+  | 'GET_WORKSPACE_TABS_SUMMARY'
 
 // ============ 请求消息定义 ============
 
@@ -43,10 +42,6 @@ export interface LoginWithCredentialsMessage {
 
 export interface LogoutMessage {
   action: 'LOGOUT'
-}
-
-export interface SyncNowMessage {
-  action: 'SYNC_NOW'
 }
 
 export interface GetTabsMessage {
@@ -78,14 +73,23 @@ export interface GetWorkspacesMessage {
   action: 'GET_WORKSPACES'
 }
 
+/** 标签页数据（前端传给后端创建工作组的标签页信息） */
+export interface WorkspaceTabPayload {
+  url: string
+  title: string
+  favIconUrl: string
+  /** Chrome 本地 tabId */
+  chromeTabId: number
+}
+
 export interface CreateWorkspaceMessage {
   action: 'CREATE_WORKSPACE'
-  payload: { name: string; color: string; icon?: string; tabIds: string[] }
+  payload: { name: string; color: string; icon?: string; tabs: WorkspaceTabPayload[] }
 }
 
 export interface UpdateWorkspaceMessage {
   action: 'UPDATE_WORKSPACE'
-  payload: { id: string; name?: string; color?: string; icon?: string; tabIds?: string[] }
+  payload: { id: string; name?: string; color?: string; icon?: string; tabs?: WorkspaceTabPayload[] }
 }
 
 export interface DeleteWorkspaceMessage {
@@ -106,13 +110,16 @@ export interface GetDevicesMessage {
   action: 'GET_DEVICES'
 }
 
+export interface GetWorkspaceTabsSummaryMessage {
+  action: 'GET_WORKSPACE_TABS_SUMMARY'
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
   | LoginWithTokenMessage
   | LoginWithCredentialsMessage
   | LogoutMessage
-  | SyncNowMessage
   | GetTabsMessage
   | CloseTabMessage
   | CloseTabsBatchMessage
@@ -124,6 +131,7 @@ export type ExtensionMessage =
   | OpenWorkspaceMessage
   | OpenDashboardMessage
   | GetDevicesMessage
+  | GetWorkspaceTabsSummaryMessage
 
 // ============ 响应定义 ============
 
@@ -137,10 +145,6 @@ export interface MessageResponse<T = unknown> {
 /** GET_STATE 响应数据 */
 export interface StateData {
   auth: AuthState
-  syncStatus: SyncStatus
-  lastSyncAt: string | null
-  /** 待同步事件数量 */
-  pendingCount: number
   tabCount: {
     open: number
     closed: number
@@ -165,4 +169,14 @@ export interface LoginData {
 /** GET_DEVICES 响应数据 */
 export interface DevicesData {
   devices: Device[]
+}
+
+/** GET_WORKSPACE_TABS_SUMMARY 响应数据 */
+export interface WorkspaceTabsSummaryData {
+  summaries: Array<{
+    workspaceId: string
+    workspaceName: string
+    workspaceColor: string
+    tabs: Array<{ tabId: string; url: string }>
+  }>
 }

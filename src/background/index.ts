@@ -1,6 +1,5 @@
 import { handleMessage } from './message-handler'
 import { initTabMonitor } from './tab-monitor'
-import { initAlarmManager, startAlarms } from './alarm-manager'
 import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
@@ -11,25 +10,19 @@ logger.info('Service Worker started')
 // 注册标签页事件监听（必须在顶层同步注册，SW 重启时也能正确绑定）
 initTabMonitor()
 
-// 注册定时器事件监听（同样必须在顶层同步注册）
-initAlarmManager()
-
 // 扩展安装/更新时初始化
 chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Extension installed/updated:', details.reason)
   const deviceId = await getOrCreateDeviceId()
   const deviceName = await getDeviceName()
   logger.info('Device ID:', deviceId, 'Name:', deviceName)
-  // 启动定时同步和心跳（内部会先执行 startup sync）
-  await startAlarms()
   // 尝试向后端注册设备（后端未部署时静默失败）
   await tryRegisterDevice(deviceId)
 })
 
-// 浏览器启动时也做一次启动对账并启动定时器
+// 浏览器启动时注册设备
 chrome.runtime.onStartup.addListener(async () => {
   logger.info('Browser startup')
-  await startAlarms()
   // 尝试注册/更新设备
   const deviceId = await getOrCreateDeviceId()
   await tryRegisterDevice(deviceId)

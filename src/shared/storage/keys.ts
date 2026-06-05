@@ -14,10 +14,6 @@ export const STORAGE_KEYS = {
   DEVICE_NAME: 'device_name',
   /** 后端 API 地址 */
   API_BASE_URL: 'api_base_url',
-  /** 同步间隔 (分钟) */
-  SYNC_INTERVAL: 'sync_interval',
-  /** 上次同步时间 (ISO 字符串) */
-  LAST_SYNC_AT: 'last_sync_at',
 } as const
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS]
