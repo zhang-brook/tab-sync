@@ -340,7 +340,7 @@ Background Service Worker 的消息处理分发表：
 ## 5. 后端 OpenAPI 接口设计
 
 ### 基础信息
-- Base URL: `{configurable}/api/v1`
+- Base URL: `{configurable}/v1`
 - 认证: 除登录接口外，所有请求需携带 `Authorization: Bearer <token>`
 - 所有请求携带 `X-Device-Id` header
 

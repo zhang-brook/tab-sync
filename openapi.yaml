@@ -3,17 +3,17 @@ info:
   title: SpiderMemos Tab Sync API
   description: |
     SpiderMemos 浏览器标签页同步扩展的后端 API 规范。
-    
+
     ## 认证方式
     使用 Bearer Token 认证，通过 `Authorization: Bearer <token>` 请求头传递。
-    
+
     ## 公共请求头
     | Header | 必需 | 说明 |
     |--------|------|------|
     | Authorization | 是（除登录接口外） | Bearer Token |
     | X-Device-Id | 否 | 当前设备 UUID |
     | Content-Type | 是 | application/json |
-    
+
     ## 错误响应格式
     所有接口在出错时返回统一的错误格式：
     ```json
@@ -43,7 +43,7 @@ tags:
 
 paths:
   # ============ Auth ============
-  /api/v1/auth/login:
+  /v1/auth/login:
     post:
       tags: [Auth]
       summary: 账号密码登录
@@ -76,7 +76,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/auth/verify-token:
+  /v1/auth/verify-token:
     post:
       tags: [Auth]
       summary: 验证 Token 有效性
@@ -106,7 +106,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/auth/logout:
+  /v1/auth/logout:
     post:
       tags: [Auth]
       summary: 登出
@@ -125,7 +125,7 @@ paths:
                     example: true
 
   # ============ Sync ============
-  /api/v1/sync/events:
+  /v1/sync/events:
     post:
       tags: [Sync]
       summary: 增量事件同步
@@ -148,7 +148,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/sync/full:
+  /v1/sync/full:
     post:
       tags: [Sync]
       summary: 全量状态对账
@@ -171,7 +171,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/sync/pull:
+  /v1/sync/pull:
     get:
       tags: [Sync]
       summary: 拉取其他设备的变更
@@ -203,7 +203,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 
   # ============ Devices ============
-  /api/v1/devices:
+  /v1/devices:
     get:
       tags: [Devices]
       summary: 获取当前用户的所有已注册设备
@@ -224,7 +224,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/devices/register:
+  /v1/devices/register:
     post:
       tags: [Devices]
       summary: 注册或更新设备信息
@@ -266,7 +266,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/devices/{deviceId}:
+  /v1/devices/{deviceId}:
     patch:
       tags: [Devices]
       summary: 更新设备信息
@@ -303,7 +303,7 @@ paths:
         '404':
           description: 设备不存在
 
-  /api/v1/devices/{deviceId}/heartbeat:
+  /v1/devices/{deviceId}/heartbeat:
     post:
       tags: [Devices]
       summary: 设备心跳
