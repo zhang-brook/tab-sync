@@ -7,6 +7,9 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import manifest from './src/manifest'
 
 export default defineConfig({
+  server: {
+    port: 6886,
+  },
   plugins: [
     vue(),
     crx({ manifest }),
