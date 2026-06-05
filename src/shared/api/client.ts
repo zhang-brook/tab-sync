@@ -27,7 +27,10 @@ let refreshPromise: Promise<boolean> | null = null
  */
 async function doRefreshToken(refreshToken: string): Promise<boolean> {
   const baseUrl = await getBaseUrl()
-  if (!baseUrl) return false
+  if (!baseUrl) {
+    logger.warn('Token 续签失败：未配置后端地址')
+    return false
+  }
 
   try {
     const res = await fetch(`${baseUrl}/v1/tab-sync/auth/refresh`, {
@@ -36,12 +39,26 @@ async function doRefreshToken(refreshToken: string): Promise<boolean> {
       body: JSON.stringify({ refreshToken }),
     })
 
-    if (res.status === 401) {
+    logger.info(`Token 续签响应: HTTP ${res.status}`)
+
+    const json = await res.json().catch(() => null)
+
+    if (!json) {
+      logger.warn('Token 续签失败：响应体解析失败')
       return false
     }
 
-    const json = await res.json().catch(() => null)
+    if (res.status === 401) {
+      logger.warn('Token 续签失败：服务端返回 401')
+      return false
+    }
+
     // CommonReturn 解包: { code, success, data, ... }
+    if (json.success === false) {
+      logger.warn('Token 续签失败：', json.message || 'refresh_token 无效或已过期')
+      return false
+    }
+
     const data = json?.data
     if (data?.accessToken) {
       await storage.set(STORAGE_KEYS.AUTH_TOKEN, data.accessToken)
@@ -49,9 +66,11 @@ async function doRefreshToken(refreshToken: string): Promise<boolean> {
       logger.info('Token 续签成功')
       return true
     }
+
+    logger.warn('Token 续签失败：响应中缺少 accessToken', json)
     return false
   } catch (err) {
-    logger.error('Token 刷新请求失败:', err)
+    logger.error('Token 刷新请求异常:', err)
     return false
   }
 }
@@ -132,6 +151,9 @@ async function request<T>(
           logger.info('Token 续签成功，重试原请求')
           return request<T>(method, path, body)
         }
+        logger.warn('Token 续签失败，清除认证状态')
+      } else {
+        logger.warn('没有 refresh_token，无法续签')
       }
 
       // 刷新失败或无可用的 refresh_token，清除认证
