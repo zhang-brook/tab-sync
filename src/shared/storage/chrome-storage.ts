@@ -1,20 +1,16 @@
 import { STORAGE_KEYS } from './keys'
-import type { TabRecord, TabEvent, Workspace, AuthUser, SyncState } from '../types'
+import type { AuthUser } from '../types'
 
-/** chrome.storage.local 数据结构映射 */
+/** chrome.storage.local 数据结构映射 (v2: 仅认证/设备/设置) */
 interface StorageSchema {
   [STORAGE_KEYS.AUTH_TOKEN]: string | null
   [STORAGE_KEYS.REFRESH_TOKEN]: string | null
   [STORAGE_KEYS.AUTH_USER]: AuthUser | null
   [STORAGE_KEYS.DEVICE_ID]: string | null
   [STORAGE_KEYS.DEVICE_NAME]: string | null
-  [STORAGE_KEYS.TAB_RECORDS]: Record<string, TabRecord>
-  [STORAGE_KEYS.TAB_ID_MAP]: Record<number, string>
-  [STORAGE_KEYS.SYNC_STATE]: SyncState
-  [STORAGE_KEYS.PENDING_EVENTS]: TabEvent[]
-  [STORAGE_KEYS.WORKSPACES]: Workspace[]
   [STORAGE_KEYS.API_BASE_URL]: string
   [STORAGE_KEYS.SYNC_INTERVAL]: number
+  [STORAGE_KEYS.LAST_SYNC_AT]: string | null
 }
 
 /** 默认值 */
@@ -24,17 +20,9 @@ const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.AUTH_USER]: null,
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,
-  [STORAGE_KEYS.TAB_RECORDS]: {},
-  [STORAGE_KEYS.TAB_ID_MAP]: {},
-  [STORAGE_KEYS.SYNC_STATE]: {
-    lastSyncAt: null,
-    pendingEvents: [],
-    status: 'idle',
-  },
-  [STORAGE_KEYS.PENDING_EVENTS]: [],
-  [STORAGE_KEYS.WORKSPACES]: [],
   [STORAGE_KEYS.API_BASE_URL]: '',
   [STORAGE_KEYS.SYNC_INTERVAL]: 5,
+  [STORAGE_KEYS.LAST_SYNC_AT]: null,
 }
 
 /**

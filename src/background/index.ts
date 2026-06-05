@@ -1,6 +1,7 @@
 import { handleMessage } from './message-handler'
-import { initTabMonitor, scanAllTabs } from './tab-monitor'
+import { initTabMonitor } from './tab-monitor'
 import { initAlarmManager, startAlarms } from './alarm-manager'
+import { performStartupSync } from './sync-engine'
 import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
@@ -20,18 +21,18 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   const deviceId = await getOrCreateDeviceId()
   const deviceName = await getDeviceName()
   logger.info('Device ID:', deviceId, 'Name:', deviceName)
-  // 全量扫描当前已打开的标签页
-  await scanAllTabs()
+  // 启动对账：与后端比对标签页状态
+  await performStartupSync()
   // 启动定时同步和心跳
   await startAlarms()
   // 尝试向后端注册设备（后端未部署时静默失败）
   await tryRegisterDevice(deviceId)
 })
 
-// 浏览器启动时也做一次全量扫描并启动定时器
+// 浏览器启动时也做一次启动对账并启动定时器
 chrome.runtime.onStartup.addListener(async () => {
   logger.info('Browser startup')
-  await scanAllTabs()
+  await performStartupSync()
   await startAlarms()
   // 尝试注册/更新设备
   const deviceId = await getOrCreateDeviceId()

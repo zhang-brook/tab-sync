@@ -1,4 +1,6 @@
-/** chrome.storage.local 的存储 key 常量 */
+/** chrome.storage.local 的存储 key 常量
+ * v2: 仅保留认证/设备/设置，业务数据全部走后端 API
+ */
 export const STORAGE_KEYS = {
   /** 认证 Token */
   AUTH_TOKEN: 'auth_token',
@@ -10,20 +12,12 @@ export const STORAGE_KEYS = {
   DEVICE_ID: 'device_id',
   /** 设备名称 */
   DEVICE_NAME: 'device_name',
-  /** 本地标签页记录 Map<tabUUID, TabRecord> */
-  TAB_RECORDS: 'tab_records',
-  /** Chrome tabId → 扩展 UUID 的映射表 */
-  TAB_ID_MAP: 'tab_id_map',
-  /** 同步状态 */
-  SYNC_STATE: 'sync_state',
-  /** 待同步事件队列 */
-  PENDING_EVENTS: 'pending_events',
-  /** 工作组列表 */
-  WORKSPACES: 'workspaces',
   /** 后端 API 地址 */
   API_BASE_URL: 'api_base_url',
   /** 同步间隔 (分钟) */
   SYNC_INTERVAL: 'sync_interval',
+  /** 上次同步时间 (ISO 字符串) */
+  LAST_SYNC_AT: 'last_sync_at',
 } as const
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS]

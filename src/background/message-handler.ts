@@ -1,9 +1,10 @@
 import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, WorkspacesData, DevicesData } from '../shared/types'
-import type { Workspace, TabReference } from '../shared/types'
-import { generateUUID, nowISO } from '../shared/utils/tab-utils'
+import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { getDevices } from '../shared/api/devices'
+import { getTabs } from '../shared/api/tabs'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from '../shared/api/workspaces'
 import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { triggerSync } from './sync-engine'
@@ -72,17 +73,30 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
 /** 获取扩展当前状态 */
 async function handleGetState(): Promise<MessageResponse<StateData>> {
-  const { auth_token, auth_user, sync_state } = await storage.getMultiple([
+  const { auth_token, auth_user } = await storage.getMultiple([
     STORAGE_KEYS.AUTH_TOKEN,
     STORAGE_KEYS.AUTH_USER,
-    STORAGE_KEYS.SYNC_STATE,
   ])
 
-  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-  const pendingEvents = await storage.get(STORAGE_KEYS.PENDING_EVENTS)
-  const tabs = Object.values(tabRecords)
-  const openCount = tabs.filter(t => t.status === 'open').length
-  const closedCount = tabs.filter(t => t.status === 'closed').length
+  const lastSyncAt = await storage.get(STORAGE_KEYS.LAST_SYNC_AT)
+
+  // 从 session storage 获取待同步事件数
+  const sessionData = await chrome.storage.session.get('pending_events')
+  const pendingEvents: unknown[] = (sessionData['pending_events'] as unknown[]) || []
+
+  // 尝试从后端获取标签页计数（后端不可用时降级为 0）
+  let openCount = 0
+  let closedCount = 0
+  if (auth_token) {
+    try {
+      const openRes = await getTabs({ status: 'open', limit: 1 })
+      if (openRes.ok && openRes.data) openCount = openRes.data.total
+      const closedRes = await getTabs({ status: 'closed', limit: 1 })
+      if (closedRes.ok && closedRes.data) closedCount = closedRes.data.total
+    } catch {
+      // 后端不可用，降级处理
+    }
+  }
 
   return {
     success: true,
@@ -92,8 +106,8 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
         token: auth_token,
         user: auth_user,
       },
-      syncStatus: sync_state.status,
-      lastSyncAt: sync_state.lastSyncAt,
+      syncStatus: pendingEvents.length > 0 ? 'syncing' : 'idle',
+      lastSyncAt: lastSyncAt || null,
       pendingCount: pendingEvents.length,
       tabCount: { open: openCount, closed: closedCount },
     },
@@ -183,63 +197,48 @@ async function handleOpenDashboard(): Promise<MessageResponse> {
 
 // ============ 标签页操作 ============
 
-/** 获取标签页列表（支持筛选） */
+/** 获取标签页列表（支持筛选，从后端 API 获取） */
 async function handleGetTabs(
   filters?: { status?: string; search?: string; deviceId?: string; workspaceId?: string },
 ): Promise<MessageResponse<TabsData>> {
-  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-  let tabs = Object.values(tabRecords)
-
-  if (filters?.status) {
-    tabs = tabs.filter(t => t.status === filters.status)
+  const res = await getTabs({ ...filters })
+  if (res.ok && res.data) {
+    return { success: true, data: { tabs: res.data.tabs } }
   }
-  if (filters?.deviceId) {
-    tabs = tabs.filter(t => t.deviceId === filters.deviceId)
-  }
-  if (filters?.workspaceId) {
-    tabs = tabs.filter(t => t.workspaceIds.includes(filters.workspaceId!))
-  }
-  if (filters?.search) {
-    const keyword = filters.search.toLowerCase()
-    tabs = tabs.filter(
-      t => t.title.toLowerCase().includes(keyword) || t.url.toLowerCase().includes(keyword),
-    )
-  }
-
-  // 按最近访问时间倒序
-  tabs.sort((a, b) => new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime())
-
-  return { success: true, data: { tabs } }
+  // 后端不可用时返回空列表
+  logger.warn('getTabs API failed:', res.error)
+  return { success: true, data: { tabs: [] } }
 }
 
-/** 关闭本地标签页，保留远端记录 */
+/** 关闭本地标签页（通过 session storage 查找 chromeTabId） */
 async function handleCloseTab(tabId: string): Promise<MessageResponse> {
-  const records = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-  const record = records[tabId]
-  if (!record) {
-    return { success: false, error: '标签页不存在' }
+  // 从 session storage 查找对应的 chromeTabId（反向映射：UUID → chromeTabId）
+  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+  const chromeTabIdStr = Object.keys(mappings).find(key => mappings[key] === tabId)
+  if (!chromeTabIdStr) {
+    return { success: false, error: '标签页不在当前会话中' }
   }
 
-  if (record.status === 'open') {
-    try {
-      await chrome.tabs.remove(record.chromeTabId)
-    } catch {
-      // 标签页可能已经被用户手动关闭
-    }
+  try {
+    await chrome.tabs.remove(Number(chromeTabIdStr))
+  } catch {
+    // 标签页可能已经被用户手动关闭
   }
 
   return { success: true }
 }
 
-/** 批量关闭标签页 */
+/** 批量关闭标签页（通过 session storage 查找 chromeTabId） */
 async function handleCloseTabsBatch(tabIds: string[]): Promise<MessageResponse> {
-  const records = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+  const uuidSet = new Set(tabIds)
   const chromeTabIds: number[] = []
 
-  for (const tabId of tabIds) {
-    const record = records[tabId]
-    if (record && record.status === 'open') {
-      chromeTabIds.push(record.chromeTabId)
+  for (const [chromeTabIdStr, uuid] of Object.entries(mappings)) {
+    if (uuidSet.has(uuid)) {
+      chromeTabIds.push(Number(chromeTabIdStr))
     }
   }
 
@@ -263,157 +262,65 @@ async function handleReopenTab(url: string): Promise<MessageResponse> {
 
 // ============ 工作组操作 ============
 
-/** 获取所有工作组 */
+/** 获取所有工作组（从后端 API 获取） */
 async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
-  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
-  return { success: true, data: { workspaces } }
+  const res = await getWorkspaces()
+  if (res.ok && res.data) {
+    return { success: true, data: { workspaces: res.data.workspaces } }
+  }
+  logger.warn('getWorkspaces API failed:', res.error)
+  return { success: false, error: res.error || '获取工作组失败' }
 }
 
-/** 创建工作组 */
+/** 创建工作组（通过后端 API） */
 async function handleCreateWorkspace(
   payload: { name: string; color: string; icon?: string; tabIds: string[] },
 ): Promise<MessageResponse> {
-  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
-  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-  const now = nowISO()
-
-  // 根据 tabIds 构建 TabReference 快照
-  const tabs: TabReference[] = payload.tabIds
-    .map((id) => {
-      const record = tabRecords[id]
-      if (!record) return null
-      return {
-        tabId: id,
-        url: record.url,
-        title: record.title,
-        favIconUrl: record.favIconUrl,
-        addedAt: now,
-      }
-    })
-    .filter((t): t is TabReference => t !== null)
-
-  const workspace: Workspace = {
-    id: generateUUID(),
-    name: payload.name,
-    color: payload.color,
-    icon: payload.icon,
-    tabs,
-    createdAt: now,
-    updatedAt: now,
+  const res = await createWorkspace(payload)
+  if (res.ok && res.data) {
+    logger.info('Workspace created:', payload.name)
+    return { success: true, data: { workspace: res.data.workspace } }
   }
-
-  workspaces.push(workspace)
-  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
-
-  // 更新关联标签页的 workspaceIds
-  for (const tabRef of tabs) {
-    const record = tabRecords[tabRef.tabId]
-    if (record && !record.workspaceIds.includes(workspace.id)) {
-      record.workspaceIds.push(workspace.id)
-    }
-  }
-  await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
-
-  logger.info('Workspace created:', workspace.name)
-  return { success: true, data: { workspace } }
+  logger.warn('createWorkspace API failed:', res.error)
+  return { success: false, error: res.error || '创建工作组失败' }
 }
 
-/** 更新工作组 */
+/** 更新工作组（通过后端 API） */
 async function handleUpdateWorkspace(
   payload: { id: string; name?: string; color?: string; icon?: string; tabIds?: string[] },
 ): Promise<MessageResponse> {
-  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
-  const idx = workspaces.findIndex((w) => w.id === payload.id)
-  if (idx === -1) {
-    return { success: false, error: '工作组不存在' }
+  const { id, ...updatePayload } = payload
+  const res = await updateWorkspace(id, updatePayload)
+  if (res.ok) {
+    logger.info('Workspace updated:', id)
+    return { success: true }
   }
-
-  const workspace = workspaces[idx]
-  const now = nowISO()
-
-  if (payload.name !== undefined) workspace.name = payload.name
-  if (payload.color !== undefined) workspace.color = payload.color
-  if (payload.icon !== undefined) workspace.icon = payload.icon
-
-  // 如果更新了标签页列表
-  if (payload.tabIds !== undefined) {
-    const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-
-    // 移除旧关联
-    for (const oldRef of workspace.tabs) {
-      const record = tabRecords[oldRef.tabId]
-      if (record) {
-        record.workspaceIds = record.workspaceIds.filter((id) => id !== workspace.id)
-      }
-    }
-
-    // 构建新的 TabReference 列表
-    workspace.tabs = payload.tabIds
-      .map((id) => {
-        const record = tabRecords[id]
-        if (!record) return null
-        return {
-          tabId: id,
-          url: record.url,
-          title: record.title,
-          favIconUrl: record.favIconUrl,
-          addedAt: now,
-        }
-      })
-      .filter((t): t is TabReference => t !== null)
-
-    // 添加新关联
-    for (const tabRef of workspace.tabs) {
-      const record = tabRecords[tabRef.tabId]
-      if (record && !record.workspaceIds.includes(workspace.id)) {
-        record.workspaceIds.push(workspace.id)
-      }
-    }
-
-    await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
-  }
-
-  workspace.updatedAt = now
-  workspaces[idx] = workspace
-  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
-
-  logger.info('Workspace updated:', workspace.name)
-  return { success: true }
+  logger.warn('updateWorkspace API failed:', res.error)
+  return { success: false, error: res.error || '更新工作组失败' }
 }
 
-/** 删除工作组 */
+/** 删除工作组（通过后端 API） */
 async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
-  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
-  const idx = workspaces.findIndex((w) => w.id === id)
-  if (idx === -1) {
-    return { success: false, error: '工作组不存在' }
+  const res = await deleteWorkspace(id)
+  if (res.ok) {
+    logger.info('Workspace deleted:', id)
+    return { success: true }
   }
-
-  const workspace = workspaces[idx]
-
-  // 清除关联标签页的 workspaceIds
-  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
-  for (const tabRef of workspace.tabs) {
-    const record = tabRecords[tabRef.tabId]
-    if (record) {
-      record.workspaceIds = record.workspaceIds.filter((wid) => wid !== id)
-    }
-  }
-  await storage.set(STORAGE_KEYS.TAB_RECORDS, tabRecords)
-
-  workspaces.splice(idx, 1)
-  await storage.set(STORAGE_KEYS.WORKSPACES, workspaces)
-
-  logger.info('Workspace deleted:', workspace.name)
-  return { success: true }
+  logger.warn('deleteWorkspace API failed:', res.error)
+  return { success: false, error: res.error || '删除工作组失败' }
 }
 
 /** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */
 async function handleOpenWorkspace(
   payload: { id: string; tabIds?: string[]; newWindow?: boolean },
 ): Promise<MessageResponse> {
-  const workspaces = await storage.get(STORAGE_KEYS.WORKSPACES)
-  const workspace = workspaces.find((w) => w.id === payload.id)
+  // 从后端获取工作组数据
+  const res = await getWorkspaces()
+  if (!res.ok || !res.data) {
+    return { success: false, error: res.error || '获取工作组失败' }
+  }
+
+  const workspace = res.data.workspaces.find((w) => w.id === payload.id)
   if (!workspace) {
     return { success: false, error: '工作组不存在' }
   }
@@ -427,21 +334,29 @@ async function handleOpenWorkspace(
     return { success: false, error: '没有可打开的标签页' }
   }
 
-  const tabRecords = await storage.get(STORAGE_KEYS.TAB_RECORDS)
+  // 从 session storage 获取当前打开的标签页映射
+  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
+  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
+  // 构建反向映射: UUID → chromeTabId
+  const uuidToChromeTabId: Record<string, number> = {}
+  for (const [chromeTabIdStr, uuid] of Object.entries(mappings)) {
+    uuidToChromeTabId[uuid] = Number(chromeTabIdStr)
+  }
+
   let opened = 0
   let alreadyOpen = 0
 
   // 分类: 已打开的标签页 vs 需要重新打开的标签页
-  const toActivate: { chromeTabId: number; windowId: number }[] = []
+  const toActivate: { chromeTabId: number; windowId?: number }[] = []
   const toReopen: TabReference[] = []
 
   for (const tabRef of tabsToOpen) {
-    const record = tabRecords[tabRef.tabId]
-    if (record && record.status === 'open') {
+    const chromeTabId = uuidToChromeTabId[tabRef.tabId]
+    if (chromeTabId != null) {
       // 尝试确认 Chrome 标签页是否真的还存在
       try {
-        await chrome.tabs.get(record.chromeTabId)
-        toActivate.push({ chromeTabId: record.chromeTabId, windowId: record.windowId })
+        const tab = await chrome.tabs.get(chromeTabId)
+        toActivate.push({ chromeTabId, windowId: tab.windowId })
         continue
       } catch {
         // Chrome 标签页已不存在（可能被用户关闭但事件未捕获），转入重新打开

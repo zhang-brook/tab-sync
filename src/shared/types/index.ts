@@ -2,7 +2,18 @@ export type { TabRecord, TabStatus, TabEvent, TabEventType } from './tab'
 export type { Workspace, TabReference } from './workspace'
 export type { Device } from './device'
 export type { AuthState, AuthUser, LoginRequest, LoginResponse, VerifyTokenResponse } from './auth'
-export type { SyncStatus, SyncState, SyncEventsRequest, SyncEventsResponse, SyncFullRequest, SyncFullResponse, SyncPullResponse } from './sync'
+export type {
+  SyncStatus,
+  SyncEventsRequest,
+  SyncEventsResponse,
+  StartupRequest,
+  StartupTab,
+  StartupResponse,
+  RebuildRequest,
+  RebuildTab,
+  RebuildResponse,
+  SyncPullResponse,
+} from './sync'
 export type {
   MessageAction,
   ExtensionMessage,

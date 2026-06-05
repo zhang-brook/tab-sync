@@ -169,8 +169,12 @@ function handleSelectionChange(rows: TabRecord[]) {
 
 /** 切换到指定标签页 */
 function handleSwitchToTab(tab: TabRecord) {
-  chrome.tabs.update(tab.chromeTabId, { active: true })
-  chrome.windows.update(tab.windowId, { focused: true })
+  try {
+    chrome.tabs.update(tab.chromeTabId, { active: true })
+    chrome.windows.update(tab.windowId, { focused: true })
+  } catch {
+    // 标签页可能来自其他设备或已被关闭
+  }
 }
 
 /** 关闭单个标签页 */
