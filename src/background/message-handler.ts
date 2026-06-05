@@ -132,7 +132,7 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
 
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Token login success:', res.data.user.username)
-  // 登录成功后启动定时同步和心跳
+  // 登录成功后启动定时同步和心跳（内部会先执行 startup sync）
   await startAlarms()
   return { success: true, data: { user: res.data.user } }
 }
@@ -154,7 +154,7 @@ async function handleLoginWithCredentials(
   await storage.set(STORAGE_KEYS.REFRESH_TOKEN, res.data.refreshToken)
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Credentials login success:', res.data.user.username)
-  // 登录成功后启动定时同步和心跳
+  // 登录成功后启动定时同步和心跳（内部会先执行 startup sync）
   await startAlarms()
   return { success: true, data: { user: res.data.user } }
 }

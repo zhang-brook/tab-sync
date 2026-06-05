@@ -2,7 +2,7 @@ import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getOrCreateDeviceId } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { ALARM_NAMES, DEFAULT_SYNC_INTERVAL, HEARTBEAT_INTERVAL } from '../shared/constants'
-import { triggerSync } from './sync-engine'
+import { triggerSync, performStartupSync } from './sync-engine'
 import { deviceHeartbeat } from '../shared/api/devices'
 
 /**
@@ -20,8 +20,11 @@ export function initAlarmManager() {
   logger.info('Alarm manager initialized')
 }
 
-/** 启动定时同步和心跳 */
+/** 启动定时同步和心跳（先执行启动对账，再启动定时器） */
 export async function startAlarms() {
+  // 先对账：将当前所有打开的标签页同步到后端
+  await performStartupSync()
+
   const syncInterval = await storage.get(STORAGE_KEYS.SYNC_INTERVAL)
   const interval = syncInterval || DEFAULT_SYNC_INTERVAL
 
