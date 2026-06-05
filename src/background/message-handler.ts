@@ -263,7 +263,7 @@ async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
     return { success: true, data: { workspaces: res.data.workspaces } }
   }
   logger.warn('getWorkspaces API failed:', res.error)
-  return { success: false, error: res.error || '获取工作组失败' }
+  return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
 }
 
 /** 创建工作组（通过后端 API）
@@ -284,7 +284,7 @@ async function handleCreateWorkspace(
     return { success: true, data: { workspace: res.data.workspace, mappings: res.data.mappings } }
   }
   logger.warn('createWorkspace API failed:', res.error)
-  return { success: false, error: res.error || '创建工作组失败' }
+  return { success: false, error: res.error || '创建工作组失败', authError: res.status === 401 }
 }
 
 /** 更新工作组（通过后端 API） */
@@ -305,7 +305,7 @@ async function handleUpdateWorkspace(
     return { success: true }
   }
   logger.warn('updateWorkspace API failed:', res.error)
-  return { success: false, error: res.error || '更新工作组失败' }
+  return { success: false, error: res.error || '更新工作组失败', authError: res.status === 401 }
 }
 
 /** 删除工作组（通过后端 API） */
@@ -316,7 +316,7 @@ async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
     return { success: true }
   }
   logger.warn('deleteWorkspace API failed:', res.error)
-  return { success: false, error: res.error || '删除工作组失败' }
+  return { success: false, error: res.error || '删除工作组失败', authError: res.status === 401 }
 }
 
 /** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */
@@ -326,7 +326,7 @@ async function handleOpenWorkspace(
   // 从后端获取工作组数据
   const res = await getWorkspaces()
   if (!res.ok || !res.data) {
-    return { success: false, error: res.error || '获取工作组失败' }
+    return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
   }
 
   const workspace = res.data.workspaces.find((w) => w.id === payload.id)
@@ -461,6 +461,10 @@ async function handleGetDevices(): Promise<MessageResponse<DevicesData>> {
         success: true,
         data: { devices: [currentDevice, ...remoteDevices] },
       }
+    }
+    // API 失败，如果是认证错误则传播标记
+    if (res.status === 401) {
+      return { success: true, data: { devices: [currentDevice] }, authError: true }
     }
   }
 

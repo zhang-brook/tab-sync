@@ -39,14 +39,30 @@
       </el-main>
     </el-container>
   </el-container>
+
+  <!-- 登录过期遮罩 -->
+  <div v-if="!authenticated" class="auth-overlay">
+    <div class="auth-overlay-card">
+      <el-icon :size="48" color="#f56c6c"><WarningFilled /></el-icon>
+      <h2>登录已过期</h2>
+      <p>请通过扩展弹窗重新登录后再继续使用</p>
+      <el-button type="primary" @click="openPopup">打开弹窗登录</el-button>
+      <el-button text @click="retryCheckAuth">重新检查</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Collection, FolderOpened, Clock, Monitor, Setting } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled } from '@element-plus/icons-vue'
+import { sendMessage } from '../shared/composables/useMessage'
+import { STORAGE_KEYS } from '../shared/storage'
+import type { StateData } from '../shared/types'
 
 const route = useRoute()
+
+const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
 
 const pageTitleMap: Record<string, string> = {
   '/tabs': '标签页管理',
@@ -58,6 +74,36 @@ const pageTitleMap: Record<string, string> = {
 
 const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => pageTitleMap[route.path] || '标签页管理')
+
+// 监听 storage 变化，检测 token 被清除
+function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
+  if (changes[STORAGE_KEYS.AUTH_TOKEN] && !changes[STORAGE_KEYS.AUTH_TOKEN].newValue) {
+    authenticated.value = false
+  }
+}
+
+async function retryCheckAuth() {
+  const res = await sendMessage<StateData>({ action: 'GET_STATE' })
+  if (res.success && res.data) {
+    authenticated.value = res.data.auth?.authenticated ?? false
+  }
+}
+
+function openPopup() {
+  // 通过 chrome.action.openPopup() 打开弹窗（仅 MV3 支持）
+  chrome.action.openPopup().catch(() => {
+    // 降级：无法编程打开弹窗时，提示用户手动点击扩展图标
+  })
+}
+
+onMounted(() => {
+  retryCheckAuth()
+  chrome.storage.onChanged.addListener(handleStorageChange)
+})
+
+onUnmounted(() => {
+  chrome.storage.onChanged.removeListener(handleStorageChange)
+})
 </script>
 
 <style>
@@ -126,5 +172,41 @@ html, body, #app {
 
 .dashboard-main {
   background-color: #f5f7fa;
+}
+
+/* 登录过期遮罩 */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.auth-overlay-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.auth-overlay-card h2 {
+  margin: 16px 0 8px;
+  font-size: 20px;
+  color: #303133;
+}
+
+.auth-overlay-card p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #909399;
+}
+
+.auth-overlay-card .el-button {
+  margin: 0 8px;
 }
 </style>

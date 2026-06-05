@@ -168,6 +168,41 @@ paths:
                             type: boolean
                             example: true
 
+  /v1/tab-sync/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新 Token
+      description: 使用 Refresh Token 获取新的 Access Token 和 Refresh Token（Token 家族轮换）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  description: 当前持有的 Refresh Token
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          description: Refresh Token 无效或已过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonReturnError'
+
   # ============ Sync ============
   /v1/tab-sync/sync/events:
     post:
@@ -500,6 +535,17 @@ components:
           type: boolean
         user:
           $ref: '#/components/schemas/AuthUser'
+
+    RefreshTokenResponse:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken:
+          type: string
+          description: 新的短期访问令牌
+        refreshToken:
+          type: string
+          description: 新的长期刷新令牌（Token 家族轮换）
 
     # ---- Tab ----
     TabRecord:

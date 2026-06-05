@@ -140,6 +140,8 @@ export interface MessageResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
+  /** 是否为认证错误（Token 过期等），UI 可据此跳转登录 */
+  authError?: boolean
 }
 
 /** GET_STATE 响应数据 */

@@ -8,6 +8,7 @@ import { getOrCreateDeviceId } from '../utils/device-fingerprint'
  * - 自动附加 X-Device-Id header
  * - 自动解包 CommonReturn 响应 (取 data 字段)
  * - 统一错误处理
+ * - Token 过期自动续签（防并发重复刷新）
  */
 
 export interface ApiResponse<T> {
@@ -15,6 +16,52 @@ export interface ApiResponse<T> {
   status: number
   data?: T
   error?: string
+}
+
+/** 刷新中 Promise，用于合并并发 401 请求的刷新调用 */
+let refreshPromise: Promise<boolean> | null = null
+
+/**
+ * 执行 Token 刷新（绕过 request 避免递归）
+ * @returns true 表示刷新成功
+ */
+async function doRefreshToken(refreshToken: string): Promise<boolean> {
+  const baseUrl = await getBaseUrl()
+  if (!baseUrl) return false
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/tab-sync/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+
+    if (res.status === 401) {
+      return false
+    }
+
+    const json = await res.json().catch(() => null)
+    // CommonReturn 解包: { code, success, data, ... }
+    const data = json?.data
+    if (data?.accessToken) {
+      await storage.set(STORAGE_KEYS.AUTH_TOKEN, data.accessToken)
+      await storage.set(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken)
+      logger.info('Token 续签成功')
+      return true
+    }
+    return false
+  } catch (err) {
+    logger.error('Token 刷新请求失败:', err)
+    return false
+  }
+}
+
+function clearAuth(): Promise<void> {
+  return storage.setMultiple({
+    [STORAGE_KEYS.AUTH_TOKEN]: null,
+    [STORAGE_KEYS.REFRESH_TOKEN]: null,
+    [STORAGE_KEYS.AUTH_USER]: null,
+  }) as Promise<void>
 }
 
 async function getHeaders(): Promise<Record<string, string>> {
@@ -61,9 +108,35 @@ async function request<T>(
     const json = await res.json().catch(() => null)
 
     if (res.status === 401) {
+      // 如果当前请求就是 refresh 自身，不再重试，直接清除认证
+      if (path === '/v1/tab-sync/auth/refresh') {
+        logger.warn('Token 刷新失败，清除认证状态')
+        await clearAuth()
+        return { ok: false, status: 401, error: 'Token 无效或已过期' }
+      }
+
+      // 尝试使用 refresh_token 续签
+      const storedRefreshToken = await storage.get(STORAGE_KEYS.REFRESH_TOKEN)
+      if (storedRefreshToken) {
+        logger.info('Token 过期，尝试续签...')
+
+        // 合并并发刷新请求，防止多次重复刷新
+        if (!refreshPromise) {
+          refreshPromise = doRefreshToken(storedRefreshToken).finally(() => {
+            refreshPromise = null
+          })
+        }
+        const refreshed = await refreshPromise
+
+        if (refreshed) {
+          logger.info('Token 续签成功，重试原请求')
+          return request<T>(method, path, body)
+        }
+      }
+
+      // 刷新失败或无可用的 refresh_token，清除认证
       logger.warn('Token 无效或已过期，清除认证状态')
-      await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
-      await storage.set(STORAGE_KEYS.AUTH_USER, null)
+      await clearAuth()
       return { ok: false, status: 401, error: 'Token 无效或已过期' }
     }
 
