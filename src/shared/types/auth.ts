@@ -11,7 +11,6 @@ export interface AuthState {
 export interface AuthUser {
   id: string
   username: string
-  email: string
 }
 
 /** 账号密码登录请求 */
@@ -22,7 +21,8 @@ export interface LoginRequest {
 
 /** 登录响应 */
 export interface LoginResponse {
-  token: string
+  accessToken: string
+  refreshToken: string
   user: AuthUser
 }
 

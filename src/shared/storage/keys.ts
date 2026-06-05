@@ -2,6 +2,8 @@
 export const STORAGE_KEYS = {
   /** 认证 Token */
   AUTH_TOKEN: 'auth_token',
+  /** 刷新 Token */
+  REFRESH_TOKEN: 'refresh_token',
   /** 当前用户信息 */
   AUTH_USER: 'auth_user',
   /** 设备 ID */

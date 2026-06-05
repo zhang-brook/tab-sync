@@ -4,6 +4,7 @@ import type { TabRecord, TabEvent, Workspace, AuthUser, SyncState } from '../typ
 /** chrome.storage.local 数据结构映射 */
 interface StorageSchema {
   [STORAGE_KEYS.AUTH_TOKEN]: string | null
+  [STORAGE_KEYS.REFRESH_TOKEN]: string | null
   [STORAGE_KEYS.AUTH_USER]: AuthUser | null
   [STORAGE_KEYS.DEVICE_ID]: string | null
   [STORAGE_KEYS.DEVICE_NAME]: string | null
@@ -19,6 +20,7 @@ interface StorageSchema {
 /** 默认值 */
 const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.AUTH_TOKEN]: null,
+  [STORAGE_KEYS.REFRESH_TOKEN]: null,
   [STORAGE_KEYS.AUTH_USER]: null,
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,

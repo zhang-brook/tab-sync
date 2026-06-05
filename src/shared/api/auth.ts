@@ -12,6 +12,6 @@ export function verifyToken(token: string) {
 }
 
 /** 登出 */
-export function logout() {
-  return apiClient.post('/v1/tab-sync/auth/logout')
+export function logout(refreshToken: string) {
+  return apiClient.post('/v1/tab-sync/auth/logout', { refreshToken })
 }

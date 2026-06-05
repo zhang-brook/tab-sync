@@ -14,14 +14,32 @@ info:
     | X-Device-Id | 否 | 当前设备 UUID |
     | Content-Type | 是 | application/json |
 
-    ## 错误响应格式
-    所有接口在出错时返回统一的错误格式：
+    ## 公共响应格式
+    所有接口返回统一的 `CommonReturn` 格式：
     ```json
     {
-      "error": {
-        "message": "错误描述",
-        "code": "ERROR_CODE"
-      }
+      "code": 0,
+      "success": true,
+      "message": "",
+      "developerMessage": "操作成功",
+      "data": { ... },
+      "traceId": "..."
+    }
+    ```
+    - `code`: 0 表示成功，-1 表示失败
+    - `data`: 各接口的实际业务数据
+    - `message`: 错误时展示给用户的提示信息
+
+    ## 错误响应格式
+    出错时 `success` 为 `false`，`code` 为 -1，`message` 包含错误描述：
+    ```json
+    {
+      "code": -1,
+      "success": false,
+      "message": "错误描述",
+      "developerMessage": "操作失败",
+      "data": null,
+      "traceId": "..."
     }
     ```
   version: 1.0.0
@@ -43,7 +61,7 @@ tags:
 
 paths:
   # ============ Auth ============
-  /v1/auth/login:
+  /v1/tab-sync/auth/login:
     post:
       tags: [Auth]
       summary: 账号密码登录
@@ -68,15 +86,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
         '401':
           description: 用户名或密码错误
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/CommonReturnError'
 
-  /v1/auth/verify-token:
+  /v1/tab-sync/auth/verify-token:
     post:
       tags: [Auth]
       summary: 验证 Token 有效性
@@ -98,34 +121,55 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerifyTokenResponse'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/VerifyTokenResponse'
         '401':
           description: Token 无效或已过期
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/CommonReturnError'
 
-  /v1/auth/logout:
+  /v1/tab-sync/auth/logout:
     post:
       tags: [Auth]
       summary: 登出
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  description: 要注销的 Refresh Token
       responses:
         '200':
           description: 登出成功
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                    example: true
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                            example: true
 
   # ============ Sync ============
-  /v1/sync/events:
+  /v1/tab-sync/sync/events:
     post:
       tags: [Sync]
       summary: 增量事件同步
@@ -144,11 +188,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncEventsResponse'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncEventsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /v1/sync/full:
+  /v1/tab-sync/sync/full:
     post:
       tags: [Sync]
       summary: 全量状态对账
@@ -167,11 +216,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncFullResponse'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncFullResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /v1/sync/pull:
+  /v1/tab-sync/sync/pull:
     get:
       tags: [Sync]
       summary: 拉取其他设备的变更
@@ -190,7 +244,6 @@ paths:
           required: true
           schema:
             type: string
-            format: date-time
           description: 上次同步时间（ISO 8601），仅返回此时间之后的事件
       responses:
         '200':
@@ -198,12 +251,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncPullResponse'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncPullResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
   # ============ Devices ============
-  /v1/devices:
+  /v1/tab-sync/devices:
     get:
       tags: [Devices]
       summary: 获取当前用户的所有已注册设备
@@ -215,16 +273,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  devices:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Device'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          devices:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Device'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /v1/devices/register:
+  /v1/tab-sync/devices/register:
     post:
       tags: [Devices]
       summary: 注册或更新设备信息
@@ -259,14 +322,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  device:
-                    $ref: '#/components/schemas/Device'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          device:
+                            $ref: '#/components/schemas/Device'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /v1/devices/{deviceId}:
+  /v1/tab-sync/devices/{deviceId}:
     patch:
       tags: [Devices]
       summary: 更新设备信息
@@ -294,16 +362,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  device:
-                    $ref: '#/components/schemas/Device'
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          device:
+                            $ref: '#/components/schemas/Device'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: 设备不存在
 
-  /v1/devices/{deviceId}/heartbeat:
+  /v1/tab-sync/devices/{deviceId}/heartbeat:
     post:
       tags: [Devices]
       summary: 设备心跳
@@ -322,11 +395,16 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                    example: true
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                            example: true
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -344,29 +422,73 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/CommonReturnError'
 
   schemas:
+    # ---- Common ----
+    CommonReturn:
+      type: object
+      required: [code, success, data]
+      properties:
+        code:
+          type: integer
+          description: 0 表示成功，-1 表示失败
+        success:
+          type: boolean
+        message:
+          type: string
+          description: 展示给用户的信息
+        developerMessage:
+          type: string
+          description: 面向开发者的调试信息
+        data:
+          type: object
+          description: 实际业务数据
+        traceId:
+          type: string
+          description: 请求追踪 ID
+
+    CommonReturnError:
+      type: object
+      required: [code, success, message]
+      properties:
+        code:
+          type: integer
+          example: -1
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: 错误描述
+        developerMessage:
+          type: string
+          example: 操作失败
+        data:
+          nullable: true
+        traceId:
+          type: string
+
     # ---- Auth ----
     AuthUser:
       type: object
-      required: [id, username, email]
+      required: [id, username]
       properties:
         id:
           type: string
         username:
           type: string
-        email:
-          type: string
-          format: email
 
     LoginResponse:
       type: object
-      required: [token, user]
+      required: [accessToken, refreshToken, user]
       properties:
-        token:
+        accessToken:
           type: string
-          description: Bearer Token
+          description: 短期访问令牌（Bearer Token）
+        refreshToken:
+          type: string
+          description: 长期刷新令牌，用于获取新的 accessToken
         user:
           $ref: '#/components/schemas/AuthUser'
 
@@ -532,17 +654,3 @@ components:
         lastSeen:
           type: string
           format: date-time
-
-    # ---- Error ----
-    ErrorResponse:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: object
-          required: [message]
-          properties:
-            message:
-              type: string
-            code:
-              type: string

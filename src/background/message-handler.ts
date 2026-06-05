@@ -136,7 +136,8 @@ async function handleLoginWithCredentials(
     return { success: false, error }
   }
 
-  await storage.set(STORAGE_KEYS.AUTH_TOKEN, res.data.token)
+  await storage.set(STORAGE_KEYS.AUTH_TOKEN, res.data.accessToken)
+  await storage.set(STORAGE_KEYS.REFRESH_TOKEN, res.data.refreshToken)
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Credentials login success:', res.data.user.username)
   // 登录成功后启动定时同步和心跳
@@ -147,9 +148,13 @@ async function handleLoginWithCredentials(
 /** 登出 */
 async function handleLogout(): Promise<MessageResponse> {
   // 尝试通知后端，失败也没关系
-  await apiLogout().catch(() => {})
+  const refreshToken = await storage.get(STORAGE_KEYS.REFRESH_TOKEN)
+  if (refreshToken) {
+    await apiLogout(refreshToken).catch(() => {})
+  }
 
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
+  await storage.set(STORAGE_KEYS.REFRESH_TOKEN, null)
   await storage.set(STORAGE_KEYS.AUTH_USER, null)
   // 登出后停止定时同步和心跳
   await stopAlarms()
