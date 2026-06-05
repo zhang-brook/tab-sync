@@ -306,8 +306,9 @@ function statusTagType(status: string): 'success' | 'warning' | 'info' {
 }
 
 function statusLabel(status: string): string {
-  if (status === 'complete') return '已加载'
+  if (status === 'unloaded') return '已冻结' // '未加载'
   if (status === 'loading') return '加载中'
+  if (status === 'complete') return '已加载'
   return status || '未知'
 }
 
