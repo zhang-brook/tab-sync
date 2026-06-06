@@ -86,14 +86,19 @@ const emit = defineEmits<{
 
 const loginMode = ref<'credentials' | 'token'>('credentials')
 const tokenInput = ref('')
-const username = ref('')
-const password = ref('')
+const username = ref(process.env.NODE_ENV === 'production' ? '' : 'admin')
+const password = ref(process.env.NODE_ENV === 'production' ? '' : 'password')
 const serverUrl = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
+const defaultServerUrl = process.env.NODE_ENV === 'production'
+  ? 'https://api.spidermemos.com'
+  : 'http://localhost:9998'
+
 onMounted(async () => {
-  serverUrl.value = await storage.get(STORAGE_KEYS.API_BASE_URL) || ''
+  const storedUrl = await storage.get(STORAGE_KEYS.API_BASE_URL)
+  serverUrl.value = storedUrl || defaultServerUrl
 })
 
 async function handleServerUrlChange() {
