@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import LoginPanel from './components/LoginPanel.vue'
 import { sendMessage } from '../shared/composables/useMessage'
@@ -80,6 +81,7 @@ async function handleLogout() {
   await sendMessage({ action: 'LOGOUT' })
   authenticated.value = false
   userName.value = ''
+  ElMessage.success('已退出登录')
 }
 
 function openDashboard() {
