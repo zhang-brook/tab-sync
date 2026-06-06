@@ -414,7 +414,7 @@ paths:
     delete:
       tags: [Devices]
       summary: 注销设备
-      description: 用户登出时调用，软删除设备注册记录，其他设备将不再看到该设备
+      description: 用户登出时调用，物理删除设备注册记录，其他设备将不再看到该设备
       security:
         - bearerAuth: []
       parameters:
