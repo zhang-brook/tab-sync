@@ -58,7 +58,7 @@ import type { StateData } from '../shared/types'
 const loading = ref(true)
 const authenticated = ref(false)
 const userName = ref('')
-const tabCount = ref({ open: 0, closed: 0 })
+const tabCount = ref({ open: 0, frozen: 0 })
 
 onMounted(() => {
   loadState()
@@ -70,7 +70,7 @@ async function loadState() {
     if (res.success && res.data) {
       authenticated.value = res.data.auth?.authenticated ?? false
       userName.value = res.data.auth?.user?.username || ''
-      tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
+      tabCount.value = res.data.tabCount ?? { open: 0, frozen: 0 }
     }
   } finally {
     loading.value = false

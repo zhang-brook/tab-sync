@@ -2,7 +2,7 @@ import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData,
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
-import { getDevices, registerDevice } from '../shared/api/devices'
+import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, reorderWorkspaceTabs } from '../shared/api/workspaces'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
@@ -83,6 +83,9 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
   const chromeTabs = await chrome.tabs.query({})
   const openCount = chromeTabs.length
 
+  const frozenTabs = await chrome.tabs.query({ frozen: true })
+  const frozenCount = frozenTabs.length
+
   return {
     success: true,
     data: {
@@ -91,7 +94,7 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
         token: auth_token,
         user: auth_user,
       },
-      tabCount: { open: openCount, closed: 0 },
+      tabCount: { open: openCount, frozen: frozenCount },
     },
   }
 }
@@ -123,7 +126,7 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
       if (res.ok) logger.info('Device registered on server after login')
       else logger.debug('Device registration skipped (server unavailable):', res.error)
     })
-    .catch(() => {})
+    .catch(() => { })
 
   return { success: true, data: { user: res.data.user } }
 }
@@ -154,17 +157,23 @@ async function handleLoginWithCredentials(
       if (res.ok) logger.info('Device registered on server after login')
       else logger.debug('Device registration skipped (server unavailable):', res.error)
     })
-    .catch(() => {})
+    .catch(() => { })
 
   return { success: true, data: { user: res.data.user } }
 }
 
 /** 登出 */
 async function handleLogout(): Promise<MessageResponse> {
+  // 尝试通知后端注销设备，失败也没关系
+  const deviceId = await storage.get(STORAGE_KEYS.DEVICE_ID)
+  if (deviceId) {
+    deregisterDevice(deviceId).catch(() => { })
+  }
+
   // 尝试通知后端，失败也没关系
   const refreshToken = await storage.get(STORAGE_KEYS.REFRESH_TOKEN)
   if (refreshToken) {
-    await apiLogout(refreshToken).catch(() => {})
+    await apiLogout(refreshToken).catch(() => { })
   }
 
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)

@@ -8,12 +8,7 @@
 
       <el-form label-width="120px" label-position="left">
         <el-form-item label="API 地址">
-          <el-input
-            v-model="apiBaseUrl"
-            placeholder="例如: https://api.example.com"
-            clearable
-            @blur="saveApiBaseUrl"
-          />
+          <el-input v-model="apiBaseUrl" placeholder="例如: https://api.example.com" clearable @blur="saveApiBaseUrl" />
           <div class="form-tip">后端服务的 API 基础地址，留空则不与后端同步</div>
         </el-form-item>
       </el-form>
@@ -47,7 +42,7 @@
 
       <el-form label-width="120px" label-position="left">
         <el-form-item label="本地标签页">
-          <span>{{ tabCount.open }} 个打开，{{ tabCount.closed }} 个已关闭</span>
+          <span>{{ tabCount.open }} 个打开，其中 {{ tabCount.frozen }} 个已冻结</span>
         </el-form-item>
 
         <el-form-item label="清除数据">
@@ -87,7 +82,7 @@ import type { StateData } from '../../shared/types'
 const apiBaseUrl = ref('')
 const deviceId = ref('')
 const deviceName = ref('')
-const tabCount = ref({ open: 0, closed: 0 })
+const tabCount = ref({ open: 0, frozen: 0 })
 
 const extensionVersion = chrome.runtime.getManifest().version
 const extensionId = chrome.runtime.id
@@ -101,7 +96,7 @@ onMounted(async () => {
   // 从 background 获取运行时状态
   const res = await sendMessage<StateData>({ action: 'GET_STATE' })
   if (res.success && res.data) {
-    tabCount.value = res.data.tabCount ?? { open: 0, closed: 0 }
+    tabCount.value = res.data.tabCount ?? { open: 0, frozen: 0 }
   }
 })
 

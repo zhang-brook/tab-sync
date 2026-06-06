@@ -16,14 +16,14 @@
         <el-icon :size="32" class="device-icon"><Monitor /></el-icon>
         <div class="device-info">
           <div class="device-name">
-            {{ currentDevice.name || '未命名设备' }}
-            <el-tag type="success" size="small" class="device-tag">当前设备</el-tag>
+            {{ currentDevice.name || '未命名设备' }}（当前）
           </div>
           <div class="device-meta">
             <span>{{ currentDevice.browser }}</span>
             <el-divider direction="vertical" />
             <span>{{ currentDevice.os }}</span>
           </div>
+          <div class="device-id-text">ID: {{ currentDevice.id || '--' }}</div>
         </div>
       </div>
 
@@ -39,8 +39,8 @@
         <el-descriptions-item label="打开标签页">
           {{ tabCount.open }} 个
         </el-descriptions-item>
-        <el-descriptions-item label="已关闭标签页">
-          {{ tabCount.closed }} 个
+        <el-descriptions-item label="已冻结标签页">
+          {{ tabCount.frozen }} 个
         </el-descriptions-item>
       </el-descriptions>
     </el-card>
@@ -67,6 +67,7 @@
               <el-divider direction="vertical" />
               <span>最后活跃: {{ formatTime(device.lastSeen) }}</span>
             </div>
+            <div class="device-id-text">ID: {{ device.id }}</div>
           </div>
         </div>
       </div>
@@ -87,7 +88,7 @@ import { sendMessage } from '../../shared/composables/useMessage'
 import type { Device, DevicesData, StateData } from '../../shared/types'
 
 const allDevices = ref<Device[]>([])
-const tabCount = ref({ open: 0, closed: 0 })
+const tabCount = ref({ open: 0, frozen: 0 })
 const loading = ref(true)
 
 /** 当前设备（列表中第一个） */
@@ -108,7 +109,7 @@ onMounted(async () => {
   // 获取标签页统计
   const stateRes = await sendMessage<StateData>({ action: 'GET_STATE' })
   if (stateRes.success && stateRes.data) {
-    tabCount.value = stateRes.data.tabCount ?? { open: 0, closed: 0 }
+    tabCount.value = stateRes.data.tabCount ?? { open: 0, frozen: 0 }
   }
 
   loading.value = false
@@ -170,24 +171,18 @@ function formatTime(iso: string): string {
   font-size: 15px;
   font-weight: 500;
   color: #303133;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
-.device-tag {
-  flex-shrink: 0;
+.device-id-text {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  color: #c0c4cc;
+  margin-top: 2px;
 }
 
 .device-meta {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
-}
-
-.mono-text {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-  color: #606266;
 }
 </style>

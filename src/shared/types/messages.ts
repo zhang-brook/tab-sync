@@ -165,7 +165,7 @@ export interface StateData {
   auth: AuthState
   tabCount: {
     open: number
-    closed: number
+    frozen: number
   }
 }
 

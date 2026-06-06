@@ -29,14 +29,58 @@ export async function getDeviceName(): Promise<string> {
   else if (ua.includes('Linux')) os = 'Linux'
   else if (ua.includes('CrOS')) os = 'ChromeOS'
 
-  const defaultName = `Chrome on ${os}`
+  const browserName = getBrowserName()
+  const defaultName = `${browserName} on ${os}`
   await storage.set(STORAGE_KEYS.DEVICE_NAME, defaultName)
   return defaultName
 }
 
-/** 获取浏览器信息 */
+/** 获取浏览器名称（不含版本号） */
+function getBrowserName(): string {
+  const ua = navigator.userAgent
+  if (ua.includes('Edg/')) return 'Edge'
+  if (ua.includes('OPR/')) return 'Opera'
+  if (ua.includes('Brave')) return 'Brave'
+  if (ua.includes('Vivaldi/')) return 'Vivaldi'
+  if (ua.includes('Chrome/')) return 'Chrome'
+  if (ua.includes('Firefox/')) return 'Firefox'
+  if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari'
+  return 'Unknown'
+}
+
+/** 获取浏览器信息（含名称和版本号，用于注册到后端） */
 export function getBrowserInfo(): string {
-  return 'Chrome'
+  const ua = navigator.userAgent
+
+  if (ua.includes('Edg/')) {
+    const v = ua.match(/Edg\/([\d.]+)/)
+    return v ? `Edge ${v[1]}` : 'Edge'
+  }
+  if (ua.includes('OPR/')) {
+    const v = ua.match(/OPR\/([\d.]+)/)
+    return v ? `Opera ${v[1]}` : 'Opera'
+  }
+  if (ua.includes('Brave')) {
+    const v = ua.match(/Chrome\/([\d.]+)/)
+    return v ? `Brave ${v[1]}` : 'Brave'
+  }
+  if (ua.includes('Vivaldi/')) {
+    const v = ua.match(/Vivaldi\/([\d.]+)/)
+    return v ? `Vivaldi ${v[1]}` : 'Vivaldi'
+  }
+  if (ua.includes('Chrome/')) {
+    const v = ua.match(/Chrome\/([\d.]+)/)
+    return v ? `Chrome ${v[1]}` : 'Chrome'
+  }
+  if (ua.includes('Firefox/')) {
+    const v = ua.match(/Firefox\/([\d.]+)/)
+    return v ? `Firefox ${v[1]}` : 'Firefox'
+  }
+  if (ua.includes('Safari/') && !ua.includes('Chrome')) {
+    const v = ua.match(/Version\/([\d.]+)/)
+    return v ? `Safari ${v[1]}` : 'Safari'
+  }
+  return 'Unknown'
 }
 
 /** 获取操作系统信息 */
