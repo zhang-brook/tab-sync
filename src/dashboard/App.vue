@@ -53,8 +53,8 @@
       <el-icon :size="48" color="#f56c6c"><WarningFilled /></el-icon>
       <h2>登录已过期</h2>
       <p>请通过扩展弹窗重新登录后再继续使用</p>
-      <el-button type="primary" @click="openPopup">打开弹窗登录</el-button>
-      <el-button text @click="retryCheckAuth">重新检查</el-button>
+      <el-button type="primary" @click="openPopup">重新登录</el-button>
+      <el-button text @click="retryCheckAuth">我已登录</el-button>
     </div>
   </div>
 </template>
