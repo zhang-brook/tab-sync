@@ -33,6 +33,13 @@
     <el-container>
       <el-header class="dashboard-header">
         <span class="header-title">{{ pageTitle }}</span>
+        <div v-if="authenticated" class="header-right">
+          <span class="header-username">{{ userName }}</span>
+          <el-button type="danger" size="small" text @click="handleLogout">
+            <el-icon><SwitchButton /></el-icon>
+            退出登录
+          </el-button>
+        </div>
       </el-header>
       <el-main class="dashboard-main">
         <router-view />
@@ -55,7 +62,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled, SwitchButton } from '@element-plus/icons-vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import { STORAGE_KEYS } from '../shared/storage'
 import type { StateData } from '../shared/types'
@@ -63,6 +71,7 @@ import type { StateData } from '../shared/types'
 const route = useRoute()
 
 const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
+const userName = ref('')
 
 const pageTitleMap: Record<string, string> = {
   '/tabs': '标签页管理',
@@ -86,7 +95,21 @@ async function retryCheckAuth() {
   const res = await sendMessage<StateData>({ action: 'GET_STATE' })
   if (res.success && res.data) {
     authenticated.value = res.data.auth?.authenticated ?? false
+    userName.value = res.data.auth?.user?.username || ''
   }
+}
+
+/** 退出登录 */
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning' })
+  } catch {
+    return // 用户取消
+  }
+  await sendMessage({ action: 'LOGOUT' })
+  authenticated.value = false
+  userName.value = ''
+  ElMessage.success('已退出登录')
 }
 
 function openPopup() {
@@ -159,6 +182,7 @@ html, body, #app {
 .dashboard-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   background-color: #fff;
   border-bottom: 1px solid #f0f0f0;
   padding: 0 24px;
@@ -168,6 +192,17 @@ html, body, #app {
   font-size: 18px;
   font-weight: 500;
   color: #303133;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-username {
+  font-size: 14px;
+  color: #606266;
 }
 
 .dashboard-main {
