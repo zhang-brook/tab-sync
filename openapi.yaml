@@ -411,6 +411,38 @@ paths:
         '404':
           description: 设备不存在
 
+    delete:
+      tags: [Devices]
+      summary: 注销设备
+      description: 用户登出时调用，软删除设备注册记录，其他设备将不再看到该设备
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 扩展本地生成的设备 UUID
+      responses:
+        '200':
+          description: 注销成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CommonReturn'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/tab-sync/devices/{deviceId}/heartbeat:
     post:
       tags: [Devices]

@@ -20,3 +20,8 @@ export function updateDevice(deviceId: string, payload: { name?: string }) {
 export function deviceHeartbeat(deviceId: string) {
   return apiClient.post<{ ok: true }>(`/v1/tab-sync/devices/${encodeURIComponent(deviceId)}/heartbeat`)
 }
+
+/** 注销设备 - 登出时通知后端移除设备 */
+export function deregisterDevice(deviceId: string) {
+  return apiClient.delete<{ ok: true }>(`/v1/tab-sync/devices/${encodeURIComponent(deviceId)}`)
+}
