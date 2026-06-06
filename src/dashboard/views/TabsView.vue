@@ -66,7 +66,15 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="工作组" min-width="160">
+      <el-table-column label="最后访问时间" width="140" align="center">
+        <template #default="{ row }">
+          <el-tooltip :content="lastAccessedTip(row)" placement="top" :disabled="!row.lastAccessedAt">
+            <span class="time-text">{{ formatTime(row.lastAccessedAt) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="工作组" min-width="160" header-align="center">
         <template #default="{ row }">
           <div class="workspace-tags">
             <el-tag
@@ -236,6 +244,8 @@ interface TabRow {
   favIconUrl: string
   windowId: number
   chromeStatus: string
+  /** Chrome 最后激活时间（毫秒时间戳，来自 chrome.tabs.Tab.lastAccessed） */
+  lastAccessedAt: number
   workspaceTags: Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>
 }
 
@@ -332,6 +342,7 @@ async function loadTabs() {
         favIconUrl: tab.favIconUrl || '',
         windowId: tab.windowId ?? 0,
         chromeStatus: tab.status || 'complete',
+        lastAccessedAt: tab.lastAccessed ?? 0,
         workspaceTags: urlMap.get(url) || [],
       }
     })
@@ -369,6 +380,51 @@ function statusLabel(status: string): string {
   if (status === 'loading') return '加载中'
   if (status === 'complete') return '已加载'
   return status || '未知'
+}
+
+/** 格式化时间（支持 ISO 字符串或毫秒时间戳） */
+function formatTime(value: string | number): string {
+  if (!value) return '--'
+  const d = typeof value === 'number' ? new Date(value) : new Date(value)
+  if (isNaN(d.getTime())) return '--'
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+
+  // 1 分钟内：刚刚
+  if (diffMin < 1) return '刚刚'
+  // 1 小时内：X分钟前
+  if (diffMin < 60) return `${diffMin}分钟前`
+  // 今天：HH:mm
+  if (isSameDay(d, now)) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  // 昨天：昨天 HH:mm
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (isSameDay(d, yesterday)) {
+    return `昨天 ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  // 今年内：MM-DD HH:mm
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  // 跨年：YYYY-MM-DD
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** 生成 tooltip 用的完整 ISO 时间字符串 */
+function lastAccessedTip(row: TabRow): string {
+  if (!row.lastAccessedAt) return ''
+  return new Date(row.lastAccessedAt).toLocaleString()
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function pad(n: number): string {
+  return n.toString().padStart(2, '0')
 }
 
 /** 切换到指定标签页 */

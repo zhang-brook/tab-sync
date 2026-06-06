@@ -2,9 +2,9 @@ import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData,
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
-import { getDevices } from '../shared/api/devices'
+import { getDevices, registerDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, reorderWorkspaceTabs } from '../shared/api/workspaces'
-import { getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
+import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
 
@@ -114,6 +114,17 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
 
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Token login success:', res.data.user.username)
+
+  // 登录成功后向后端注册当前设备
+  const deviceId = await getOrCreateDeviceId()
+  const deviceName = await getDeviceName()
+  registerDevice({ deviceId, name: deviceName, browser: getBrowserInfo(), os: getOSInfo() })
+    .then(res => {
+      if (res.ok) logger.info('Device registered on server after login')
+      else logger.debug('Device registration skipped (server unavailable):', res.error)
+    })
+    .catch(() => {})
+
   return { success: true, data: { user: res.data.user } }
 }
 
@@ -134,6 +145,17 @@ async function handleLoginWithCredentials(
   await storage.set(STORAGE_KEYS.REFRESH_TOKEN, res.data.refreshToken)
   await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
   logger.info('Credentials login success:', res.data.user.username)
+
+  // 登录成功后向后端注册当前设备
+  const deviceId = await getOrCreateDeviceId()
+  const deviceName = await getDeviceName()
+  registerDevice({ deviceId, name: deviceName, browser: getBrowserInfo(), os: getOSInfo() })
+    .then(res => {
+      if (res.ok) logger.info('Device registered on server after login')
+      else logger.debug('Device registration skipped (server unavailable):', res.error)
+    })
+    .catch(() => {})
+
   return { success: true, data: { user: res.data.user } }
 }
 
