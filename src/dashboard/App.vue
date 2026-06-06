@@ -107,9 +107,16 @@ async function handleLogout() {
     return // 用户取消
   }
   await sendMessage({ action: 'LOGOUT' })
-  authenticated.value = false
-  userName.value = ''
+  // 页面将被关闭，所以短期内暂不更新状态，避免页面闪现登录态过期弹窗
+  setTimeout(() => {
+    authenticated.value = false
+    userName.value = ''
+  }, 1000)
   ElMessage.success('已退出登录')
+
+  // 打开 popup 显示登录页，然后关闭当前后台管理页面
+  chrome.action.openPopup().catch(() => { })
+  window.close()
 }
 
 function openPopup() {
