@@ -378,24 +378,60 @@ async function handleAddTabsToWorkspace(
   return { success: false, error: updateRes.error || '更新工作组失败', authError: updateRes.status === 401 }
 }
 
+/** 将 hex 颜色映射为 Chrome 标签组颜色名称 */
+function mapHexToTabGroupColor(hex: string): chrome.tabGroups.Color {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+
+  // 计算与各 Chrome 预设颜色 (近似值) 的欧氏距离，取最接近的
+  const presetColors: Array<{ name: chrome.tabGroups.Color; r: number; g: number; b: number }> = [
+    { name: chrome.tabGroups.Color.GREY, r: 128, g: 128, b: 128 },
+    { name: chrome.tabGroups.Color.BLUE, r: 66, g: 133, b: 244 },
+    { name: chrome.tabGroups.Color.RED, r: 219, g: 68, b: 55 },
+    { name: chrome.tabGroups.Color.YELLOW, r: 244, g: 180, b: 0 },
+    { name: chrome.tabGroups.Color.GREEN, r: 15, g: 157, b: 88 },
+    { name: chrome.tabGroups.Color.PINK, r: 233, g: 30, b: 99 },
+    { name: chrome.tabGroups.Color.PURPLE, r: 154, g: 50, b: 211 },
+    { name: chrome.tabGroups.Color.CYAN, r: 82, g: 196, b: 196 },
+    { name: chrome.tabGroups.Color.ORANGE, r: 251, g: 140, b: 0 },
+  ]
+
+  let minDist = Infinity
+  let closest: chrome.tabGroups.Color = chrome.tabGroups.Color.BLUE
+  for (const preset of presetColors) {
+    const dr = r - preset.r
+    const dg = g - preset.g
+    const db = b - preset.b
+    const dist = dr * dr + dg * dg + db * db
+    if (dist < minDist) {
+      minDist = dist
+      closest = preset.name
+    }
+  }
+  return closest
+}
+
 /** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */
 async function handleOpenWorkspace(
-  payload: { id: string; tabIds?: string[]; newWindow?: boolean },
+  payload: { id: string; tabIds?: string[]; newWindow?: boolean; asTabGroup?: boolean },
 ): Promise<MessageResponse> {
+  const { id, tabIds, newWindow, asTabGroup } = payload
+
   // 从后端获取工作组数据
   const res = await getWorkspaces()
   if (!res.ok || !res.data) {
     return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
   }
 
-  const workspace = res.data.workspaces.find((w) => w.id === payload.id)
+  const workspace = res.data.workspaces.find((w) => w.id === id)
   if (!workspace) {
     return { success: false, error: '工作组不存在' }
   }
 
   // 确定要打开的标签页
-  const tabsToOpen = payload.tabIds
-    ? workspace.tabs.filter((t) => payload.tabIds!.includes(t.tabId))
+  const tabsToOpen = tabIds
+    ? workspace.tabs.filter((t) => tabIds!.includes(t.tabId))
     : workspace.tabs
 
   if (tabsToOpen.length === 0) {
@@ -413,6 +449,9 @@ async function handleOpenWorkspace(
 
   let opened = 0
   let alreadyOpen = 0
+
+  // 收集所有要归入标签组的 Chrome tabId（用于 asTabGroup 模式）
+  const allChromeTabIds: number[] = []
 
   // 分类: 已打开的标签页 vs 需要重新打开的标签页
   const toActivate: { chromeTabId: number; windowId?: number }[] = []
@@ -433,8 +472,24 @@ async function handleOpenWorkspace(
     toReopen.push(tabRef)
   }
 
+  // 确定标签组目标窗口 ID
+  let targetWindowId: number | undefined
+  if (asTabGroup) {
+    if (newWindow) {
+      // 新窗口模式：稍后在创建窗口后设置
+    } else {
+      // 当前窗口模式：获取当前聚焦窗口
+      try {
+        const currentWin = await chrome.windows.getLastFocused()
+        targetWindowId = currentWin.id
+      } catch {
+        // 忽略，后续分组时不指定 windowId
+      }
+    }
+  }
+
   // 1) 激活已打开的标签页（当前窗口模式下才激活，新窗口模式下跳过）
-  if (!payload.newWindow) {
+  if (!newWindow) {
     for (const item of toActivate) {
       try {
         await chrome.tabs.update(item.chromeTabId, { active: true })
@@ -444,38 +499,74 @@ async function handleOpenWorkspace(
       } catch {
         // 忽略激活失败
       }
+      allChromeTabIds.push(item.chromeTabId)
+    }
+  } else {
+    // 新窗口模式，仅收集已有 tabId
+    for (const item of toActivate) {
+      allChromeTabIds.push(item.chromeTabId)
     }
   }
   alreadyOpen = toActivate.length
 
   // 2) 重新打开已关闭/不存在的标签页
   if (toReopen.length > 0) {
-    if (payload.newWindow) {
+    if (newWindow) {
       // 新窗口模式: 逐个创建以确保每个标签页都能正确预注册
       // 先创建窗口
       const firstTab = toReopen[0]
       registerPendingReopen(firstTab.url, firstTab.tabId)
       const win = await chrome.windows.create({ url: firstTab.url })
       opened++
+      if (win?.tabs?.[0]?.id != null) {
+        allChromeTabIds.push(win.tabs[0].id)
+      }
+      targetWindowId = win?.id
 
       // 剩余标签页在该窗口中创建
       for (let i = 1; i < toReopen.length; i++) {
         registerPendingReopen(toReopen[i].url, toReopen[i].tabId)
-        await chrome.tabs.create({ url: toReopen[i].url, windowId: win?.id })
+        const tab = await chrome.tabs.create({ url: toReopen[i].url, windowId: win?.id })
         opened++
+        if (tab?.id != null) {
+          allChromeTabIds.push(tab.id)
+        }
       }
     } else {
       // 当前窗口模式
       for (const tabRef of toReopen) {
         registerPendingReopen(tabRef.url, tabRef.tabId)
-        await chrome.tabs.create({ url: tabRef.url })
+        const tab = await chrome.tabs.create({ url: tabRef.url })
         opened++
+        if (tab?.id != null) {
+          allChromeTabIds.push(tab.id)
+        }
       }
     }
   }
 
+  // 3) 创建标签组
+  if (asTabGroup && allChromeTabIds.length > 1) {
+    try {
+      const groupOptions: chrome.tabs.GroupOptions = { tabIds: allChromeTabIds as [number, ...number[]] }
+      if (targetWindowId != null) {
+        groupOptions.createProperties = { windowId: targetWindowId }
+      }
+      const groupId = await chrome.tabs.group(groupOptions)
+      await chrome.tabGroups.update(groupId, {
+        title: workspace.name,
+        color: mapHexToTabGroupColor(workspace.color),
+        collapsed: false,
+      })
+      logger.info(`Tab group created for workspace "${workspace.name}": groupId=${groupId}, tabs=${allChromeTabIds.length}`)
+    } catch (e) {
+      logger.warn('Failed to create tab group:', e)
+      // 分组失败不影响整体操作
+    }
+  }
+
   logger.info(
-    `Workspace "${workspace.name}": opened=${opened}, alreadyOpen=${alreadyOpen}`,
+    `Workspace "${workspace.name}": opened=${opened}, alreadyOpen=${alreadyOpen}${asTabGroup ? ', grouped=' + allChromeTabIds.length : ''}`,
   )
   return {
     success: true,

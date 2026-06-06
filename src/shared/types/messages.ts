@@ -101,7 +101,7 @@ export interface DeleteWorkspaceMessage {
 
 export interface OpenWorkspaceMessage {
   action: 'OPEN_WORKSPACE'
-  payload: { id: string; tabIds?: string[]; newWindow?: boolean }
+  payload: { id: string; tabIds?: string[]; newWindow?: boolean; asTabGroup?: boolean }
 }
 
 /** 重新排序工作组内的标签页 */

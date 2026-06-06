@@ -7,6 +7,7 @@ export default defineManifest({
   description: '同步和管理浏览器标签页，支持多设备共享、工作组管理',
   permissions: [
     'tabs',
+    'tabGroups',
     'storage',
     'alarms',
     'activeTab',

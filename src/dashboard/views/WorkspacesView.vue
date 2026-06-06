@@ -52,6 +52,11 @@
                   <el-icon><CopyDocument /></el-icon>
                 </el-button>
               </el-tooltip>
+              <el-tooltip content="打开为标签组" placement="top">
+                <el-button size="small" text type="primary" @click="handleOpenAsTabGroup(ws.id)">
+                  <el-icon><Collection /></el-icon>
+                </el-button>
+              </el-tooltip>
               <el-tooltip content="编辑" placement="top">
                 <el-button size="small" text @click="showEditDialog(ws)">
                   <el-icon><Edit /></el-icon>
@@ -157,7 +162,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Edit, Delete, View } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -320,6 +325,25 @@ async function handleOpenWorkspace(id: string, newWindow: boolean) {
       ElMessage.success(`已打开 ${data.opened} 个标签页，另有 ${data.alreadyOpen} 个已存在`)
     } else {
       ElMessage.success(`已打开 ${data?.opened ?? 0} 个标签页`)
+    }
+  } else {
+    ElMessage.error(res.error || '打开失败')
+  }
+}
+
+async function handleOpenAsTabGroup(id: string) {
+  const res = await sendMessage<{ opened: number; alreadyOpen: number }>({
+    action: 'OPEN_WORKSPACE',
+    payload: { id, asTabGroup: true },
+  })
+  if (res.success) {
+    const data = res.data
+    if (data && data.alreadyOpen > 0 && data.opened === 0) {
+      ElMessage.info(`所有 ${data.alreadyOpen} 个标签页均已打开并归入标签组`)
+    } else if (data && data.alreadyOpen > 0) {
+      ElMessage.success(`已打开 ${data.opened} 个标签页并归入标签组，另有 ${data.alreadyOpen} 个已存在`)
+    } else {
+      ElMessage.success(`已打开 ${data?.opened ?? 0} 个标签页并归入标签组`)
     }
   } else {
     ElMessage.error(res.error || '打开失败')
