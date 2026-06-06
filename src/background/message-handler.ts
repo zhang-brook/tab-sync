@@ -83,7 +83,8 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
   const chromeTabs = await chrome.tabs.query({})
   const openCount = chromeTabs.length
 
-  const frozenTabs = await chrome.tabs.query({ frozen: true })
+  // const frozenTabs = await chrome.tabs.query({ frozen: true })
+  const frozenTabs = await chrome.tabs.query({ status: 'unloaded' })
   const frozenCount = frozenTabs.length
 
   return {
