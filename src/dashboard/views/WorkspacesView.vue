@@ -356,23 +356,29 @@ function openSingleTab(url: string) {
   chrome.tabs.create({ url })
 }
 
-/** 同组内拖拽排序 — SortableJS @update 事件，列表数据已更新 */
+/** 同组内拖拽排序 — 用 tabId 在列表中反查真实位置，避免 DOM index 偏差 */
 function onDragUpdate(workspaceId: string, evt: any) {
   const ws = workspaces.value.find(w => w.id === workspaceId)
   if (!ws) return
   const tab = ws.tabs[evt.newIndex]
   if (tab) {
-    handleMoveTab(workspaceId, tab.tabId, evt.newIndex)
+    const actualIndex = ws.tabs.findIndex(t => t.tabId === tab.tabId)
+    handleMoveTab(workspaceId, tab.tabId, actualIndex >= 0 ? actualIndex : evt.newIndex)
   }
 }
 
-/** 跨工作组拖入 — SortableJS @add 事件，列表数据已更新（含新元素） */
+/** 跨工作组拖入 — 从 DOM 元素提取 TabReference，再在列表中反查真实位置 */
 function onDragAdd(workspaceId: string, evt: any) {
   const ws = workspaces.value.find(w => w.id === workspaceId)
   if (!ws) return
-  const tab = ws.tabs[evt.newIndex]
-  if (tab) {
-    handleMoveTab(workspaceId, tab.tabId, evt.newIndex)
+  // vuedraggable 在 onDragStart 时将元素引用存到了 DOM 上
+  const underlying = evt.item?._underlying_vm_
+  const tabId: string | undefined = underlying?.tabId
+  if (tabId) {
+    const actualIndex = ws.tabs.findIndex(t => t.tabId === tabId)
+    if (actualIndex >= 0) {
+      handleMoveTab(workspaceId, tabId, actualIndex)
+    }
   }
 }
 
