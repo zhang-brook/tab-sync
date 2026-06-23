@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, reorderWorkspaceTabs } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
@@ -61,8 +61,8 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'ADD_TABS_TO_WORKSPACE':
       return handleAddTabsToWorkspace(message.payload)
 
-    case 'SORT_WORKSPACE_TABS':
-      return handleSortWorkspaceTabs(message.payload)
+    case 'MOVE_WORKSPACE_TAB':
+      return handleMoveWorkspaceTab(message.payload)
 
     case 'GET_DEVICES':
       return handleGetDevices()
@@ -384,8 +384,9 @@ async function handleAddTabsToWorkspace(
     return { success: true, data: { added: 0, skipped: payload.tabs.length } }
   }
 
-  // 5. 将已有 TabReference 转为 WorkspaceTabPayload（chromeTabId=0 表示未知）
+  // 5. 将已有 TabReference 转为 WorkspaceTabPayload（chromeTabId=0 表示未知，保留 tabId）
   const existingTabPayloads = workspace.tabs.map(t => ({
+    tabId: t.tabId,
     url: t.url,
     title: t.title,
     favIconUrl: t.favIconUrl,
@@ -606,17 +607,22 @@ async function handleOpenWorkspace(
   }
 }
 
-/** 重新排序工作组内的标签页 */
-async function handleSortWorkspaceTabs(
-  payload: { workspaceId: string; tabOrder: string[] },
+/** 移动标签页到目标工作组指定位置（精简版 — 只需传 tabId + workspaceId + newIndex） */
+async function handleMoveWorkspaceTab(
+  payload: { workspaceId: string; tabId: string; newIndex: number },
 ): Promise<MessageResponse> {
-  const res = await reorderWorkspaceTabs(payload.workspaceId, payload.tabOrder)
-  if (res.ok) {
-    logger.info('Workspace tabs reordered:', payload.workspaceId)
-    return { success: true }
+  try {
+    const res = await moveWorkspaceTab(payload.workspaceId, payload.tabId, payload.newIndex)
+    if (res.ok) {
+      logger.info(`Tab moved: ${payload.tabId} → workspace=${payload.workspaceId}, index=${payload.newIndex}`)
+      return { success: true }
+    }
+    logger.warn('moveWorkspaceTab API failed:', res.error)
+    return { success: false, error: res.error || '移动标签页失败', authError: res.status === 401 }
+  } catch (err) {
+    logger.warn('moveWorkspaceTab error:', err)
+    return { success: false, error: '移动标签页失败: ' + String(err) }
   }
-  logger.warn('reorderWorkspaceTabs API failed:', res.error)
-  return { success: false, error: res.error || '排序失败', authError: res.status === 401 }
 }
 
 // ============ 设备操作 ============

@@ -35,7 +35,7 @@ export function getWorkspaceTabsSummary() {
   return apiClient.get<WorkspaceTabsSummaryData>('/v1/tab-sync/workspaces/tabs-summary')
 }
 
-/** 重新排序工作组内的标签页 */
-export function reorderWorkspaceTabs(workspaceId: string, tabOrder: string[]) {
-  return apiClient.put<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/reorder`, { tabOrder })
+/** 移动标签页到指定工作组的目标位置（支持同组排序和跨组移动） */
+export function moveWorkspaceTab(targetWorkspaceId: string, tabId: string, newIndex: number) {
+  return apiClient.post<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(targetWorkspaceId)}/tabs/move`, { tabId, newIndex })
 }

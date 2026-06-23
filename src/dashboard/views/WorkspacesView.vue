@@ -71,15 +71,16 @@
           </div>
         </template>
 
-        <!-- 标签页列表（可拖拽排序） -->
+        <!-- 标签页列表（可跨工作组拖拽排序） -->
         <div v-if="ws.tabs.length > 0" class="ws-tabs">
           <draggable
             :list="ws.tabs"
+            group="workspaces"
             item-key="tabId"
             handle=".drag-handle"
             ghost-class="tab-ghost"
             :animation="200"
-            @end="handleTabSort(ws.id)"
+            @change="(evt: DraggableChangeEvent) => onDragChange(ws.id, evt)"
           >
             <template #item="{ element: tab }">
               <div class="ws-tab-item">
@@ -166,9 +167,19 @@ import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, De
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
-import type { Workspace, WorkspacesData, WorkspaceTabPayload } from '../../shared/types'
+import type { Workspace, WorkspacesData, WorkspaceTabPayload, TabReference } from '../../shared/types'
+
+/** vuedraggable change 事件类型 */
+interface DraggableChangeEvent {
+  added?: { element: TabReference; newIndex: number }
+  removed?: { element: TabReference; oldIndex: number }
+  moved?: { element: TabReference; oldIndex: number; newIndex: number }
+}
 
 const workspaces = ref<Workspace[]>([])
+
+/** 记录最后一次 removed 事件，用于检测跨工作组移动 */
+const lastRemoved = ref<{ tabId: string; sourceWorkspaceId: string } | null>(null)
 const loading = ref(true)
 const searchKeyword = ref('')
 
@@ -354,19 +365,46 @@ function openSingleTab(url: string) {
   chrome.tabs.create({ url })
 }
 
-/** 拖拽排序完成后，将新顺序同步到后端 */
-async function handleTabSort(workspaceId: string) {
-  const ws = workspaces.value.find(w => w.id === workspaceId)
-  if (!ws) return
+/** 拖拽变化事件处理 — 统一走 MOVE_WORKSPACE_TAB（后端自行调整排序号） */
+function onDragChange(workspaceId: string, evt: DraggableChangeEvent) {
+  if (evt.moved) {
+    // 同一工作组内拖拽排序：传 tabId + 目标位置
+    handleMoveTab(workspaceId, evt.moved.element.tabId, evt.moved.newIndex)
+    return
+  }
 
-  const tabOrder = ws.tabs.map(t => t.tabId)
+  if (evt.removed) {
+    // 标签页被拖出当前工作组，记录来源信息
+    lastRemoved.value = {
+      tabId: evt.removed.element.tabId,
+      sourceWorkspaceId: workspaceId,
+    }
+    return
+  }
+
+  if (evt.added) {
+    const tabId = evt.added.element.tabId
+    // 检测是否为跨工作组移动
+    if (lastRemoved.value && lastRemoved.value.tabId === tabId && lastRemoved.value.sourceWorkspaceId !== workspaceId) {
+      handleMoveTab(workspaceId, tabId, evt.added.newIndex)
+    }
+    lastRemoved.value = null
+  }
+}
+
+/** 移动标签页到目标工作组指定位置（后端自动处理跨组/同组） */
+async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {
   try {
-    await sendMessage({
-      action: 'SORT_WORKSPACE_TABS',
-      payload: { workspaceId, tabOrder },
+    const res = await sendMessage({
+      action: 'MOVE_WORKSPACE_TAB',
+      payload: { workspaceId: targetWsId, tabId, newIndex },
     })
+    if (!res.success) {
+      // API 失败则刷新以回滚视觉状态
+      await loadWorkspaces()
+    }
   } catch {
-    // 排序 API 失败不回滚 UI，保留乐观更新
+    await loadWorkspaces()
   }
 }
 

@@ -20,8 +20,8 @@ export type MessageAction =
   | 'UPDATE_WORKSPACE'
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
-  | 'SORT_WORKSPACE_TABS'
   | 'ADD_TABS_TO_WORKSPACE'
+  | 'MOVE_WORKSPACE_TAB'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
   | 'GET_WORKSPACE_TABS_SUMMARY'
@@ -77,6 +77,8 @@ export interface GetWorkspacesMessage {
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
 export interface WorkspaceTabPayload {
+  /** 标签页 UUID（更新已有标签页时传入，新建时可不传由后端生成） */
+  tabId?: string
   url: string
   title: string
   favIconUrl: string
@@ -104,12 +106,6 @@ export interface OpenWorkspaceMessage {
   payload: { id: string; tabIds?: string[]; newWindow?: boolean; asTabGroup?: boolean }
 }
 
-/** 重新排序工作组内的标签页 */
-export interface SortWorkspaceTabsMessage {
-  action: 'SORT_WORKSPACE_TABS'
-  payload: { workspaceId: string; tabOrder: string[] }
-}
-
 export interface OpenDashboardMessage {
   action: 'OPEN_DASHBOARD'
 }
@@ -128,6 +124,19 @@ export interface AddTabsToWorkspaceMessage {
   payload: { workspaceId: string; tabs: WorkspaceTabPayload[] }
 }
 
+/** 移动标签页到目标工作组指定位置（精简版，支持同组排序和跨组移动） */
+export interface MoveWorkspaceTabMessage {
+  action: 'MOVE_WORKSPACE_TAB'
+  payload: {
+    /** 目标工作组 UUID */
+    workspaceId: string
+    /** 要移动的标签页 UUID */
+    tabId: string
+    /** 目标排序位置（0-based） */
+    newIndex: number
+  }
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -143,8 +152,8 @@ export type ExtensionMessage =
   | UpdateWorkspaceMessage
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
-  | SortWorkspaceTabsMessage
   | AddTabsToWorkspaceMessage
+  | MoveWorkspaceTabMessage
   | OpenDashboardMessage
   | GetDevicesMessage
   | GetWorkspaceTabsSummaryMessage
