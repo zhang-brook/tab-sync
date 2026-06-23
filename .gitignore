@@ -25,3 +25,5 @@ dist-ssr
 *.sw?
 
 tsconfig.tsbuildinfo
+auto-imports.d.ts
+components.d.ts
