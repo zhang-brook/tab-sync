@@ -1,14 +1,19 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import path from 'node:path'
 import { crx } from '@crxjs/vite-plugin'
+import vue from '@vitejs/plugin-vue'
+import { defineConfig } from 'vite'
+import zip from 'vite-plugin-zip-pack'
+import manifest from './manifest.config.ts'
+import { name, version } from './package.json'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import manifest from './src/manifest'
 
 export default defineConfig({
-  server: {
-    port: 6886,
+  resolve: {
+    alias: {
+      '@': `${path.resolve(__dirname, 'src')}`,
+    },
   },
   plugins: [
     vue(),
@@ -19,12 +24,14 @@ export default defineConfig({
     Components({
       resolvers: [ElementPlusResolver()],
     }),
+    zip({ outDir: 'release', outFileName: `crx-${name}-${version}.zip` }),
   ],
-  build: {
-    rollupOptions: {
-      input: {
-        dashboard: 'src/dashboard/index.html',
-      },
+  server: {
+    port: 6886,
+    cors: {
+      origin: [
+        /chrome-extension:\/\//,
+      ],
     },
   },
 })
