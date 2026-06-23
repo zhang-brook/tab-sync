@@ -32,7 +32,17 @@
     </el-aside>
     <el-container>
       <el-header class="dashboard-header">
-        <span class="header-title">{{ pageTitle }}</span>
+        <div class="header-left">
+          <span class="header-title">{{ pageTitle }}</span>
+          <template v-if="dataSource">
+            <el-tag size="small" effect="plain" :type="dataSource.type">
+              {{ dataSource.label }}
+            </el-tag>
+            <el-text size="small" v-if="dataSource.desc">
+              {{ dataSource.desc }}
+            </el-text>
+          </template>
+        </div>
         <div v-if="authenticated" class="header-right">
           <span class="header-username">{{ userName }}</span>
           <el-button type="danger" size="small" text @click="handleLogout">
@@ -83,6 +93,9 @@ const pageTitleMap: Record<string, string> = {
 
 const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => pageTitleMap[route.path] || '标签页管理')
+
+/** 从路由 meta 中读取当前页面的数据来源标识 */
+const dataSource = computed(() => route.meta.dataSource ?? null)
 
 // 监听 storage 变化，检测 token 被清除
 function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
@@ -199,6 +212,12 @@ html, body, #app {
   font-size: 18px;
   font-weight: 500;
   color: #303133;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .header-right {
