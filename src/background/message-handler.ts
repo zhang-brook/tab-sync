@@ -64,6 +64,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'MOVE_WORKSPACE_TAB':
       return handleMoveWorkspaceTab(message.payload)
 
+    case 'REMOVE_WORKSPACE_TAB':
+      return handleRemoveWorkspaceTab(message.payload.workspaceId, message.payload.tabId)
+
     case 'GET_DEVICES':
       return handleGetDevices()
 
@@ -622,6 +625,50 @@ async function handleMoveWorkspaceTab(
   } catch (err) {
     logger.warn('moveWorkspaceTab error:', err)
     return { success: false, error: '移动标签页失败: ' + String(err) }
+  }
+}
+
+/** 从工作组中移除指定标签页 */
+async function handleRemoveWorkspaceTab(workspaceId: string, tabId: string): Promise<MessageResponse> {
+  try {
+    // 1. 获取所有工作组
+    const res = await getWorkspaces()
+    if (!res.ok || !res.data) {
+      return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
+    }
+
+    // 2. 找到目标工作组
+    const workspace = res.data.workspaces.find(w => w.id === workspaceId)
+    if (!workspace) {
+      return { success: false, error: '工作组不存在' }
+    }
+
+    // 3. 过滤掉要移除的标签页
+    const remainingTabs = workspace.tabs.filter(t => t.tabId !== tabId)
+    if (remainingTabs.length === workspace.tabs.length) {
+      return { success: false, error: '标签页不在该工作组中' }
+    }
+
+    // 4. 构造更新 payload（保留 tabId，chromeTabId=0 表示未知）
+    const tabPayloads = remainingTabs.map(t => ({
+      tabId: t.tabId,
+      url: t.url,
+      title: t.title,
+      favIconUrl: t.favIconUrl,
+      chromeTabId: 0,
+    }))
+
+    // 5. 调用更新 API
+    const updateRes = await updateWorkspace(workspaceId, { tabs: tabPayloads })
+    if (updateRes.ok) {
+      logger.info(`Tab ${tabId} removed from workspace "${workspace.name}"`)
+      return { success: true }
+    }
+    logger.warn('removeWorkspaceTab: updateWorkspace failed:', updateRes.error)
+    return { success: false, error: updateRes.error || '移除标签页失败', authError: updateRes.status === 401 }
+  } catch (err) {
+    logger.warn('removeWorkspaceTab error:', err)
+    return { success: false, error: '移除标签页失败: ' + String(err) }
   }
 }
 

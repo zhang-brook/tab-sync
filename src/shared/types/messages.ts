@@ -22,6 +22,7 @@ export type MessageAction =
   | 'OPEN_WORKSPACE'
   | 'ADD_TABS_TO_WORKSPACE'
   | 'MOVE_WORKSPACE_TAB'
+  | 'REMOVE_WORKSPACE_TAB'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
   | 'GET_WORKSPACE_TABS_SUMMARY'
@@ -124,6 +125,17 @@ export interface AddTabsToWorkspaceMessage {
   payload: { workspaceId: string; tabs: WorkspaceTabPayload[] }
 }
 
+/** 从工作组中移除指定标签页 */
+export interface RemoveWorkspaceTabMessage {
+  action: 'REMOVE_WORKSPACE_TAB'
+  payload: {
+    /** 工作组 UUID */
+    workspaceId: string
+    /** 要移除的标签页 UUID */
+    tabId: string
+  }
+}
+
 /** 移动标签页到目标工作组指定位置（精简版，支持同组排序和跨组移动） */
 export interface MoveWorkspaceTabMessage {
   action: 'MOVE_WORKSPACE_TAB'
@@ -154,6 +166,7 @@ export type ExtensionMessage =
   | OpenWorkspaceMessage
   | AddTabsToWorkspaceMessage
   | MoveWorkspaceTabMessage
+  | RemoveWorkspaceTabMessage
   | OpenDashboardMessage
   | GetDevicesMessage
   | GetWorkspaceTabsSummaryMessage

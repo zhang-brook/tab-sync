@@ -94,12 +94,17 @@
                 />
                 <div v-else class="tab-favicon-placeholder" />
                 <div class="tab-text">
-                  <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
+                  <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
                   <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
                 </div>
                 <el-tooltip content="在新标签页中打开" placement="top">
                   <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
                     <el-icon><View /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip content="从工作组中移除" placement="top">
+                  <el-button size="small" text type="danger" @click="handleRemoveTab(ws.id, tab.tabId)">
+                    <el-icon><Delete /></el-icon>
                   </el-button>
                 </el-tooltip>
               </div>
@@ -356,6 +361,20 @@ function openSingleTab(url: string) {
   chrome.tabs.create({ url })
 }
 
+/** 从工作组中移除指定标签页 */
+async function handleRemoveTab(workspaceId: string, tabId: string) {
+  const res = await sendMessage({
+    action: 'REMOVE_WORKSPACE_TAB',
+    payload: { workspaceId, tabId },
+  })
+  if (res.success) {
+    ElMessage.success('标签页已从工作组移除')
+    await loadWorkspaces()
+  } else {
+    ElMessage.error(res.error || '移除失败')
+  }
+}
+
 /** 同组内拖拽排序 — 用 tabId 在列表中反查真实位置，避免 DOM index 偏差 */
 function onDragUpdate(workspaceId: string, evt: any) {
   const ws = workspaces.value.find(w => w.id === workspaceId)
@@ -512,6 +531,12 @@ function formatTime(iso: string): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.tab-title:hover {
+  color: #409EFF;
+  text-decoration: underline;
 }
 
 .tab-url {
