@@ -68,7 +68,7 @@
 
       <el-table-column label="最后访问时间" width="140" align="center">
         <template #default="{ row }">
-          <el-tooltip :content="lastAccessedTip(row)" placement="top" :disabled="!row.lastAccessedAt">
+          <el-tooltip :content="lastAccessedTip(row as TabRow)" placement="top" :disabled="!row.lastAccessedAt">
             <span class="time-text">{{ formatTime(row.lastAccessedAt) }}</span>
           </el-tooltip>
         </template>
@@ -110,7 +110,7 @@
       <el-table-column label="操作" width="140" align="center" fixed="right">
         <template #default="{ row }">
           <el-tooltip content="切换到该标签页" placement="top">
-            <el-button size="small" text type="primary" @click="handleSwitchToTab(row)">
+            <el-button size="small" text type="primary" @click="handleSwitchToTab(row as TabRow)">
               <el-icon><View /></el-icon>
             </el-button>
           </el-tooltip>
