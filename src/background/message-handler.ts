@@ -4,7 +4,7 @@ import { storage, STORAGE_KEYS } from '../shared/storage'
 import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
-import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
+import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName, getPlatformCode } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
 
@@ -143,7 +143,7 @@ async function handleLoginWithCredentials(
   username: string,
   password: string,
 ): Promise<MessageResponse<LoginData>> {
-  const res = await loginWithCredentials(username, password)
+  const res = await loginWithCredentials(username, password, getPlatformCode())
 
   if (!res.ok || !res.data) {
     const error = res.error || '登录失败'

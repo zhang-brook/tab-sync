@@ -8,8 +8,8 @@ export interface RefreshTokenResponse {
 }
 
 /** 账号密码登录 */
-export function loginWithCredentials(username: string, password: string) {
-  return apiClient.post<LoginResponse>('/v1/tab-sync/auth/login', { username, password })
+export function loginWithCredentials(username: string, password: string, platformCode: string) {
+  return apiClient.post<LoginResponse>('/v1/tab-sync/auth/login', { username, password, platformCode })
 }
 
 /** 刷新 Token */

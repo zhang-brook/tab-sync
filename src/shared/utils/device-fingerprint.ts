@@ -92,3 +92,15 @@ export function getOSInfo(): string {
   if (ua.includes('CrOS')) return 'ChromeOS'
   return 'Unknown'
 }
+
+/**
+ * 获取平台编码（与后端 Platform 枚举的 platformCode 字段对应）
+ * 用于登录时告知后端当前扩展运行在哪个浏览器上
+ */
+export function getPlatformCode(): string {
+  const ua = navigator.userAgent
+  if (ua.includes('Edg/')) return 'edge_ext'
+  if (ua.includes('Chrome/')) return 'chrome_ext'
+  if (ua.includes('Firefox/')) return 'firefox_ext'
+  return 'chrome_ext' // 默认 chrome_ext，因为目前只支持 Chromium 系浏览器
+}
