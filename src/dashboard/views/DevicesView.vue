@@ -69,6 +69,15 @@
             </div>
             <div class="device-id-text">ID: {{ device.id }}</div>
           </div>
+          <el-button
+            type="danger"
+            size="small"
+            plain
+            :loading="kickingDeviceId === device.id"
+            @click="handleKickDevice(device)"
+          >
+            下线
+          </el-button>
         </div>
       </div>
     </el-card>
@@ -84,12 +93,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Monitor } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import type { Device, DevicesData, StateData } from '../../shared/types'
 
 const allDevices = ref<Device[]>([])
 const tabCount = ref({ open: 0, frozen: 0 })
 const loading = ref(true)
+const kickingDeviceId = ref<string | null>(null)
 
 /** 当前设备（列表中第一个） */
 const currentDevice = computed(() => allDevices.value[0] ?? {
@@ -121,6 +132,47 @@ function formatTime(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** 刷新设备列表 */
+async function refreshDevices() {
+  const devRes = await sendMessage<DevicesData>({ action: 'GET_DEVICES' })
+  if (devRes.success && devRes.data) {
+    allDevices.value = devRes.data.devices
+  }
+}
+
+/** 远程下线指定设备 */
+async function handleKickDevice(device: Device) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将设备 "${device.name}" (${device.browser} / ${device.os}) 下线吗？该设备下次同步时将需要重新登录。`,
+      '确认下线设备',
+      {
+        confirmButtonText: '确认下线',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    // 用户取消操作
+    return
+  }
+
+  kickingDeviceId.value = device.id
+  try {
+    const res = await sendMessage({ action: 'DEREGISTER_DEVICE', payload: { deviceId: device.id } })
+    if (res.success) {
+      ElMessage.success(`设备 "${device.name}" 已下线`)
+      await refreshDevices()
+    } else {
+      ElMessage.error(res.error || '下线失败，请稍后重试')
+    }
+  } catch {
+    ElMessage.error('操作失败，请检查网络后重试')
+  } finally {
+    kickingDeviceId.value = null
+  }
 }
 </script>
 

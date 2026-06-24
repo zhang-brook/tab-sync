@@ -25,6 +25,7 @@ export type MessageAction =
   | 'REMOVE_WORKSPACE_TAB'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
+  | 'DEREGISTER_DEVICE'
   | 'GET_WORKSPACE_TABS_SUMMARY'
 
 // ============ 请求消息定义 ============
@@ -115,6 +116,11 @@ export interface GetDevicesMessage {
   action: 'GET_DEVICES'
 }
 
+export interface DeregisterDeviceMessage {
+  action: 'DEREGISTER_DEVICE'
+  payload: { deviceId: string }
+}
+
 export interface GetWorkspaceTabsSummaryMessage {
   action: 'GET_WORKSPACE_TABS_SUMMARY'
 }
@@ -169,6 +175,7 @@ export type ExtensionMessage =
   | RemoveWorkspaceTabMessage
   | OpenDashboardMessage
   | GetDevicesMessage
+  | DeregisterDeviceMessage
   | GetWorkspaceTabsSummaryMessage
 
 // ============ 响应定义 ============

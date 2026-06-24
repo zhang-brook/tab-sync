@@ -70,6 +70,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'GET_DEVICES':
       return handleGetDevices()
 
+    case 'DEREGISTER_DEVICE':
+      return handleDeregisterDevice(message.payload.deviceId)
+
     default:
       return { success: false, error: '未知的消息类型' }
   }
@@ -720,5 +723,21 @@ async function handleGetDevices(): Promise<MessageResponse<DevicesData>> {
   return {
     success: true,
     data: { devices: [currentDevice] },
+  }
+}
+
+/** 远程注销指定设备（踢下线） */
+async function handleDeregisterDevice(deviceId: string): Promise<MessageResponse> {
+  try {
+    const res = await deregisterDevice(deviceId)
+    if (res.ok) {
+      logger.info('Device deregistered:', deviceId)
+      return { success: true }
+    }
+    logger.warn('deregisterDevice API failed:', res.error)
+    return { success: false, error: res.error || '注销设备失败', authError: res.status === 401 }
+  } catch (err) {
+    logger.error('deregisterDevice error:', err)
+    return { success: false, error: '注销设备失败: ' + String(err) }
   }
 }
