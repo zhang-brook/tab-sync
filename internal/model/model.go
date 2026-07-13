@@ -1,0 +1,96 @@
+package model
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+// ===================== 服务端配置 =====================
+
+// ServerConfig 服务端配置（单例，仅一条记录）
+type ServerConfig struct {
+	ID        uint   `gorm:"primaryKey"`
+	SetupDone bool   `gorm:"default:false"` // 是否已完成初始化设置
+	AdminUser string `gorm:"default:admin"` // 管理员用户名
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// ===================== 认证 Token =====================
+
+// AuthToken 认证 Token（类似 API Key）
+type AuthToken struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	TokenID   string    `gorm:"uniqueIndex;size:64;not null"` // Token 唯一标识（UUID）
+	Token     string    `gorm:"uniqueIndex;size:128;not null"` // 实际 Token 值（前缀 tbs_）
+	Name      string    `gorm:"size:100"`                     // Token 备注名称
+	IsAdmin   bool      `gorm:"default:false"`                // 是否为管理员 Token
+	IsRevoked bool      `gorm:"default:false"`                // 是否已吊销
+	LastUsed  *time.Time                                      // 最后使用时间
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+// ===================== 设备 =====================
+
+// Device 设备信息
+type Device struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	DeviceID  string    `gorm:"uniqueIndex;size:64;not null"` // 设备唯一标识（UUID）
+	Name      string    `gorm:"size:100"`
+	Browser   string    `gorm:"size:50"`
+	OS        string    `gorm:"size:50"`
+	LastSeen  time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+// ===================== 工作组 =====================
+
+// Workspace 工作组
+type Workspace struct {
+	ID          uint           `gorm:"primaryKey;autoIncrement"`
+	WorkspaceID string         `gorm:"uniqueIndex;size:64;not null"` // 工作组 UUID
+	Name        string         `gorm:"size:200;not null"`
+	Color       string         `gorm:"size:7;default:'#409EFF'"`
+	Icon        string         `gorm:"size:50"`
+	SortOrder   int            `gorm:"default:0"` // 排序序号
+	IsDeleted   bool           `gorm:"default:false"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
+	// 关联
+	Tabs []WorkspaceTab `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
+}
+
+// WorkspaceTab 工作组内标签页
+type WorkspaceTab struct {
+	ID          uint      `gorm:"primaryKey;autoIncrement"`
+	WorkspaceID string    `gorm:"index;size:64;not null"`           // 所属工作组 UUID
+	TabID       string    `gorm:"uniqueIndex:ws_tab_unique;size:64;not null"` // 标签页 UUID
+	URL         string    `gorm:"size:2048;not null"`
+	Title       string    `gorm:"size:500"`
+	FavIconURL  string    `gorm:"size:2048"`
+	SortOrder   int       `gorm:"default:0"` // 排序序号
+	AddedAt     time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// ===================== 同步事件（预留） =====================
+
+// SyncEvent 同步事件记录
+type SyncEvent struct {
+	ID        uint   `gorm:"primaryKey;autoIncrement"`
+	EventID   string `gorm:"uniqueIndex;size:64;not null"` // 事件 UUID
+	EventType string `gorm:"size:50;not null"`             // created / updated / removed
+	EntityType string `gorm:"size:50;not null"`            // workspace / tab / device
+	EntityID  string `gorm:"index;size:64"`                // 实体 UUID
+	Payload   string `gorm:"type:text"`                     // 变更数据 JSON
+	Version   int64  `gorm:"default:0"`                     // 数据版本号（用于增量同步）
+	SyncedAt  *time.Time                                    // 已同步到上游的时间（nil 表示未同步）
+	CreatedAt time.Time
+}

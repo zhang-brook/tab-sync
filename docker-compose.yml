@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  tab-sync-server:
+    build: .
+    container_name: tab-sync-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - tab-sync-data:/app/data
+    environment:
+      - PORT=8080
+      - JWT_SECRET=change-me-in-production
+      - MIN_EXT_VERSION=1.0.0
+      - MAX_EXT_VERSION=2.0.0
+    restart: unless-stopped
+
+volumes:
+  tab-sync-data:
