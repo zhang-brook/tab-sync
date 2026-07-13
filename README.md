@@ -28,6 +28,7 @@ docker run -d \
 ### 手动编译
 
 ```bash
+go mod tidy
 go build -o tab-sync-server ./cmd/server
 ./tab-sync-server
 ```
