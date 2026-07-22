@@ -1,7 +1,10 @@
 package main
 
 import (
-	"log"
+	"embed"
+	"io/fs"
+	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,25 +12,36 @@ import (
 	"github.com/spidermemos/tab-sync-server/internal/config"
 	"github.com/spidermemos/tab-sync-server/internal/database"
 	"github.com/spidermemos/tab-sync-server/internal/handler"
+	"github.com/spidermemos/tab-sync-server/internal/logger"
 	"github.com/spidermemos/tab-sync-server/internal/middleware"
 	"github.com/spidermemos/tab-sync-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
+//go:embed web/*
+var webFS embed.FS
+
 func main() {
 	// 加载配置
 	cfg := config.Load()
 
+	// 初始化日志系统
+	logger.Init(cfg.LogLevel, cfg.LogOutput)
+	slog.Info("Tab Sync Server 正在启动", "version", cfg.Version)
+
 	// 初始化数据库
 	db, err := database.Init(cfg)
 	if err != nil {
-		log.Fatalf("数据库初始化失败: %v", err)
+		slog.Error("数据库初始化失败", "error", err)
+		os.Exit(1)
 	}
+	slog.Info("数据库初始化成功", "db_path", cfg.DBPath)
 
 	// 自动迁移
 	if err := database.AutoMigrate(db); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		slog.Error("数据库迁移失败", "error", err)
+		os.Exit(1)
 	}
 
 	// 初始化各层
@@ -35,15 +49,26 @@ func main() {
 	handlers := handler.NewHandlers(services)
 
 	// 设置 Gin 路由
-	r := gin.Default()
+	r := gin.New()
 
 	// 全局中间件
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestLogger())
 	r.Use(middleware.CORS())
 	r.Use(middleware.VersionCheck(cfg.Version))
 
-	// 首次设置向导
-	r.GET("/setup", handlers.Setup.RenderSetupPage)
+	// ========== 管理后台路由（Web 界面） ==========
+
+	// 嵌入的静态资源（web/ 目录）
+	webSub, _ := fs.Sub(webFS, "web")
+	r.GET("/setup", func(c *gin.Context) {
+		c.FileFromFS("/setup.html", http.FS(webSub))
+	})
+
+	// 管理后台 API（无需 Token 认证，使用 JWT 会话）
 	r.POST("/api/setup", handlers.Setup.CompleteSetup)
+	r.GET("/api/setup/status", handlers.Setup.GetSetupStatus)
+	r.POST("/api/admin/login", handlers.Setup.AdminLogin)
 
 	// API v1 路由组
 	v1 := r.Group("/v1/tab-sync")
@@ -81,9 +106,9 @@ func main() {
 			auth.GET("/sse/events", handlers.SSE.Stream)
 		}
 
-		// 管理接口（需要 Admin Token）
+		// 管理接口（支持 Admin Token 或 JWT 会话）
 		admin := v1.Group("/admin")
-		admin.Use(middleware.AdminAuth(services.Auth))
+		admin.Use(middleware.AdminOrJWTAuth(services.Auth))
 		{
 			admin.POST("/tokens", handlers.Auth.GenerateToken)
 			admin.DELETE("/tokens/:tokenId", handlers.Auth.RevokeToken)
@@ -94,11 +119,15 @@ func main() {
 
 	// 启动服务器
 	addr := ":" + cfg.Port
-	log.Printf("Tab Sync Server v%s 启动于 %s", cfg.Version, addr)
+	slog.Info("服务器启动成功", "addr", "http://localhost:"+cfg.Port)
+	if cfg.IsFirstRun {
+		slog.Info("首次运行！请在浏览器中打开设置向导", "url", "http://localhost:"+cfg.Port+"/setup")
+	}
 
 	go func() {
 		if err := r.Run(addr); err != nil {
-			log.Fatalf("服务器启动失败: %v", err)
+			slog.Error("服务器运行失败", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -106,5 +135,5 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("服务器正在关闭...")
+	slog.Info("服务器正在关闭...")
 }
