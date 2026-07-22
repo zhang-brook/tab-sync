@@ -10,11 +10,13 @@ import (
 
 // ServerConfig 服务端配置（单例，仅一条记录）
 type ServerConfig struct {
-	ID        uint   `gorm:"primaryKey"`
-	SetupDone bool   `gorm:"default:false"` // 是否已完成初始化设置
-	AdminUser string `gorm:"default:admin"` // 管理员用户名
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            uint   `gorm:"primaryKey"`
+	SetupDone     bool   `gorm:"default:false"`    // 是否已完成初始化设置
+	AdminUser     string `gorm:"default:admin"`    // 管理员用户名
+	AdminPassword string `gorm:"size:128"`         // 管理员密码哈希（SHA-256）
+	JWTSecret     string `gorm:"size:128"`         // JWT 签名密钥（首次初始化时自动生成）
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // ===================== 认证 Token =====================
