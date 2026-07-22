@@ -1,52 +1,71 @@
-# Vue 3 + Vite + CRXJS
+# SpiderMemos Tab Sync Browser Extension
 
-This template helps you quickly start developing Chrome extensions with Vue 3, TypeScript and Vite. It includes the CRXJS Vite plugin for seamless Chrome extension development.
+Chrome 浏览器标签页管理扩展，支持标签页实时同步、工作组管理、多设备协作。
 
-## Features
+- **技术栈**: Vue 3 + Element Plus + Vite + CRXJS + TypeScript + Chrome Manifest V3
+- **后端**: 轻量后端 [Tab Sync Server](https://github.com/spidermemos/tab-sync-server)（Go + Gin + SQLite）
 
-- Vue 3 with `<script setup>` syntax
-- TypeScript support
-- Vite build tool
-- CRXJS Vite plugin integration
-- Chrome extension manifest configuration
-
-## Quick Start
-
-1. Install dependencies:
+## 快速开始
 
 ```bash
+# 安装依赖
 npm install
-```
 
-2. Start development server:
-
-```bash
+# 开发模式（支持 HMR 热更新）
 npm run dev
-```
 
-3. Open Chrome and navigate to `chrome://extensions/`, enable "Developer mode", and load the unpacked extension from the `dist` directory.
-
-4. Build for production:
-
-```bash
+# 生产构建
 npm run build
 ```
 
-## Project Structure
+### 加载扩展
 
-- `src/popup/` - Extension popup UI
-- `src/content/` - Content scripts
-- `manifest.config.ts` - Chrome extension manifest configuration
+1. 运行 `npm run build` 或 `npm run dev`
+2. 打开 `chrome://extensions`，启用「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择项目 `dist` 目录
+4. 验证：打开 Popup / Dashboard / SidePanel
 
-## Documentation
+## 连接后端
 
-- [Vue 3 Documentation](https://vuejs.org/)
-- [Vite Documentation](https://vitejs.dev/)
-- [CRXJS Documentation](https://crxjs.dev/vite-plugin)
+### 选项 A：连接轻量后端（推荐）
 
-## Chrome Extension Development Notes
+1. 先部署 Tab Sync Server（参见[部署文档](https://github.com/spidermemos/tab-sync-server#readme)）
+2. 打开扩展 Dashboard → 设置
+3. 连接模式选择 **「轻量后端」**
+4. 填入后端地址（如 `http://localhost:8080`）
+5. 在管理后台（`http://localhost:8080/setup`）生成 API Token
+6. 将 Token 粘贴到设置页的 Token 输入框
+7. 点击「验证连接」
 
-- Use `manifest.config.ts` to configure your extension
-- The CRXJS plugin automatically handles manifest generation
-- Content scripts should be placed in `src/content/`
-- Popup UI should be placed in `src/popup/`
+### 选项 B：连接织个网后端（预留）
+
+1. 连接模式选择 **「织个网」**
+2. 填入织个网后端地址
+3. 使用账号密码登录
+
+## 项目结构
+
+```
+src/
+  background/            # Service Worker（数据中心 + 事件监听）
+  popup/                 # 弹出窗口（轻量快捷操作）
+  sidepanel/             # 侧边栏
+  dashboard/             # 完整管理面板（标签页/工作组/设置/历史）
+  shared/
+    api/                 # fetch 封装 + 各模块 API
+    storage/             # chrome.storage.local 封装
+    types/               # TypeScript 类型定义
+    composables/         # Vue composables
+    utils/               # 工具函数
+```
+
+## 开发指南
+
+详见 [AGENTS.md](./AGENTS.md) — AI 协作开发指南，包含关键注意事项、技术细节和沟通约定。
+
+## 后端
+
+| 后端 | 技术栈 | 适用场景 |
+|------|--------|----------|
+| [Tab Sync Server](https://github.com/spidermemos/tab-sync-server) | Go + Gin + SQLite | 自部署、个人使用、内网环境 |
+| 织个网后端 | SpringBoot + PostgreSQL | 云端多用户、分布式部署（预留） |
