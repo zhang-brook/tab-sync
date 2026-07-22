@@ -16,7 +16,6 @@
     <div v-else class="popup-body">
       <div class="user-info">
         <el-tag type="success" size="small">已登录</el-tag>
-        <span class="username">{{ userName }}</span>
         <el-button type="danger" size="small" text @click="handleLogout">
           退出
         </el-button>
@@ -57,7 +56,6 @@ import type { StateData } from '../shared/types'
 
 const loading = ref(true)
 const authenticated = ref(false)
-const userName = ref('')
 const tabCount = ref({ open: 0, frozen: 0 })
 
 onMounted(() => {
@@ -69,7 +67,6 @@ async function loadState() {
     const res = await sendMessage<StateData>({ action: 'GET_STATE' })
     if (res.success && res.data) {
       authenticated.value = res.data.auth?.authenticated ?? false
-      userName.value = res.data.auth?.user?.username || ''
       tabCount.value = res.data.tabCount ?? { open: 0, frozen: 0 }
     }
   } finally {
@@ -80,7 +77,6 @@ async function loadState() {
 async function handleLogout() {
   await sendMessage({ action: 'LOGOUT' })
   authenticated.value = false
-  userName.value = ''
   ElMessage.success('已退出登录')
 }
 
@@ -127,12 +123,6 @@ function openSidePanel() {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.username {
-  font-size: 13px;
-  color: #606266;
-  flex: 1;
 }
 
 .stat-row {

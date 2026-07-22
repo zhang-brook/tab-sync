@@ -93,6 +93,15 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
 所有 `chrome.storage.local` 的 key 集中定义在 `src/shared/storage/keys.ts` 的 `STORAGE_KEYS` 常量中。新增存储项时必须在此注册。
 
+### 3.9 认证模式 (v3: API Key 风格)
+
+- **已移除**：账号密码登录、`AUTH_USER`、`REFRESH_TOKEN` 及相关类型（`LoginRequest`, `LoginResponse`, `AuthUser`, `LoginData`）
+- **保留**：`AUTH_TOKEN` — 直接存储 API Key 风格的 Bearer Token
+- **新增**：`CONNECTION_MODE` — 连接模式标识（`'lightweight'` | `'zhige'`）
+- **新增消息 action**：`CHECK_VERSION`（版本协商）、`SET_CONNECTION_MODE`（模式切换）
+- **401 处理**：Token 无效时直接清除认证状态（无需 refresh token 续签）
+- **Token 生成**：在轻量后端管理后台（`/setup` 初始化页或 `/v1/tab-sync/admin/tokens`）生成
+
 ---
 
 ## 4. 目录结构关键文件
@@ -152,9 +161,11 @@ src/
 
 ### 5.4 后端状态
 
-- 后端尚未实现，所有 API 调用包裹 try-catch，失败时仅记录日志不影响本地功能
+- 轻量后端 `tab-sync-server` 已实现（Go + Gin + SQLite），支持设备注册、工作组 CRUD、API Key 认证
+- 后端启动后在浏览器访问 `/setup` 完成首次设置，获取 Admin Token
+- API 调用包裹 try-catch，失败时仅记录日志不影响本地功能
 - 扩展的本地功能 (标签页监控、工作组管理、历史记录) 完全独立于后端运行
-- 后端接口规范见 `openapi.yaml`
+- 后端代码位于项目根目录 `tab-sync-server/` 下
 
 ---
 

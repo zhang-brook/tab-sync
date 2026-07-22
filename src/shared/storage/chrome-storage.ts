@@ -1,11 +1,9 @@
 import { STORAGE_KEYS } from './keys'
-import type { AuthUser } from '../types'
 
-/** chrome.storage.local 数据结构映射 (v2: 仅认证/设备/设置) */
+/** chrome.storage.local 数据结构映射 (v3: API Key 风格认证) */
 interface StorageSchema {
   [STORAGE_KEYS.AUTH_TOKEN]: string | null
-  [STORAGE_KEYS.REFRESH_TOKEN]: string | null
-  [STORAGE_KEYS.AUTH_USER]: AuthUser | null
+  [STORAGE_KEYS.CONNECTION_MODE]: string | null
   [STORAGE_KEYS.DEVICE_ID]: string | null
   [STORAGE_KEYS.DEVICE_NAME]: string | null
   [STORAGE_KEYS.API_BASE_URL]: string
@@ -14,8 +12,7 @@ interface StorageSchema {
 /** 默认值 */
 const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.AUTH_TOKEN]: null,
-  [STORAGE_KEYS.REFRESH_TOKEN]: null,
-  [STORAGE_KEYS.AUTH_USER]: null,
+  [STORAGE_KEYS.CONNECTION_MODE]: null,
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,
   [STORAGE_KEYS.API_BASE_URL]: '',

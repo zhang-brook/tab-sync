@@ -1,7 +1,7 @@
 import type { TabRecord } from './tab'
 import type { Workspace } from './workspace'
 import type { Device } from './device'
-import type { AuthState, AuthUser } from './auth'
+import type { AuthState } from './auth'
 
 // ============ 消息 Action 定义 ============
 
@@ -9,7 +9,6 @@ import type { AuthState, AuthUser } from './auth'
 export type MessageAction =
   | 'GET_STATE'
   | 'LOGIN_WITH_TOKEN'
-  | 'LOGIN_WITH_CREDENTIALS'
   | 'LOGOUT'
   | 'GET_TABS'
   | 'CLOSE_TAB'
@@ -27,6 +26,8 @@ export type MessageAction =
   | 'GET_DEVICES'
   | 'DEREGISTER_DEVICE'
   | 'GET_WORKSPACE_TABS_SUMMARY'
+  | 'CHECK_VERSION'
+  | 'SET_CONNECTION_MODE'
 
 // ============ 请求消息定义 ============
 
@@ -39,13 +40,17 @@ export interface LoginWithTokenMessage {
   payload: { token: string }
 }
 
-export interface LoginWithCredentialsMessage {
-  action: 'LOGIN_WITH_CREDENTIALS'
-  payload: { username: string; password: string }
-}
-
 export interface LogoutMessage {
   action: 'LOGOUT'
+}
+
+export interface CheckVersionMessage {
+  action: 'CHECK_VERSION'
+}
+
+export interface SetConnectionModeMessage {
+  action: 'SET_CONNECTION_MODE'
+  payload: { mode: 'lightweight' | 'zhige'; apiBaseUrl?: string }
 }
 
 export interface GetTabsMessage {
@@ -159,8 +164,9 @@ export interface MoveWorkspaceTabMessage {
 export type ExtensionMessage =
   | GetStateMessage
   | LoginWithTokenMessage
-  | LoginWithCredentialsMessage
   | LogoutMessage
+  | CheckVersionMessage
+  | SetConnectionModeMessage
   | GetTabsMessage
   | CloseTabMessage
   | CloseTabsBatchMessage
@@ -196,6 +202,7 @@ export interface StateData {
     open: number
     frozen: number
   }
+  connectionMode?: string | null
 }
 
 /** GET_TABS 响应数据 */
@@ -206,11 +213,6 @@ export interface TabsData {
 /** GET_WORKSPACES 响应数据 */
 export interface WorkspacesData {
   workspaces: Workspace[]
-}
-
-/** LOGIN 响应数据 */
-export interface LoginData {
-  user: AuthUser
 }
 
 /** GET_DEVICES 响应数据 */

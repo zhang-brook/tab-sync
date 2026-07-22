@@ -1,10 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, LoginData, TabsData, WorkspacesData, DevicesData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
-import { loginWithCredentials, verifyToken, logout as apiLogout } from '../shared/api/auth'
+import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
-import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName, getPlatformCode } from '../shared/utils/device-fingerprint'
+import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
 
@@ -19,11 +19,14 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'LOGIN_WITH_TOKEN':
       return handleLoginWithToken(message.payload.token)
 
-    case 'LOGIN_WITH_CREDENTIALS':
-      return handleLoginWithCredentials(message.payload.username, message.payload.password)
-
     case 'LOGOUT':
       return handleLogout()
+
+    case 'CHECK_VERSION':
+      return handleCheckVersion()
+
+    case 'SET_CONNECTION_MODE':
+      return handleSetConnectionMode(message.payload)
 
     case 'OPEN_DASHBOARD':
       return handleOpenDashboard()
@@ -80,9 +83,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
 /** 获取扩展当前状态 */
 async function handleGetState(): Promise<MessageResponse<StateData>> {
-  const { auth_token, auth_user } = await storage.getMultiple([
+  const { auth_token, connection_mode } = await storage.getMultiple([
     STORAGE_KEYS.AUTH_TOKEN,
-    STORAGE_KEYS.AUTH_USER,
+    STORAGE_KEYS.CONNECTION_MODE,
   ])
 
   // 从浏览器获取当前打开的标签页数量
@@ -99,31 +102,29 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
       auth: {
         authenticated: !!auth_token,
         token: auth_token,
-        user: auth_user,
       },
       tabCount: { open: openCount, frozen: frozenCount },
+      connectionMode: connection_mode ?? null,
     },
   }
 }
 
 /** Token 登录 */
-async function handleLoginWithToken(token: string): Promise<MessageResponse<LoginData>> {
+async function handleLoginWithToken(token: string): Promise<MessageResponse> {
   // 先保存 token，这样 verifyToken 发请求时 apiClient 能读到
   await storage.set(STORAGE_KEYS.AUTH_TOKEN, token)
 
   const res = await verifyToken(token)
 
-  if (!res.ok || !res.data) {
+  if (!res.ok || !res.data?.valid) {
     // 验证失败，清除 token
     await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
-    // 如果是因为未配置后端地址导致的，给出明确提示
     const error = res.error || 'Token 验证失败'
     logger.warn('Token login failed:', error)
     return { success: false, error }
   }
 
-  await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
-  logger.info('Token login success:', res.data.user.username)
+  logger.info('Token login success')
 
   // 登录成功后向后端注册当前设备
   const deviceId = await getOrCreateDeviceId()
@@ -135,41 +136,10 @@ async function handleLoginWithToken(token: string): Promise<MessageResponse<Logi
     })
     .catch(() => { })
 
-  return { success: true, data: { user: res.data.user } }
+  return { success: true }
 }
 
-/** 账号密码登录 */
-async function handleLoginWithCredentials(
-  username: string,
-  password: string,
-): Promise<MessageResponse<LoginData>> {
-  const res = await loginWithCredentials(username, password, getPlatformCode())
-
-  if (!res.ok || !res.data) {
-    const error = res.error || '登录失败'
-    logger.warn('Credentials login failed:', error)
-    return { success: false, error }
-  }
-
-  await storage.set(STORAGE_KEYS.AUTH_TOKEN, res.data.accessToken)
-  await storage.set(STORAGE_KEYS.REFRESH_TOKEN, res.data.refreshToken)
-  await storage.set(STORAGE_KEYS.AUTH_USER, res.data.user)
-  logger.info('Credentials login success:', res.data.user.username)
-
-  // 登录成功后向后端注册当前设备
-  const deviceId = await getOrCreateDeviceId()
-  const deviceName = await getDeviceName()
-  registerDevice({ deviceId, name: deviceName, browser: getBrowserInfo(), os: getOSInfo() })
-    .then(res => {
-      if (res.ok) logger.info('Device registered on server after login')
-      else logger.debug('Device registration skipped (server unavailable):', res.error)
-    })
-    .catch(() => { })
-
-  return { success: true, data: { user: res.data.user } }
-}
-
-/** 登出 */
+/** 登出（API Key 风格：仅清除本地 Token） */
 async function handleLogout(): Promise<MessageResponse> {
   // 尝试通知后端注销设备，失败也没关系
   const deviceId = await storage.get(STORAGE_KEYS.DEVICE_ID)
@@ -177,16 +147,56 @@ async function handleLogout(): Promise<MessageResponse> {
     deregisterDevice(deviceId).catch(() => { })
   }
 
-  // 尝试通知后端，失败也没关系
-  const refreshToken = await storage.get(STORAGE_KEYS.REFRESH_TOKEN)
-  if (refreshToken) {
-    await apiLogout(refreshToken).catch(() => { })
+  await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
+  logger.info('Logged out')
+  return { success: true }
+}
+
+/** 版本协商：检查客户端与服务端版本兼容性 */
+async function handleCheckVersion(): Promise<MessageResponse> {
+  const res = await getServerVersion()
+
+  if (!res.ok || !res.data) {
+    return {
+      success: true,
+      data: {
+        compatible: false,
+        serverVersion: '未知',
+        reason: res.error || '无法连接服务器',
+      },
+    }
   }
 
-  await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
-  await storage.set(STORAGE_KEYS.REFRESH_TOKEN, null)
-  await storage.set(STORAGE_KEYS.AUTH_USER, null)
-  logger.info('Logged out')
+  const { serverVersion, minExtVersion, maxExtVersion } = res.data
+  const extVersion = chrome.runtime.getManifest().version
+
+  // 简单字符串版本比较
+  const compatible = extVersion >= minExtVersion && extVersion <= maxExtVersion
+
+  return {
+    success: true,
+    data: {
+      compatible,
+      serverVersion,
+      minExtVersion,
+      maxExtVersion,
+      extVersion,
+      reason: compatible ? undefined : `扩展版本 ${extVersion} 不在服务器兼容范围 [${minExtVersion}, ${maxExtVersion}]`,
+    },
+  }
+}
+
+/** 设置连接模式与后端地址 */
+async function handleSetConnectionMode(
+  payload: { mode: 'lightweight' | 'zhige'; apiBaseUrl?: string },
+): Promise<MessageResponse> {
+  await storage.set(STORAGE_KEYS.CONNECTION_MODE, payload.mode)
+
+  if (payload.mode === 'lightweight' && payload.apiBaseUrl) {
+    await storage.set(STORAGE_KEYS.API_BASE_URL, payload.apiBaseUrl)
+  }
+
+  logger.info(`Connection mode set to: ${payload.mode}`, payload.apiBaseUrl ? `url=${payload.apiBaseUrl}` : '')
   return { success: true }
 }
 

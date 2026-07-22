@@ -1,33 +1,20 @@
-/** 认证状态 */
+/** 认证状态（v3: API Key 风格，无需账号密码） */
 export interface AuthState {
   /** 是否已认证 */
   authenticated: boolean
-  /** Bearer Token */
+  /** Bearer Token（API Key 风格） */
   token: string | null
-  /** 当前用户信息 */
-  user: AuthUser | null
-}
-
-export interface AuthUser {
-  id: string
-  username: string
-}
-
-/** 账号密码登录请求 */
-export interface LoginRequest {
-  username: string
-  password: string
-}
-
-/** 登录响应 */
-export interface LoginResponse {
-  accessToken: string
-  refreshToken: string
-  user: AuthUser
 }
 
 /** Token 验证响应 */
 export interface VerifyTokenResponse {
   valid: boolean
-  user: AuthUser
+}
+
+/** 服务器版本信息 */
+export interface ServerVersionInfo {
+  serverVersion: string
+  minExtVersion: string
+  maxExtVersion: string
+  apiVersion: string
 }

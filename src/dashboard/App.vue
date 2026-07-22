@@ -44,7 +44,6 @@
           </template>
         </div>
         <div v-if="authenticated" class="header-right">
-          <span class="header-username">{{ userName }}</span>
           <el-button type="danger" size="small" text @click="handleLogout">
             <el-icon><SwitchButton /></el-icon>
             退出登录
@@ -81,7 +80,6 @@ import type { StateData } from '../shared/types'
 const route = useRoute()
 
 const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
-const userName = ref('')
 
 const pageTitleMap: Record<string, string> = {
   '/tabs': '标签页管理',
@@ -108,7 +106,6 @@ async function retryCheckAuth() {
   const res = await sendMessage<StateData>({ action: 'GET_STATE' })
   if (res.success && res.data) {
     authenticated.value = res.data.auth?.authenticated ?? false
-    userName.value = res.data.auth?.user?.username || ''
   }
 }
 
@@ -123,7 +120,6 @@ async function handleLogout() {
   // 页面将被关闭，所以短期内暂不更新状态，避免页面闪现登录态过期弹窗
   setTimeout(() => {
     authenticated.value = false
-    userName.value = ''
   }, 1000)
   ElMessage.success('已退出登录')
 
@@ -224,11 +220,6 @@ html, body, #app {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.header-username {
-  font-size: 14px;
-  color: #606266;
 }
 
 .dashboard-main {
