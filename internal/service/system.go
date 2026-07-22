@@ -20,13 +20,38 @@ func NewSystemService(db *database.DB, cfg *config.Config) *SystemService {
 	return &SystemService{db: db, cfg: cfg}
 }
 
-// GetVersionInfo 获取版本信息
+// VersionRange 扩展版本兼容范围
+type VersionRange struct {
+	MinExtVersion string `json:"minExtVersion"`
+	MaxExtVersion string `json:"maxExtVersion"`
+	Description   string `json:"description"`
+}
+
+// GetVersionInfo 获取版本信息（含版本兼容性映射表）
 func (s *SystemService) GetVersionInfo() map[string]interface{} {
 	return map[string]interface{}{
 		"server_version":  s.cfg.Version,
 		"min_ext_version": s.cfg.MinExtVersion,
 		"max_ext_version": s.cfg.MaxExtVersion,
 		"api_version":     "v1",
+		// 扩展 → 后端版本兼容性映射表
+		"version_map": []VersionRange{
+			{
+				MinExtVersion: "1.0.0",
+				MaxExtVersion: "1.x.x",
+				Description:   "初始版本，支持设备注册、工作组 CRUD、Token 认证",
+			},
+			{
+				MinExtVersion: "1.1.0",
+				MaxExtVersion: "1.x.x",
+				Description:   "新增版本协商、连接模式切换",
+			},
+			{
+				MinExtVersion: "2.0.0",
+				MaxExtVersion: "2.x.x",
+				Description:   "计划：SSE 远程查询、织个网上游对接",
+			},
+		},
 	}
 }
 

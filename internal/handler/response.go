@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"github.com/spidermemos/tab-sync-server/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,12 +18,23 @@ type CommonReturn struct {
 	TraceID          string      `json:"traceId,omitempty"`
 }
 
+// getTraceID 从 gin.Context 中提取 TraceID（由 TraceID 中间件注入）
+func getTraceID(c *gin.Context) string {
+	if traceID, exists := c.Get(middleware.TraceIDKey); exists {
+		if id, ok := traceID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
 // Success 成功响应
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, CommonReturn{
 		Code:    0,
 		Success: true,
 		Data:    data,
+		TraceID: getTraceID(c),
 	})
 }
 
@@ -31,6 +44,7 @@ func Created(c *gin.Context, data interface{}) {
 		Code:    0,
 		Success: true,
 		Data:    data,
+		TraceID: getTraceID(c),
 	})
 }
 
@@ -46,6 +60,7 @@ func Error(c *gin.Context, httpStatus int, message string) {
 		Success:          false,
 		Message:          message,
 		DeveloperMessage: message,
+		TraceID:          getTraceID(c),
 	})
 }
 

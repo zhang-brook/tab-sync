@@ -41,7 +41,7 @@ type Config struct {
 func Load() *Config {
 	cfg := &Config{
 		Port:          getEnv("PORT", "8080"),
-		Version:       "1.0.0",
+		Version:       getEnv("SERVER_VERSION", "1.0.0"),
 		DataDir:       getEnv("DATA_DIR", "./data"),
 		JWTSecret:     getEnv("JWT_SECRET", generateRandomSecret()),
 		LogLevel:      getEnv("LOG_LEVEL", "info"),

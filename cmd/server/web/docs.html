@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Sync Server - API 文档</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      padding: 32px 40px;
+    }
+    .header h1 { font-size: 28px; margin-bottom: 4px; }
+    .header .subtitle { opacity: 0.85; font-size: 14px; }
+    .nav-bar {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0 40px;
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+    }
+    .nav-bar a {
+      padding: 12px 4px;
+      text-decoration: none;
+      color: #666;
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .nav-bar a:hover, .nav-bar a.active { color: #667eea; border-bottom-color: #667eea; }
+    .content {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 40px;
+    }
+    .section { margin-bottom: 40px; }
+    .section h2 {
+      font-size: 20px;
+      color: #1a1a2e;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .endpoint {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .endpoint-header:hover { background: #fafafa; }
+    .method {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: monospace;
+      min-width: 54px;
+      text-align: center;
+    }
+    .method.get { background: #e8f5e9; color: #2e7d32; }
+    .method.post { background: #e3f2fd; color: #1565c0; }
+    .method.put { background: #fff3e0; color: #e65100; }
+    .method.patch { background: #f3e5f5; color: #7b1fa2; }
+    .method.delete { background: #ffebee; color: #c62828; }
+    .ep-path {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      flex: 1;
+    }
+    .ep-auth {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .ep-auth.public { background: #e8f5e9; color: #2e7d32; }
+    .ep-auth.token { background: #e3f2fd; color: #1565c0; }
+    .ep-auth.admin { background: #fff3e0; color: #e65100; }
+    .ep-toggle { color: #999; font-size: 12px; }
+    .endpoint-body {
+      display: none;
+      padding: 0 20px 20px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .endpoint.open .endpoint-body { display: block; }
+    .endpoint.open .ep-toggle { transform: rotate(180deg); }
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 12px 0;
+    }
+    .info-table td {
+      padding: 6px 12px 6px 0;
+      vertical-align: top;
+    }
+    .info-table td:first-child {
+      color: #999;
+      white-space: nowrap;
+      width: 80px;
+    }
+    .code-block {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin: 8px 0;
+      white-space: pre;
+      line-height: 1.5;
+    }
+    .code-block .key { color: #89b4fa; }
+    .code-block .str { color: #a6e3a1; }
+    .code-block .num { color: #fab387; }
+    .code-block .comment { color: #6c7086; }
+    h3 { font-size: 14px; color: #555; margin: 16px 0 8px; }
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: #999;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Tab Sync Server API 文档</h1>
+    <p class="subtitle">轻量后端 · Gin + SQLite · v1.0.0</p>
+  </div>
+
+  <div class="nav-bar">
+    <a href="#public" class="active">公开接口</a>
+    <a href="#auth">认证管理</a>
+    <a href="#devices">设备管理</a>
+    <a href="#workspaces">工作组管理</a>
+    <a href="#admin">管理后台</a>
+    <a href="#compat">兼容性说明</a>
+  </div>
+
+  <div class="content">
+
+    <!-- 通用说明 -->
+    <div class="section">
+      <h2>通用说明</h2>
+      <table class="info-table">
+        <tr><td>Base URL</td><td><code>http://localhost:8080</code></td></tr>
+        <tr><td>Content-Type</td><td><code>application/json</code></td></tr>
+        <tr><td>认证方式</td><td>Bearer Token（API Key 风格），在请求头 <code>Authorization: Bearer &lt;token&gt;</code> 中携带</td></tr>
+        <tr><td>响应格式</td><td>统一使用 <code>CommonReturn</code>：
+<div class="code-block">{
+  <span class="key">"code"</span>: <span class="num">0</span>,
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: { ... },
+  <span class="key">"message"</span>: <span class="str">"操作成功"</span>,
+  <span class="key">"developerMessage"</span>: <span class="str">"Operation successful"</span>,
+  <span class="key">"traceId"</span>: <span class="str">"550e8400-e29b-41d4-a716-446655440000"</span>
+}</div>
+        </td></tr>
+        <tr><td>成功判断</td><td><code>code === 0</code> 且 <code>success === true</code></td></tr>
+        <tr><td>TraceID</td><td>每个请求自动分配唯一 <code>traceId</code>，同时存在于响应头 <code>X-Trace-Id</code></td></tr>
+        <tr><td>版本协商</td><td>扩展应在请求头携带 <code>X-Ext-Version</code>，不兼容时返回 <code>426 Upgrade Required</code></td></tr>
+      </table>
+    </div>
+
+    <!-- 公开接口 -->
+    <div class="section" id="public">
+      <h2>公开接口</h2>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/version</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table">
+            <tr><td>说明</td><td>获取服务端版本信息，扩展启动时握手协商</td></tr>
+            <tr><td>认证</td><td>无需认证</td></tr>
+          </table>
+          <h3>响应示例</h3>
+          <div class="code-block">{
+  <span class="key">"code"</span>: <span class="num">0</span>,
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"server_version"</span>: <span class="str">"1.0.0"</span>,
+    <span class="key">"min_ext_version"</span>: <span class="str">"1.0.0"</span>,
+    <span class="key">"max_ext_version"</span>: <span class="str">"2.0.0"</span>,
+    <span class="key">"api_version"</span>: <span class="str">"v1"</span>,
+    <span class="key">"version_map"</span>: [
+      { <span class="key">"minExtVersion"</span>: <span class="str">"1.0.0"</span>, <span class="key">"maxExtVersion"</span>: <span class="str">"1.x.x"</span>, <span class="key">"description"</span>: <span class="str">"..."</span> }
+    ]
+  }
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/auth/verify-token</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table">
+            <tr><td>说明</td><td>验证 Bearer Token 是否有效</td></tr>
+            <tr><td>认证</td><td>Token 在请求头 <code>Authorization: Bearer &lt;token&gt;</code></td></tr>
+          </table>
+          <h3>响应示例</h3>
+          <div class="code-block"><span class="comment">// 有效</span>
+{
+  <span class="key">"code"</span>: <span class="num">0</span>, <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: { <span class="key">"valid"</span>: <span class="num">true</span> }
+}
+<span class="comment">// 无效</span>
+{
+  <span class="key">"code"</span>: <span class="num">401</span>, <span class="key">"success"</span>: <span class="num">false</span>,
+  <span class="key">"message"</span>: <span class="str">"Token 无效或已过期"</span>
+}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 认证管理 -->
+    <div class="section" id="auth">
+      <h2>认证管理</h2>
+      <p style="font-size:13px;color:#999;margin-bottom:16px;">Token 生成和吊销在管理后台操作，不在 API 中暴露。</p>
+
+      <table class="info-table" style="background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:16px 20px;">
+        <tr><td>Token 生成</td><td>管理后台 → Token 管理 → 输入名称 → 点击「生成」</td></tr>
+        <tr><td>Token 吊销</td><td>管理后台 → Token 管理 → 点击「吊销」</td></tr>
+        <tr><td>Token 列表</td><td>管理后台 → Token 管理 → 查看所有 Token 使用情况</td></tr>
+        <tr><td>认证方式</td><td>所有需要认证的接口在请求头携带 <code>Authorization: Bearer &lt;token&gt;</code></td></tr>
+        <tr><td>设备绑定</td><td>Token 首次使用时自动绑定 <code>X-Device-Id</code> 请求头中的设备 ID</td></tr>
+      </table>
+    </div>
+
+    <!-- 设备管理 -->
+    <div class="section" id="devices">
+      <h2>设备管理</h2>
+      <p style="font-size:13px;color:#999;margin-bottom:16px;">需要 Bearer Token 认证。</p>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/devices/register</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>注册当前设备（或更新已有设备信息）</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"deviceId"</span>: <span class="str">"uuid-string"</span>,
+  <span class="key">"name"</span>: <span class="str">"My Chrome"</span>,
+  <span class="key">"browser"</span>: <span class="str">"Chrome"</span>,
+  <span class="key">"os"</span>: <span class="str">"Windows"</span>
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/devices</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>列出所有已注册设备</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method patch">PATCH</span>
+          <span class="ep-path">/v1/tab-sync/devices/:deviceId</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>更新设备名称</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"name"</span>: <span class="str">"My Chrome (Home)"</span>
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/devices/:deviceId/heartbeat</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>发送心跳，更新最后在线时间</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method delete">DELETE</span>
+          <span class="ep-path">/v1/tab-sync/devices/:deviceId</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>注销设备</td></tr></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工作组管理 -->
+    <div class="section" id="workspaces">
+      <h2>工作组管理</h2>
+      <p style="font-size:13px;color:#999;margin-bottom:16px;">需要 Bearer Token 认证。</p>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/workspaces</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>列出所有工作组（含标签页摘要）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/workspaces</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>创建工作组（可同时添加标签页）</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"name"</span>: <span class="str">"我的项目"</span>,
+  <span class="key">"tabs"</span>: [
+    { <span class="key">"url"</span>: <span class="str">"https://example.com"</span>, <span class="key">"title"</span>: <span class="str">"Example"</span> }
+  ]
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method put">PUT</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>更新工作组名称和标签页</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method delete">DELETE</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>删除工作组（软删除）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/tabs-summary</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>获取所有工作组的标签页数量摘要</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id/tabs/move</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>移动工作组中的标签页顺序</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"tabId"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"newIndex"</span>: <span class="num">2</span>
+}</div>
+        </div>
+      </div>
+
+      <!-- 同步/SSE (预留) -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/sync/push</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>推送同步事件（预留，当前版本未完整实现）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/sync/pull</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>拉取同步事件（预留）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/sse/events</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>SSE 实时事件流（预留，用于 AI 远程查询）</td></tr></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 管理后台 -->
+    <div class="section" id="admin">
+      <h2>管理后台</h2>
+      <p style="font-size:13px;color:#999;margin-bottom:16px;">支持 Admin Token 或 JWT 会话认证。</p>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/setup</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>管理后台 Web 界面（首次初始化设置 + Token 管理）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/api/docs</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>API 文档页面（本页）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/admin/tokens</span>
+          <span class="ep-auth admin">Admin</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>生成新 Token</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"name"</span>: <span class="str">"我的 Chrome"</span>,
+  <span class="key">"isAdmin"</span>: <span class="num">false</span>
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/admin/tokens</span>
+          <span class="ep-auth admin">Admin</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>列出所有 Token</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method delete">DELETE</span>
+          <span class="ep-path">/v1/tab-sync/admin/tokens/:tokenId</span>
+          <span class="ep-auth admin">Admin</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>吊销 Token</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/admin/stats</span>
+          <span class="ep-auth admin">Admin</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>获取统计信息（设备数、工作组数、标签页数）</td></tr></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 兼容性说明 -->
+    <div class="section" id="compat">
+      <h2>兼容性说明</h2>
+
+      <h3>与织个网后端的差异</h3>
+      <table class="info-table" style="background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:16px 20px;">
+        <tr><td style="width:180px;">认证方式</td><td>织个网：账号密码 + JWT + Refresh Token<br>轻量后端：API Key 风格 Bearer Token（更简单）</td></tr>
+        <tr><td>移除的端点</td><td><code>POST /auth/login</code>、<code>POST /auth/refresh</code>、<code>POST /auth/logout</code>（轻量后端不需要）</td></tr>
+        <tr><td>新增的端点</td><td><code>GET /v1/tab-sync/version</code>（版本协商）</td></tr>
+        <tr><td>数据库</td><td>织个网：PostgreSQL（雪花 ID）<br>轻量后端：SQLite（UUID 主键）</td></tr>
+        <tr><td>ID 格式</td><td>响应中使用 UUID 字符串，不暴露数据库内部自增 ID</td></tr>
+        <tr><td>时间格式</td><td>统一使用 RFC 3339 / ISO 8601</td></tr>
+      </table>
+
+      <h3>版本号映射表</h3>
+      <table class="info-table" style="background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:16px 20px;">
+        <tr><th style="text-align:left;padding:4px 0;width:120px;">扩展版本</th><th style="text-align:left;padding:4px 0;width:120px;">最低后端</th><th style="text-align:left;padding:4px 0;width:120px;">最高后端</th><th style="text-align:left;padding:4px 0;">说明</th></tr>
+        <tr><td>1.0.x</td><td>1.0.0</td><td>1.x.x</td><td>初始版本：设备注册、工作组 CRUD、Token 认证</td></tr>
+        <tr><td>1.1.x</td><td>1.0.0</td><td>1.x.x</td><td>新增版本协商、连接模式切换</td></tr>
+        <tr><td>2.0.x</td><td>2.0.0</td><td>2.x.x</td><td>计划：SSE 远程查询、织个网上游对接</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Tab Sync Server · API v1 · <a href="/setup" style="color:#667eea;">管理后台</a>
+  </div>
+
+  <script>
+    // 默认展开第一个 endpoint
+    document.querySelectorAll('.endpoint').forEach(el => el.classList.remove('open'));
+    // 导航高亮
+    const navLinks = document.querySelectorAll('.nav-bar a');
+    navLinks.forEach(a => {
+      a.addEventListener('click', () => {
+        navLinks.forEach(l => l.classList.remove('active'));
+        a.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

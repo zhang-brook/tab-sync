@@ -53,9 +53,10 @@ func main() {
 
 	// 全局中间件
 	r.Use(gin.Recovery())
+	r.Use(middleware.TraceID())
 	r.Use(middleware.RequestLogger())
 	r.Use(middleware.CORS())
-	r.Use(middleware.VersionCheck(cfg.Version))
+	r.Use(middleware.VersionCheck(cfg.Version, cfg.MinExtVersion, cfg.MaxExtVersion))
 
 	// ========== 管理后台路由（Web 界面） ==========
 
@@ -69,6 +70,11 @@ func main() {
 	r.POST("/api/setup", handlers.Setup.CompleteSetup)
 	r.GET("/api/setup/status", handlers.Setup.GetSetupStatus)
 	r.POST("/api/admin/login", handlers.Setup.AdminLogin)
+
+	// API 文档页面
+	r.GET("/api/docs", func(c *gin.Context) {
+		c.FileFromFS("/docs.html", http.FS(webSub))
+	})
 
 	// API v1 路由组
 	v1 := r.Group("/v1/tab-sync")
