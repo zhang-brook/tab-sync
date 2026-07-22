@@ -1,5 +1,7 @@
 # 提交约定 (Commit Convention)
 
+本地改动后请在本地形成Git提交，记得把你自己加为该提交的 co-author (仅提交你改动的文件，本地的其他改动不要提交) (Git 提交时，提交信息应使用英语，格式 `<type>(<scope>): <subject>`)
+
 ## 格式
 
 ```
@@ -30,5 +32,5 @@ feat(config): add log configuration and random secret generator
 - Add LogLevel and LogOutput fields with environment variable support
 - Add generateRandomSecret() for default JWT secret fallback
 
-Co-authored-by: <你的名字> <你的邮箱>
+Co-authored-by: CodeBuddy <codebuddy@tencent.com>
 ```
