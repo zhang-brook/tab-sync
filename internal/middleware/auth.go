@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/spidermemos/tab-sync-server/internal/service"
 )
@@ -61,7 +62,7 @@ func TokenAuth(authSvc *service.AuthService) gin.HandlerFunc {
 	}
 }
 
-// AdminAuth 管理员认证中间件
+// AdminAuth 管理员认证中间件（仅 Admin Token）
 func AdminAuth(authSvc *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -80,3 +81,48 @@ func AdminAuth(authSvc *service.AuthService) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// AdminOrJWTAuth 管理员认证中间件（支持 Admin Token 或 JWT 会话）
+// 管理后台 Web 界面使用 JWT，API 调用使用 Admin Token
+func AdminOrJWTAuth(authSvc *service.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"success": false,
+				"message": "未提供认证信息",
+			})
+			c.Abort()
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+		// 先尝试作为 Admin Token 验证
+		if authSvc.IsAdmin(tokenStr) {
+			c.Next()
+			return
+		}
+
+		// 再尝试作为 JWT 验证
+		claims, err := authSvc.ValidateJWT(tokenStr)
+		if err == nil {
+			sub, _ := claims.GetSubject()
+			if sub == "admin" {
+				c.Next()
+				return
+			}
+		}
+
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    403,
+			"success": false,
+			"message": "需要管理员权限",
+		})
+		c.Abort()
+	}
+}
+
+// 确保 jwt 包被引用（用于 JWT 验证）
+var _ jwt.MapClaims

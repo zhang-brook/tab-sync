@@ -1,6 +1,9 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+
 	"github.com/spidermemos/tab-sync-server/internal/config"
 	"github.com/spidermemos/tab-sync-server/internal/database"
 	"github.com/spidermemos/tab-sync-server/internal/model"
@@ -20,10 +23,10 @@ func NewSystemService(db *database.DB, cfg *config.Config) *SystemService {
 // GetVersionInfo 获取版本信息
 func (s *SystemService) GetVersionInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"server_version": s.cfg.Version,
+		"server_version":  s.cfg.Version,
 		"min_ext_version": s.cfg.MinExtVersion,
 		"max_ext_version": s.cfg.MaxExtVersion,
-		"api_version":    "v1",
+		"api_version":     "v1",
 	}
 }
 
@@ -38,12 +41,24 @@ func (s *SystemService) IsSetupDone() bool {
 }
 
 // CompleteSetup 完成初始化设置
+// 将管理员密码哈希后存储到数据库
 func (s *SystemService) CompleteSetup(adminPassword string) error {
 	config := model.ServerConfig{
-		SetupDone: true,
-		AdminUser: "admin",
+		SetupDone:     true,
+		AdminUser:     "admin",
+		AdminPassword: hashPassword(adminPassword),
 	}
 	return s.db.Create(&config).Error
+}
+
+// VerifyAdminPassword 验证管理员密码
+func (s *SystemService) VerifyAdminPassword(password string) bool {
+	var config model.ServerConfig
+	result := s.db.First(&config)
+	if result.Error != nil {
+		return false
+	}
+	return config.AdminPassword == hashPassword(password)
 }
 
 // GetStats 获取统计信息
@@ -58,4 +73,10 @@ func (s *SystemService) GetStats() map[string]interface{} {
 		"workspaces": workspaceCount,
 		"tabs":       tabCount,
 	}
+}
+
+// hashPassword 使用 SHA-256 哈希密码
+func hashPassword(password string) string {
+	hash := sha256.Sum256([]byte(password))
+	return hex.EncodeToString(hash[:])
 }

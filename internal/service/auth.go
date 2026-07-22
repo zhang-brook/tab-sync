@@ -95,10 +95,27 @@ func (s *AuthService) IsAdmin(tokenStr string) bool {
 // GenerateJWT 生成 JWT（用于管理界面会话）
 func (s *AuthService) GenerateJWT(adminUser string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub":  adminUser,
-		"iat":  time.Now().Unix(),
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+		"sub": adminUser,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.cfg.JWTSecret))
+}
+
+// ValidateJWT 验证 JWT 并返回 Claims
+func (s *AuthService) ValidateJWT(tokenStr string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("签名算法不匹配")
+		}
+		return []byte(s.cfg.JWTSecret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	}
+	return nil, errors.New("token 无效")
 }
