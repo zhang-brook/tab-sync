@@ -29,8 +29,13 @@ docker run -d \
 
 ```bash
 go mod tidy
+# 非 Windows 系统
 go build -o tab-sync-server ./cmd/server
 ./tab-sync-server
+
+# Windows 系统
+go build -o tab-sync-server.exe ./cmd/server
+tab-sync-server.exe
 ```
 
 ## API 文档
