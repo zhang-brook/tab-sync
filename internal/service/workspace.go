@@ -12,12 +12,13 @@ import (
 
 // WorkspaceService 工作组管理服务
 type WorkspaceService struct {
-	db *database.DB
+	db      *database.DB
+	syncSvc *SyncService
 }
 
 // NewWorkspaceService 创建工作区服务
-func NewWorkspaceService(db *database.DB) *WorkspaceService {
-	return &WorkspaceService{db: db}
+func NewWorkspaceService(db *database.DB, syncSvc *SyncService) *WorkspaceService {
+	return &WorkspaceService{db: db, syncSvc: syncSvc}
 }
 
 // WorkspaceTabData 创建/更新时的标签页数据
@@ -128,6 +129,11 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		return nil, err
 	}
 
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("created", "workspace", wsID, workspace)
+	}
+
 	return &CreateResult{
 		Workspace: toWorkspaceResponse(workspace),
 		Mappings:  mappings,
@@ -206,12 +212,18 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	}
 
 	resp := toWorkspaceResponse(workspace)
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("updated", "workspace", id, payload)
+	}
+
 	return &resp, nil
 }
 
 // Delete 删除工作区（软删除）
 func (s *WorkspaceService) Delete(id string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 软删除工作组
 		if err := tx.Model(&model.Workspace{}).
 			Where("workspace_id = ?", id).
@@ -221,6 +233,16 @@ func (s *WorkspaceService) Delete(id string) error {
 		// 物理删除关联标签页
 		return tx.Where("workspace_id = ?", id).Delete(&model.WorkspaceTab{}).Error
 	})
+	if err != nil {
+		return err
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("removed", "workspace", id, map[string]string{"workspaceId": id})
+	}
+
+	return nil
 }
 
 // TabsSummary 获取所有工作组标签页摘要

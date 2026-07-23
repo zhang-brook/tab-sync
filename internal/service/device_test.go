@@ -6,7 +6,7 @@ import (
 
 func TestDeviceService_Register(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewDeviceService(db)
+	svc := NewDeviceService(db, nil)
 
 	// 首次注册
 	device, err := svc.Register("dev-001", "Chrome", "Chrome 120", "Windows")
@@ -41,7 +41,7 @@ func TestDeviceService_Register(t *testing.T) {
 
 func TestDeviceService_Heartbeat(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewDeviceService(db)
+	svc := NewDeviceService(db, nil)
 
 	svc.Register("dev-002", "Firefox", "Firefox", "macOS")
 
@@ -60,7 +60,7 @@ func TestDeviceService_Heartbeat(t *testing.T) {
 
 func TestDeviceService_Deregister(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewDeviceService(db)
+	svc := NewDeviceService(db, nil)
 
 	svc.Register("dev-003", "Edge", "Edge", "Linux")
 
@@ -77,7 +77,7 @@ func TestDeviceService_Deregister(t *testing.T) {
 
 func TestDeviceService_Update(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewDeviceService(db)
+	svc := NewDeviceService(db, nil)
 
 	svc.Register("dev-004", "Old Name", "Chrome", "Windows")
 

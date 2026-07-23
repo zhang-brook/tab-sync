@@ -6,7 +6,7 @@ import (
 
 func TestWorkspaceService_Create(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewWorkspaceService(db, nil)
 
 	result, err := svc.Create(CreateWorkspacePayload{
 		Name:  "测试工作组",
@@ -33,7 +33,7 @@ func TestWorkspaceService_Create(t *testing.T) {
 
 func TestWorkspaceService_List(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewWorkspaceService(db, nil)
 
 	svc.Create(CreateWorkspacePayload{Name: "工作组 A"})
 	svc.Create(CreateWorkspacePayload{Name: "工作组 B"})
@@ -50,7 +50,7 @@ func TestWorkspaceService_List(t *testing.T) {
 
 func TestWorkspaceService_Update(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewWorkspaceService(db, nil)
 
 	result, _ := svc.Create(CreateWorkspacePayload{
 		Name: "原始名称",
@@ -74,7 +74,7 @@ func TestWorkspaceService_Update(t *testing.T) {
 
 func TestWorkspaceService_Delete(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewWorkspaceService(db, nil)
 
 	result, _ := svc.Create(CreateWorkspacePayload{Name: "待删除"})
 
@@ -91,7 +91,7 @@ func TestWorkspaceService_Delete(t *testing.T) {
 
 func TestWorkspaceService_TabsSummary(t *testing.T) {
 	db, _ := setupTestDB(t)
-	svc := NewWorkspaceService(db)
+	svc := NewWorkspaceService(db, nil)
 
 	svc.Create(CreateWorkspacePayload{
 		Name: "带标签的工作组",

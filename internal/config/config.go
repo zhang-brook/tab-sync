@@ -3,8 +3,10 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Config 应用配置
@@ -35,6 +37,8 @@ type Config struct {
 	UpstreamURL string
 	// 织个网上游同步 Token（预留）
 	UpstreamToken string
+	// 是否启用上游同步（预留）
+	UpstreamSyncEnabled bool
 }
 
 // Load 加载配置（环境变量 + 默认值）
@@ -48,9 +52,10 @@ func Load() *Config {
 		LogOutput:     getEnv("LOG_OUTPUT", "stdout"),
 		MinExtVersion: getEnv("MIN_EXT_VERSION", "1.0.0"),
 		MaxExtVersion: getEnv("MAX_EXT_VERSION", "2.0.0"),
-		AdminEnabled:  true,
-		UpstreamURL:   getEnv("UPSTREAM_URL", ""),
-		UpstreamToken: getEnv("UPSTREAM_TOKEN", ""),
+		AdminEnabled:         true,
+		UpstreamURL:          getEnv("UPSTREAM_URL", ""),
+		UpstreamToken:        getEnv("UPSTREAM_TOKEN", ""),
+		UpstreamSyncEnabled:  getEnvBool("UPSTREAM_SYNC_ENABLED"),
 	}
 
 	// 确保数据目录存在
@@ -73,6 +78,36 @@ func getEnv(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+// getEnvBool 读取布尔型环境变量（默认 false）
+func getEnvBool(key string) bool {
+	val := os.Getenv(key)
+	return val == "1" || val == "true" || val == "TRUE" || val == "yes" || val == "YES"
+}
+
+// getEnvInt 读取整数型环境变量
+func getEnvInt(key string, defaultVal int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	n := 0
+	fmt.Sscanf(val, "%d", &n)
+	return n
+}
+
+// getEnvDuration 读取 Duration 型环境变量（如 "30s"、"5m"）
+func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	d, err := time.ParseDuration(val)
+	if err != nil {
+		return defaultVal
+	}
+	return d
 }
 
 // generateRandomSecret 生成随机密钥（32 字节 hex）

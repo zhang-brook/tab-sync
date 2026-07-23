@@ -16,13 +16,14 @@ type Services struct {
 }
 
 // NewServices 创建所有服务实例
+// SyncService 先于 WorkspaceService / DeviceService 创建，因为它们依赖 SyncService 记录变更事件。
 func NewServices(db *database.DB, cfg *config.Config) *Services {
-	authSvc := NewAuthService(db, cfg)
-	deviceSvc := NewDeviceService(db)
-	workspaceSvc := NewWorkspaceService(db)
 	syncSvc := NewSyncService(db, cfg)
+	authSvc := NewAuthService(db, cfg)
+	deviceSvc := NewDeviceService(db, syncSvc)
+	workspaceSvc := NewWorkspaceService(db, syncSvc)
 	systemSvc := NewSystemService(db, cfg)
-	sseSvc := NewSSEService()
+	sseSvc := NewSSEService(cfg)
 
 	return &Services{
 		Auth:      authSvc,

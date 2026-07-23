@@ -9,12 +9,13 @@ import (
 
 // DeviceService 设备管理服务
 type DeviceService struct {
-	db *database.DB
+	db      *database.DB
+	syncSvc *SyncService
 }
 
 // NewDeviceService 创建设备服务
-func NewDeviceService(db *database.DB) *DeviceService {
-	return &DeviceService{db: db}
+func NewDeviceService(db *database.DB, syncSvc *SyncService) *DeviceService {
+	return &DeviceService{db: db, syncSvc: syncSvc}
 }
 
 // Register 注册或更新设备（幂等）
@@ -22,8 +23,10 @@ func (s *DeviceService) Register(deviceID, name, browser, os string) (*model.Dev
 	var device model.Device
 	result := s.db.Where("device_id = ?", deviceID).First(&device)
 
+	isNew := false
 	if result.Error != nil {
 		// 设备不存在，创建新记录
+		isNew = true
 		device = model.Device{
 			DeviceID: deviceID,
 			Name:     name,
@@ -42,6 +45,19 @@ func (s *DeviceService) Register(deviceID, name, browser, os string) (*model.Dev
 			"os":        os,
 			"last_seen": time.Now(),
 		})
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		if isNew {
+			s.syncSvc.RecordEvent("created", "device", deviceID, device)
+		} else {
+			s.syncSvc.RecordEvent("updated", "device", deviceID, map[string]string{
+				"name":    name,
+				"browser": browser,
+				"os":      os,
+			})
+		}
 	}
 
 	return &device, nil
@@ -73,5 +89,15 @@ func (s *DeviceService) Heartbeat(deviceID string) error {
 
 // Deregister 注销设备
 func (s *DeviceService) Deregister(deviceID string) error {
-	return s.db.Where("device_id = ?", deviceID).Delete(&model.Device{}).Error
+	err := s.db.Where("device_id = ?", deviceID).Delete(&model.Device{}).Error
+	if err != nil {
+		return err
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("removed", "device", deviceID, map[string]string{"deviceId": deviceID})
+	}
+
+	return nil
 }

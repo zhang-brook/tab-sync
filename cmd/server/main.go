@@ -108,8 +108,11 @@ func main() {
 			auth.POST("/sync/push", handlers.Sync.PushEvents)
 			auth.GET("/sync/pull", handlers.Sync.PullEvents)
 
-			// SSE 通道（预留，用于 AI 远程查询）
+			// SSE 通道（浏览器扩展 ↔ 轻量后端长连接）
 			auth.GET("/sse/events", handlers.SSE.Stream)
+
+			// AI 远程查询 tool_calling（织个网上游对接预留）
+			auth.POST("/tool-calling", handlers.SSE.HandleToolCall)
 		}
 
 		// 管理接口（支持 Admin Token 或 JWT 会话）
@@ -122,6 +125,9 @@ func main() {
 			admin.GET("/stats", handlers.System.GetStats)
 		}
 	}
+
+	// 启动上游 SSE 连接（预留：织个网对接）
+	services.SSE.ConnectToUpstream()
 
 	// 启动服务器
 	addr := ":" + cfg.Port
