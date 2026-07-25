@@ -81,7 +81,7 @@ func (s *AuthService) RevokeToken(tokenID string) error {
 // ListTokens 列出所有 Token
 func (s *AuthService) ListTokens() ([]model.AuthToken, error) {
 	var tokens []model.AuthToken
-	err := s.db.Order("created_at DESC").Find(&tokens).Error
+	err := s.db.Where("is_revoked = ?", false).Order("created_at DESC").Find(&tokens).Error
 	return tokens, err
 }
 
