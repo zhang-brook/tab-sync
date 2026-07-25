@@ -1,24 +1,6 @@
-# Tab Sync Server — 轻量级浏览器标签页同步后端
+# Tab Sync Server - 轻量级浏览器标签页同步后端
 
 基于 **Go + Gin + SQLite** 的轻量后端服务，为 SpiderMemos Tab Sync 浏览器扩展提供设备注册、工作组管理和多设备同步能力。
-
-## 目录
-
-- [特性](#特性)
-- [快速开始](#快速开始)
-  - [Docker 部署（推荐）](#docker-部署推荐)
-  - [手动编译部署](#手动编译部署)
-  - [反向代理 + HTTPS](#反向代理--https)
-- [首次设置](#首次设置)
-- [配置浏览器扩展](#配置浏览器扩展)
-- [环境变量](#环境变量)
-- [数据备份与恢复](#数据备份与恢复)
-- [API 文档](#api-文档)
-- [架构与目录结构](#架构与目录结构)
-- [开发](#开发)
-- [更新日志](#更新日志)
-
----
 
 ## 特性
 
@@ -74,12 +56,18 @@ docker compose logs -f
 git clone https://github.com/spidermemos/tab-sync-server.git
 cd tab-sync-server
 
-# 编译
-make build
-# 或手动：go build -o tab-sync-server ./cmd/server
+# 安装依赖
+go mod tidy
 
-# 运行
+# 编译、运行
+# 非 Windows 系统
+go build -o tab-sync-server ./cmd/server
+# 或 make build
 ./tab-sync-server
+
+# Windows 系统
+go build -o tab-sync-server.exe ./cmd/server
+tab-sync-server.exe
 ```
 
 ---
