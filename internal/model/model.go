@@ -23,16 +23,16 @@ type ServerConfig struct {
 
 // AuthToken 认证 Token（类似 API Key）
 type AuthToken struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement"`
-	TokenID   string    `gorm:"uniqueIndex;size:64;not null"` // Token 唯一标识（UUID）
-	Token     string    `gorm:"uniqueIndex;size:128;not null"` // 实际 Token 值（前缀 tbs_）
-	Name      string    `gorm:"size:100"`                     // Token 备注名称
-	IsAdmin   bool      `gorm:"default:false"`                // 是否为管理员 Token
-	IsRevoked bool      `gorm:"default:false"`                // 是否已吊销
-	LastUsed  *time.Time                                      // 最后使用时间
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ID        uint      `gorm:"primaryKey;autoIncrement" json:"-"`
+	TokenID   string    `gorm:"uniqueIndex;size:64;not null" json:"tokenId"`   // Token 唯一标识（UUID）
+	Token     string    `gorm:"uniqueIndex;size:128;not null" json:"-"`         // 实际 Token 值（前缀 tbs_），不对外暴露
+	Name      string    `gorm:"size:100" json:"name"`                          // Token 备注名称
+	IsAdmin   bool      `gorm:"default:false" json:"isAdmin"`                  // 是否为管理员 Token
+	IsRevoked bool      `gorm:"default:false" json:"isRevoked"`                // 是否已吊销
+	LastUsed  *time.Time `json:"lastUsed"`                                      // 最后使用时间
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // ===================== 设备 =====================
