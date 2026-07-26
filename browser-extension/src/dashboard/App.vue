@@ -112,7 +112,8 @@ async function retryCheckAuth() {
 /** 退出登录 */
 async function handleLogout() {
   try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
+    // 全局已配置 zh-CN 语言包，默认 确定/取消 按钮即为中文，无需手动指定
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning' })
   } catch {
     return // 用户取消
   }

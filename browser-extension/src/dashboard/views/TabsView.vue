@@ -455,7 +455,7 @@ async function handleBatchClose() {
     await ElMessageBox.confirm(
       `确定要关闭选中的 ${selectedTabs.value.length} 个标签页吗？`,
       '批量关闭',
-      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' },
+      { type: 'warning' },
     )
   } catch {
     return

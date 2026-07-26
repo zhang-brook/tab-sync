@@ -7,6 +7,11 @@ import 'element-plus/theme-chalk/el-message-box.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 
+// 配置 Element Plus 全局汉化（zh-CN）：作用在全局配置上，模板组件与命令式 API
+// （ElMessageBox / ElMessage / ElNotification）的默认文案都会自动使用中文
+import { provideGlobalConfig } from 'element-plus/es/components/config-provider/src/hooks/use-global-config'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+
 /** 扩展 vue-router 的 RouteMeta，声明数据来源字段 */
 declare module 'vue-router' {
   interface RouteMeta {
@@ -66,4 +71,6 @@ const router = createRouter({
 
 const app = createApp(App)
 app.use(router)
+// 设置全局语言为中文（第三个参数 true = 写入全局配置，命令式 API 也能生效）
+provideGlobalConfig({ locale: zhCn }, app, true)
 app.mount('#app')
