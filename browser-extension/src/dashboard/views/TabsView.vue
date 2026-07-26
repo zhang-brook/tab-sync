@@ -32,7 +32,13 @@
 
       <div class="toolbar-spacer" />
 
-      <el-button :icon="Refresh" @click="refresh">刷新</el-button>
+      <el-button
+        type="success"
+        :icon="FolderAdd"
+        :disabled="selectedTabIds.size === 0"
+        @click="showCreateWorkspace"
+      >创建工作组</el-button>
+      <el-button :icon="Refresh" @click="refresh()">刷新</el-button>
     </div>
 
     <!-- 批量操作栏 -->
@@ -73,6 +79,15 @@
             <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
             <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
             <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
+            <span class="tab-ws-tags">
+              <el-tag
+                v-for="ws in workspacesForTab(tab)"
+                :key="ws.workspaceId"
+                size="small"
+                :style="{ backgroundColor: ws.workspaceColor ? mapColor(ws.workspaceColor) : '#909399', color: '#fff', cursor: 'pointer' }"
+                @click="openWorkspace(ws.workspaceId)"
+              >{{ ws.workspaceName }}</el-tag>
+            </span>
             <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
           </div>
 
@@ -109,16 +124,51 @@
       title="加入工作组"
       @select="handlePickerSelect"
     />
+
+    <!-- 创建工作组对话框 -->
+    <el-dialog
+      v-model="createWorkspaceDialogVisible"
+      title="创建工作组"
+      width="420px"
+      @closed="resetNewWorkspace"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="名称" required>
+          <el-input v-model="newWorkspace.name" placeholder="例如：前端调研" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="图标">
+          <el-input v-model="newWorkspace.icon" placeholder="可选，如 📚" maxlength="4" style="max-width: 160px;" />
+        </el-form-item>
+        <el-form-item label="颜色">
+          <div class="color-palette">
+            <span
+              v-for="c in colorPalette"
+              :key="c"
+              class="color-dot"
+              :class="{ active: newWorkspace.color === c }"
+              :style="{ backgroundColor: c }"
+              @click="newWorkspace.color = c"
+            />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createWorkspaceDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleCreateWorkspace">创建并加入选中标签页</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Search, Refresh, Close, Loading, CaretRight, Monitor } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import type { WorkspaceTabsSummaryData } from '@/shared/types'
 
 interface TreeTab {
   id: number
@@ -151,6 +201,60 @@ const winExpanded = reactive<Record<number, boolean>>({})
 const groupExpanded = reactive<Record<number, boolean>>({})
 const selectedTabIds = reactive(new Set<number>())
 const pickerVisible = ref(false)
+const createWorkspaceDialogVisible = ref(false)
+const newWorkspace = reactive({ name: '', color: '#409EFF', icon: '' })
+const colorPalette = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#16A085', '#E84393']
+const workspacesSummary = ref<WorkspaceTabsSummaryData['summaries']>([])
+
+// 按 URL 建立「该标签页所属工作组」索引，用于在树中展示标签并支持点击跳转
+const urlToWorkspaces = computed<Record<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>>>(() => {
+  const map: Record<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>> = {}
+  for (const s of workspacesSummary.value) {
+    for (const t of s.tabs) {
+      ;(map[t.url] ||= []).push({
+        workspaceId: s.workspaceId,
+        workspaceName: s.workspaceName,
+        workspaceColor: s.workspaceColor,
+      })
+    }
+  }
+  return map
+})
+
+function workspacesForTab(tab: TreeTab) {
+  return urlToWorkspaces.value[tab.url] || []
+}
+
+const router = useRouter()
+function openWorkspace(_id: string) {
+  router.push('/workspaces')
+}
+
+function resetNewWorkspace() {
+  newWorkspace.name = ''
+  newWorkspace.icon = ''
+  newWorkspace.color = '#409EFF'
+}
+
+function showCreateWorkspace() {
+  if (selectedTabIds.size === 0) {
+    ElMessage.warning('请先选择标签页')
+    return
+  }
+  resetNewWorkspace()
+  createWorkspaceDialogVisible.value = true
+}
+
+async function loadWorkspaceSummary() {
+  try {
+    const res = await sendMessage({ action: 'GET_WORKSPACE_TABS_SUMMARY' })
+    if (res.success && res.data) {
+      workspacesSummary.value = (res.data as WorkspaceTabsSummaryData).summaries
+    }
+  } catch {
+    /* 忽略：未登录或后端不可用时无需展示标签 */
+  }
+}
 
 function mapColor(hex: string): string {
   return hex.startsWith('#') ? hex : `#${hex}`
@@ -177,8 +281,8 @@ function clearSelection() {
   selectedTabIds.clear()
 }
 
-async function refresh() {
-  loading.value = true
+async function refresh(showLoading = true) {
+  if (showLoading) loading.value = true
   try {
     const chromeWindows = await chrome.windows.getAll({ populate: true })
     const result: TreeWindow[] = []
@@ -227,10 +331,11 @@ async function refresh() {
     }
     windows.value = result
     applyFilters()
+    void loadWorkspaceSummary()
   } catch (e) {
     ElMessage.error('加载本地标签页失败：' + (e as Error).message)
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
 
@@ -276,11 +381,78 @@ async function handleCloseSelected() {
   const ids = Array.from(selectedTabIds)
   if (ids.length === 0) return
   try {
+    await ElMessageBox.confirm(
+      `确定要关闭选中的 ${ids.length} 个标签页吗？`,
+      '批量关闭',
+      { confirmButtonText: '关闭', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
     await chrome.tabs.remove(ids)
     clearSelection()
     await refresh()
   } catch {
     /* 忽略 */
+  }
+}
+
+async function handleCreateWorkspace() {
+  if (selectedTabIds.size === 0) {
+    ElMessage.warning('请先选择标签页')
+    return
+  }
+  if (!newWorkspace.name.trim()) {
+    ElMessage.warning('请填写工作组名称')
+    return
+  }
+  const ids = Array.from(selectedTabIds)
+  const allTabs: chrome.tabs.Tab[] = []
+  for (const id of ids) {
+    try {
+      const t = await chrome.tabs.get(id)
+      allTabs.push(t)
+    } catch {
+      /* 标签页可能已关闭，忽略 */
+    }
+  }
+  const payloadTabs = allTabs.map((t) => ({
+    url: t.url || '',
+    title: t.title || t.url || '',
+    favIconUrl: t.favIconUrl || '',
+    chromeTabId: t.id || 0,
+  }))
+  try {
+    const res = await sendMessage({
+      action: 'CREATE_WORKSPACE',
+      payload: { name: newWorkspace.name.trim(), color: newWorkspace.color, icon: newWorkspace.icon || undefined },
+    })
+    if (!res.success) {
+      ElMessage.error(res.error || '创建工作组失败')
+      return
+    }
+    const created = (res.data as { workspace: { id: string } } | undefined)?.workspace
+    if (!created) {
+      ElMessage.error('创建工作组建失败：未返回工作组信息')
+      return
+    }
+    const updateRes = await sendMessage({
+      action: 'UPDATE_WORKSPACE',
+      payload: { id: created.id, tabs: payloadTabs },
+    })
+    if (updateRes.success) {
+      ElMessage.success(`已创建工作组「${newWorkspace.name.trim()}」并加入 ${payloadTabs.length} 个标签页`)
+      createWorkspaceDialogVisible.value = false
+      clearSelection()
+      void loadWorkspaceSummary()
+    } else if (updateRes.authError) {
+      ElMessage.warning('工作组已创建，但添加标签页需要登录后端')
+    } else {
+      ElMessage.error(updateRes.error || '已创建工作组建但添加标签页失败')
+    }
+  } catch (e) {
+    ElMessage.error('创建工作组失败：' + (e as Error).message)
   }
 }
 
@@ -329,15 +501,46 @@ async function handlePickerSelect(node: WorkspaceTreeNode) {
   }
 }
 
-let refreshTimer: number | undefined
+// 事件驱动刷新：仅在标签页/窗口/分组真正变化时才静默更新，避免固定轮询造成的频繁刷新
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => refresh(false), 150)
+}
+
+const listeners: Array<() => void> = []
+function registerListeners() {
+  const add = (
+    ev?: { addListener: (cb: (...args: any[]) => void) => void; removeListener: (cb: (...args: any[]) => void) => void },
+  ) => {
+    if (!ev) return
+    const cb = () => scheduleRefresh()
+    ev.addListener(cb)
+    listeners.push(() => ev.removeListener(cb))
+  }
+
+  add(chrome.tabs.onCreated)
+  add(chrome.tabs.onRemoved)
+  add(chrome.tabs.onUpdated)
+  add(chrome.tabs.onMoved)
+  add(chrome.tabs.onAttached)
+  add(chrome.tabs.onDetached)
+  add(chrome.tabs.onReplaced)
+  add(chrome.tabGroups?.onCreated)
+  add(chrome.tabGroups?.onUpdated)
+  add(chrome.tabGroups?.onRemoved)
+  add(chrome.windows.onCreated)
+  add(chrome.windows.onRemoved)
+  add(chrome.windows.onFocusChanged)
+}
+
 onMounted(() => {
   refresh()
-  refreshTimer = window.setInterval(() => {
-    refresh()
-  }, 5000)
+  registerListeners()
 })
 onUnmounted(() => {
-  if (refreshTimer) window.clearInterval(refreshTimer)
+  if (refreshTimer) clearTimeout(refreshTimer)
+  for (const off of listeners) off()
 })
 </script>
 
@@ -472,5 +675,33 @@ onUnmounted(() => {
 }
 .row-action {
   margin-left: auto;
+}
+.tab-ws-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.tab-ws-tags .el-tag {
+  flex: 0 0 auto;
+  line-height: 18px;
+}
+.color-palette {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+.color-dot.active {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-5);
 }
 </style>
