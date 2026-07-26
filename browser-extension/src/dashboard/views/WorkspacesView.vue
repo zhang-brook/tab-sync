@@ -1,18 +1,18 @@
 <template>
   <div class="workspaces-view">
-    <!-- 工具栏 -->
+    <!-- 顶部工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索工作组名称..."
+          placeholder="搜索工作组..."
           clearable
-          style="width: 240px"
+          style="width: 220px"
           :prefix-icon="Search"
         />
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="showCreateDialog">
+        <el-button type="primary" @click="showCreateDialog('')">
           <el-icon><Plus /></el-icon>
           新建工作组
         </el-button>
@@ -23,101 +23,171 @@
       </div>
     </div>
 
-    <!-- 工作组列表 -->
-    <div v-loading="loading" class="workspace-list">
-      <el-empty v-if="filteredWorkspaces.length === 0 && !loading" description="暂无工作组，请先在标签页视图中选择标签页并创建" />
+    <!-- 双栏：左树 + 右标签页 -->
+    <div v-loading="loading" class="split-pane">
+      <!-- 左侧：工作组树 -->
+      <div class="tree-pane">
+        <div class="pane-title">工作组</div>
+        <el-empty
+          v-if="treeData.length === 0 && !loading"
+          :image-size="60"
+          description="暂无工作组"
+        />
+        <el-tree
+          v-else
+          ref="treeRef"
+          :data="treeData"
+          node-key="id"
+          :props="treeProps"
+          :filter-node-method="filterNode"
+          :expand-on-click-node="false"
+          highlight-current
+          default-expand-all
+          @node-click="onSelectNode"
+        >
+          <template #default="{ data }">
+            <span class="tree-node">
+              <span class="tree-dot" :style="{ backgroundColor: data.color }" />
+              <span class="tree-name">{{ data.name }}</span>
+              <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
+            </span>
+          </template>
+        </el-tree>
+      </div>
 
-      <el-card
-        v-for="ws in filteredWorkspaces"
-        :key="ws.id"
-        shadow="hover"
-        class="workspace-card"
-        :style="{ borderLeftColor: ws.color }"
-      >
-        <template #header>
-          <div class="ws-header">
-            <div class="ws-title-row">
-              <span class="ws-color-dot" :style="{ backgroundColor: ws.color }" />
-              <span class="ws-name">{{ ws.name }}</span>
-              <el-tag size="small" type="info">{{ ws.tabs.length }} 个标签页</el-tag>
+      <!-- 右侧：选中工作组的标签页 -->
+      <div class="detail-pane">
+        <el-empty v-if="!selectedWorkspace" description="请选择左侧的工作组" />
+
+        <template v-else>
+          <!-- 详情头部 -->
+          <div class="detail-header">
+            <div class="detail-title-row">
+              <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
+              <span class="ws-name">{{ selectedWorkspace.name }}</span>
+              <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
-            <div class="ws-actions">
+            <div class="detail-actions">
               <el-tooltip content="打开所有标签页" placement="top">
-                <el-button size="small" text type="primary" @click="handleOpenWorkspace(ws.id, false)">
+                <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, false)">
                   <el-icon><FolderOpened /></el-icon>
                 </el-button>
               </el-tooltip>
-              <el-tooltip content="在新窗口中打开所有" placement="top">
-                <el-button size="small" text type="primary" @click="handleOpenWorkspace(ws.id, true)">
+              <el-tooltip content="在新窗口中打开" placement="top">
+                <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, true)">
                   <el-icon><CopyDocument /></el-icon>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开为标签组" placement="top">
-                <el-button size="small" text type="primary" @click="handleOpenAsTabGroup(ws.id)">
+                <el-button size="small" text type="primary" @click="handleOpenAsTabGroup(selectedWorkspace.id)">
                   <el-icon><Collection /></el-icon>
                 </el-button>
               </el-tooltip>
+              <el-tooltip content="新建子工作组" placement="top">
+                <el-button size="small" text @click="showCreateDialog(selectedWorkspace.id)">
+                  <el-icon><FolderAdd /></el-icon>
+                </el-button>
+              </el-tooltip>
               <el-tooltip content="编辑" placement="top">
-                <el-button size="small" text @click="showEditDialog(ws)">
+                <el-button size="small" text @click="showEditDialog(selectedWorkspace)">
                   <el-icon><Edit /></el-icon>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
-                <el-button size="small" text type="danger" @click="handleDelete(ws)">
+                <el-button size="small" text type="danger" @click="handleDelete(selectedWorkspace)">
                   <el-icon><Delete /></el-icon>
                 </el-button>
               </el-tooltip>
             </div>
           </div>
-        </template>
 
-        <!-- 标签页列表（可跨工作组拖拽排序） -->
-        <div v-if="ws.tabs.length > 0" class="ws-tabs">
-          <draggable
-            :list="ws.tabs"
-            group="workspaces"
-            item-key="tabId"
-            handle=".drag-handle"
-            ghost-class="tab-ghost"
-            :animation="200"
-            @update="onDragUpdate(ws.id, $event)"
-            @add="onDragAdd(ws.id, $event)"
-          >
-            <template #item="{ element: tab }">
-              <div class="ws-tab-item">
-                <span class="drag-handle" title="拖拽排序">⋮⋮</span>
+          <!-- 层级范围切换 -->
+          <div class="scope-bar">
+            <el-radio-group v-model="tabScope" size="small">
+              <el-radio-button value="current">仅本层级</el-radio-button>
+              <el-radio-button value="all">包含子工作组</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <!-- 标签页列表 -->
+          <div class="detail-body">
+            <el-empty v-if="rightTabs.length === 0" :image-size="60" description="工作组内暂无标签页" />
+
+            <!-- 仅本层级：支持拖拽排序 -->
+            <draggable
+              v-else-if="tabScope === 'current'"
+              :list="selectedWorkspace.tabs"
+              item-key="tabId"
+              handle=".drag-handle"
+              ghost-class="tab-ghost"
+              :animation="200"
+              @update="onDragUpdate"
+            >
+              <template #item="{ element: tab }">
+                <div class="ws-tab-item">
+                  <span class="drag-handle" title="拖拽排序">⋮⋮</span>
+                  <img
+                    v-if="tab.favIconUrl"
+                    :src="tab.favIconUrl"
+                    class="tab-favicon"
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                  />
+                  <div v-else class="tab-favicon-placeholder" />
+                  <div class="tab-text">
+                    <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
+                    <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                  </div>
+                  <el-tooltip content="在新标签页中打开" placement="top">
+                    <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
+                      <el-icon><View /></el-icon>
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip content="从工作组中移除" placement="top">
+                    <el-button size="small" text type="danger" @click="handleRemoveTab(selectedWorkspace!.id, tab.tabId)">
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </el-tooltip>
+                </div>
+              </template>
+            </draggable>
+
+            <!-- 包含子工作组：只读列表，带来源标记 -->
+            <div v-else class="flat-tabs">
+              <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item">
                 <img
-                  v-if="tab.favIconUrl"
-                  :src="tab.favIconUrl"
+                  v-if="item.tab.favIconUrl"
+                  :src="item.tab.favIconUrl"
                   class="tab-favicon"
-                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
                 <div v-else class="tab-favicon-placeholder" />
                 <div class="tab-text">
-                  <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
-                  <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                  <div class="tab-title" :title="item.tab.title" @click="openSingleTab(item.tab.url)">{{ item.tab.title || '(无标题)' }}</div>
+                  <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
                 </div>
+                <el-tag
+                  v-if="item.workspaceId !== selectedWorkspace.id"
+                  size="small"
+                  effect="plain"
+                  :style="{ borderColor: item.workspaceColor, color: item.workspaceColor }"
+                >
+                  {{ item.workspaceName }}
+                </el-tag>
                 <el-tooltip content="在新标签页中打开" placement="top">
-                  <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
+                  <el-button size="small" text type="primary" @click="openSingleTab(item.tab.url)">
                     <el-icon><View /></el-icon>
                   </el-button>
                 </el-tooltip>
                 <el-tooltip content="从工作组中移除" placement="top">
-                  <el-button size="small" text type="danger" @click="handleRemoveTab(ws.id, tab.tabId)">
+                  <el-button size="small" text type="danger" @click="handleRemoveTab(item.workspaceId, item.tab.tabId)">
                     <el-icon><Delete /></el-icon>
                   </el-button>
                 </el-tooltip>
               </div>
-            </template>
-          </draggable>
-        </div>
-        <el-empty v-else :image-size="60" description="工作组内暂无标签页" />
-
-        <div class="ws-footer">
-          <span class="ws-time">创建于 {{ formatTime(ws.createdAt) }}</span>
-          <span class="ws-time">更新于 {{ formatTime(ws.updatedAt) }}</span>
-        </div>
-      </el-card>
+            </div>
+          </div>
+        </template>
+      </div>
     </div>
 
     <!-- 创建/编辑对话框 -->
@@ -127,9 +197,22 @@
       width="600px"
       destroy-on-close
     >
-      <el-form label-width="80px" label-position="left">
+      <el-form label-width="90px" label-position="left">
         <el-form-item label="名称" required>
           <el-input v-model="formData.name" placeholder="例如: 项目A开发" />
+        </el-form-item>
+        <el-form-item label="父工作组">
+          <el-tree-select
+            v-model="formData.parentId"
+            :data="parentTreeData"
+            node-key="id"
+            :props="treeProps"
+            check-strictly
+            clearable
+            default-expand-all
+            placeholder="不选则为根级工作组"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="标识色">
           <el-color-picker v-model="formData.color" :predefine="presetColors" />
@@ -144,7 +227,7 @@
                       v-if="tab.favIconUrl"
                       :src="tab.favIconUrl"
                       class="tab-favicon"
-                      @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                      @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                     />
                     <div v-else class="tab-favicon-placeholder" />
                     <span class="tab-checkbox-title" :title="tab.title">{{ tab.title || '(无标题)' }}</span>
@@ -168,16 +251,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
-import type { Workspace, WorkspacesData, WorkspaceTabPayload } from '../../shared/types'
+import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
+import type { Workspace, WorkspacesData, WorkspaceTabPayload, TabReference } from '../../shared/types'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
 const searchKeyword = ref('')
+const selectedId = ref('')
+const tabScope = ref<'current' | 'all'>('current')
+
+const treeRef = ref()
+const treeProps = { label: 'name', children: 'children' }
 
 // 对话框
 const dialogVisible = ref(false)
@@ -189,6 +278,7 @@ const currentOpenTabs = ref<Array<{ chromeTabId: number; url: string; title: str
 const formData = ref({
   name: '',
   color: '#409EFF',
+  parentId: '' as string,
   checkIds: [] as number[],
 })
 
@@ -197,11 +287,63 @@ const presetColors = [
   '#909399', '#00BCD4', '#9C27B0', '#FF5722',
 ]
 
-const filteredWorkspaces = computed(() => {
-  if (!searchKeyword.value.trim()) return workspaces.value
-  const kw = searchKeyword.value.trim().toLowerCase()
-  return workspaces.value.filter(w => w.name.toLowerCase().includes(kw))
+/** 左侧树数据 */
+const treeData = computed<WorkspaceTreeNode[]>(() => buildWorkspaceTree(workspaces.value))
+
+/** 父工作组下拉树（编辑时排除自身及后代，避免形成环） */
+const parentTreeData = computed<WorkspaceTreeNode[]>(() => {
+  if (!isEditing.value || !editingId.value) return treeData.value
+  const excluded = new Set([editingId.value, ...collectDescendantIds(workspaces.value, editingId.value)])
+  const prune = (nodes: WorkspaceTreeNode[]): WorkspaceTreeNode[] =>
+    nodes
+      .filter((n) => !excluded.has(n.id))
+      .map((n) => ({ ...n, children: prune(n.children) }))
+  return prune(treeData.value)
 })
+
+const selectedWorkspace = computed<Workspace | null>(
+  () => workspaces.value.find((w) => w.id === selectedId.value) ?? null,
+)
+
+interface RightTabItem {
+  tab: TabReference
+  workspaceId: string
+  workspaceName: string
+  workspaceColor: string
+}
+
+/** 右侧标签页列表：根据层级范围聚合 */
+const rightTabs = computed<RightTabItem[]>(() => {
+  const ws = selectedWorkspace.value
+  if (!ws) return []
+
+  const collect = (w: Workspace): RightTabItem[] =>
+    w.tabs.map((tab) => ({
+      tab,
+      workspaceId: w.id,
+      workspaceName: w.name,
+      workspaceColor: w.color,
+    }))
+
+  if (tabScope.value === 'current') return collect(ws)
+
+  const ids = [ws.id, ...collectDescendantIds(workspaces.value, ws.id)]
+  const result: RightTabItem[] = []
+  for (const id of ids) {
+    const w = workspaces.value.find((x) => x.id === id)
+    if (w) result.push(...collect(w))
+  }
+  return result
+})
+
+watch(searchKeyword, (val) => {
+  treeRef.value?.filter(val)
+})
+
+function filterNode(value: string, data: WorkspaceTreeNode) {
+  if (!value) return true
+  return data.name.toLowerCase().includes(value.toLowerCase())
+}
 
 onMounted(() => {
   loadWorkspaces()
@@ -212,13 +354,23 @@ async function loadWorkspaces() {
   const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
   if (res.success && res.data) {
     workspaces.value = res.data.workspaces
+    // 保持/初始化选中项
+    if (!selectedId.value || !workspaces.value.some((w) => w.id === selectedId.value)) {
+      selectedId.value = workspaces.value[0]?.id ?? ''
+    }
+    await nextTick()
+    if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
   }
   loading.value = false
 }
 
+function onSelectNode(node: WorkspaceTreeNode) {
+  selectedId.value = node.id
+}
+
 async function loadOpenTabsForDialog() {
   const chromeTabs = await chrome.tabs.query({})
-  currentOpenTabs.value = chromeTabs.map(tab => ({
+  currentOpenTabs.value = chromeTabs.map((tab) => ({
     chromeTabId: tab.id ?? 0,
     url: tab.url || tab.pendingUrl || '',
     title: tab.title || '',
@@ -226,10 +378,10 @@ async function loadOpenTabsForDialog() {
   }))
 }
 
-function showCreateDialog() {
+function showCreateDialog(parentId: string) {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: '#409EFF', checkIds: [] }
+  formData.value = { name: '', color: '#409EFF', parentId, checkIds: [] }
   loadOpenTabsForDialog()
   dialogVisible.value = true
 }
@@ -240,6 +392,7 @@ function showEditDialog(ws: Workspace) {
   formData.value = {
     name: ws.name,
     color: ws.color,
+    parentId: ws.parentId || '',
     checkIds: [],
   }
   loadOpenTabsForDialog()
@@ -254,9 +407,8 @@ async function handleSave() {
 
   saving.value = true
 
-  // 构建标签页数据
-  const selectedTabs = currentOpenTabs.value.filter(t => formData.value.checkIds.includes(t.chromeTabId))
-  const tabs: WorkspaceTabPayload[] = selectedTabs.map(t => ({
+  const selectedTabs = currentOpenTabs.value.filter((t) => formData.value.checkIds.includes(t.chromeTabId))
+  const tabs: WorkspaceTabPayload[] = selectedTabs.map((t) => ({
     url: t.url,
     title: t.title,
     favIconUrl: t.favIconUrl,
@@ -270,25 +422,26 @@ async function handleSave() {
         id: editingId.value,
         name: formData.value.name.trim(),
         color: formData.value.color,
-        tabs,
+        parentId: formData.value.parentId || '',
+        // 编辑时若未勾选标签页则不改动标签页
+        ...(tabs.length > 0 ? { tabs } : {}),
       },
     })
-    if (res.success) {
-      ElMessage.success('工作组已更新')
-    } else {
-      ElMessage.error(res.error || '更新失败')
-    }
+    if (res.success) ElMessage.success('工作组已更新')
+    else ElMessage.error(res.error || '更新失败')
   } else {
-    const res = await sendMessage({
+    const res = await sendMessage<{ workspace: Workspace }>({
       action: 'CREATE_WORKSPACE',
       payload: {
         name: formData.value.name.trim(),
         color: formData.value.color,
+        parentId: formData.value.parentId || '',
         tabs,
       },
     })
     if (res.success) {
       ElMessage.success('工作组已创建')
+      if (res.data?.workspace?.id) selectedId.value = res.data.workspace.id
     } else {
       ElMessage.error(res.error || '创建失败')
     }
@@ -300,9 +453,12 @@ async function handleSave() {
 }
 
 async function handleDelete(ws: Workspace) {
+  const childCount = collectDescendantIds(workspaces.value, ws.id).length
   try {
     await ElMessageBox.confirm(
-      `确定要删除工作组"${ws.name}"吗？`,
+      childCount > 0
+        ? `确定要删除工作组「${ws.name}」吗？其 ${childCount} 个子工作组将上移到上一级。`
+        : `确定要删除工作组「${ws.name}」吗？`,
       '删除工作组',
       { type: 'warning' },
     )
@@ -313,6 +469,7 @@ async function handleDelete(ws: Workspace) {
   const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: ws.id } })
   if (res.success) {
     ElMessage.success('工作组已删除')
+    if (selectedId.value === ws.id) selectedId.value = ''
     await loadWorkspaces()
   } else {
     ElMessage.error(res.error || '删除失败')
@@ -320,48 +477,27 @@ async function handleDelete(ws: Workspace) {
 }
 
 async function handleOpenWorkspace(id: string, newWindow: boolean) {
-  const res = await sendMessage<{ opened: number; alreadyOpen: number }>({
+  const res = await sendMessage<{ opened: number }>({
     action: 'OPEN_WORKSPACE',
     payload: { id, newWindow },
   })
-  if (res.success) {
-    const data = res.data
-    if (data && data.alreadyOpen > 0 && data.opened === 0) {
-      ElMessage.info(`所有 ${data.alreadyOpen} 个标签页均已打开`)
-    } else if (data && data.alreadyOpen > 0) {
-      ElMessage.success(`已打开 ${data.opened} 个标签页，另有 ${data.alreadyOpen} 个已存在`)
-    } else {
-      ElMessage.success(`已打开 ${data?.opened ?? 0} 个标签页`)
-    }
-  } else {
-    ElMessage.error(res.error || '打开失败')
-  }
+  if (res.success) ElMessage.success(`已打开 ${res.data?.opened ?? 0} 个标签页`)
+  else ElMessage.error(res.error || '打开失败')
 }
 
 async function handleOpenAsTabGroup(id: string) {
-  const res = await sendMessage<{ opened: number; alreadyOpen: number }>({
+  const res = await sendMessage<{ opened: number }>({
     action: 'OPEN_WORKSPACE',
     payload: { id, asTabGroup: true },
   })
-  if (res.success) {
-    const data = res.data
-    if (data && data.alreadyOpen > 0 && data.opened === 0) {
-      ElMessage.info(`所有 ${data.alreadyOpen} 个标签页均已打开并归入标签组`)
-    } else if (data && data.alreadyOpen > 0) {
-      ElMessage.success(`已打开 ${data.opened} 个标签页并归入标签组，另有 ${data.alreadyOpen} 个已存在`)
-    } else {
-      ElMessage.success(`已打开 ${data?.opened ?? 0} 个标签页并归入标签组`)
-    }
-  } else {
-    ElMessage.error(res.error || '打开失败')
-  }
+  if (res.success) ElMessage.success(`已打开 ${res.data?.opened ?? 0} 个标签页并归入标签组`)
+  else ElMessage.error(res.error || '打开失败')
 }
 
 function openSingleTab(url: string) {
   chrome.tabs.create({ url })
 }
 
-/** 从工作组中移除指定标签页 */
 async function handleRemoveTab(workspaceId: string, tabId: string) {
   const res = await sendMessage({
     action: 'REMOVE_WORKSPACE_TAB',
@@ -375,53 +511,27 @@ async function handleRemoveTab(workspaceId: string, tabId: string) {
   }
 }
 
-/** 同组内拖拽排序 — 用 tabId 在列表中反查真实位置，避免 DOM index 偏差 */
-function onDragUpdate(workspaceId: string, evt: any) {
-  const ws = workspaces.value.find(w => w.id === workspaceId)
+/** 同组内拖拽排序 */
+function onDragUpdate(evt: { newIndex: number }) {
+  const ws = selectedWorkspace.value
   if (!ws) return
   const tab = ws.tabs[evt.newIndex]
   if (tab) {
-    const actualIndex = ws.tabs.findIndex(t => t.tabId === tab.tabId)
-    handleMoveTab(workspaceId, tab.tabId, actualIndex >= 0 ? actualIndex : evt.newIndex)
+    const actualIndex = ws.tabs.findIndex((t) => t.tabId === tab.tabId)
+    handleMoveTab(ws.id, tab.tabId, actualIndex >= 0 ? actualIndex : evt.newIndex)
   }
 }
 
-/** 跨工作组拖入 — 从 DOM 元素提取 TabReference，再在列表中反查真实位置 */
-function onDragAdd(workspaceId: string, evt: any) {
-  const ws = workspaces.value.find(w => w.id === workspaceId)
-  if (!ws) return
-  // vuedraggable 在 onDragStart 时将元素引用存到了 DOM 上
-  const underlying = evt.item?._underlying_vm_
-  const tabId: string | undefined = underlying?.tabId
-  if (tabId) {
-    const actualIndex = ws.tabs.findIndex(t => t.tabId === tabId)
-    if (actualIndex >= 0) {
-      handleMoveTab(workspaceId, tabId, actualIndex)
-    }
-  }
-}
-
-/** 移动标签页到目标工作组指定位置（后端自动处理跨组/同组） */
 async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {
   try {
     const res = await sendMessage({
       action: 'MOVE_WORKSPACE_TAB',
       payload: { workspaceId: targetWsId, tabId, newIndex },
     })
-    if (!res.success) {
-      // API 失败则刷新以回滚视觉状态
-      await loadWorkspaces()
-    }
+    if (!res.success) await loadWorkspaces()
   } catch {
     await loadWorkspaces()
   }
-}
-
-function formatTime(iso: string): string {
-  if (!iso) return '--'
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 </script>
 
@@ -430,6 +540,7 @@ function formatTime(iso: string): string {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 
 .toolbar {
@@ -446,23 +557,83 @@ function formatTime(iso: string): string {
   gap: 12px;
 }
 
-.workspace-list {
+.split-pane {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 480px;
+}
+
+.tree-pane {
+  width: 280px;
+  flex-shrink: 0;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.detail-pane {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
-.workspace-card {
-  border-left: 3px solid #409eff;
+.pane-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 8px;
 }
 
-.ws-header {
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-count {
+  font-size: 11px;
+  color: #909399;
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 0 6px;
+}
+
+.detail-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.ws-title-row {
+.detail-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -481,12 +652,20 @@ function formatTime(iso: string): string {
   color: #303133;
 }
 
-.ws-actions {
+.detail-actions {
   display: flex;
   gap: 4px;
 }
 
-.ws-tabs {
+.scope-bar {
+  padding: 12px 0;
+}
+
+.detail-body {
+  flex: 1;
+}
+
+.flat-tabs {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -535,7 +714,7 @@ function formatTime(iso: string): string {
 }
 
 .tab-title:hover {
-  color: #409EFF;
+  color: #409eff;
   text-decoration: underline;
 }
 
@@ -546,19 +725,6 @@ function formatTime(iso: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
-}
-
-.ws-footer {
-  display: flex;
-  gap: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-  margin-top: 8px;
-}
-
-.ws-time {
-  font-size: 11px;
-  color: #c0c4cc;
 }
 
 .tab-selector {
@@ -588,7 +754,6 @@ function formatTime(iso: string): string {
   font-size: 13px;
 }
 
-/* 拖拽排序 */
 .drag-handle {
   cursor: grab;
   color: #c0c4cc;
