@@ -3,162 +3,176 @@
     <!-- 顶部栏 -->
     <div class="sidepanel-header">
       <h3>Tab Sync</h3>
-      <el-button type="primary" size="small" @click="openDashboard">
-        管理面板
-      </el-button>
-    </div>
-
-    <!-- 工具栏：窗口选择 + 搜索 -->
-    <div class="toolbar">
-      <el-select v-model="windowFilter" size="small" class="window-select">
-        <el-option label="全部窗口" value="all" />
-        <el-option
-          v-for="(win, idx) in windows"
-          :key="win.id"
-          :label="`窗口 ${idx + 1}${win.id === currentWindowId ? '（当前）' : ''}`"
-          :value="win.id"
-        />
-      </el-select>
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索标签页..."
-        size="small"
-        clearable
-        :prefix-icon="Search"
-        class="search-input"
-      />
-    </div>
-
-    <!-- 选择操作栏 -->
-    <div v-if="selectedTabIds.size > 0" class="selection-bar">
-      <span class="selection-count">已选 {{ selectedTabIds.size }} 个标签页</span>
-      <div class="selection-actions">
-        <el-button size="small" text @click="clearSelection">清除</el-button>
-        <el-button size="small" type="primary" @click="pickerVisible = true">
-          加入工作组
+      <div class="sp-actions">
+        <el-button size="small" text @click="openDashboard">管理面板</el-button>
+        <el-button size="small" text @click="openSettings">设置</el-button>
+        <el-button v-if="authenticated" size="small" text type="danger" @click="logout">
+          退出
         </el-button>
       </div>
     </div>
 
-    <!-- 树状列表 -->
-    <div class="tree-list">
-      <div v-if="loading" class="hint-state">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        <span>加载中...</span>
+    <!-- 未登录：显示登录面板（从 popup 迁移而来） -->
+    <div v-if="authLoading" class="hint-state">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <span>加载中...</span>
+    </div>
+    <LoginPanel v-else-if="!authenticated" @login-success="onLoginSuccess" />
+
+    <!-- 已登录：标签页管理 -->
+    <template v-else>
+      <!-- 工具栏：窗口选择 + 搜索 -->
+      <div class="toolbar">
+        <el-select v-model="windowFilter" size="small" class="window-select">
+          <el-option label="全部窗口" value="all" />
+          <el-option
+            v-for="(win, idx) in windows"
+            :key="win.id"
+            :label="`窗口 ${idx + 1}${win.id === currentWindowId ? '（当前）' : ''}`"
+            :value="win.id"
+          />
+        </el-select>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索标签页..."
+          size="small"
+          clearable
+          :prefix-icon="Search"
+          class="search-input"
+        />
       </div>
 
-      <div v-else-if="visibleWindows.length === 0" class="hint-state">
-        <span>暂无标签页</span>
+      <!-- 选择操作栏 -->
+      <div v-if="selectedTabIds.size > 0" class="selection-bar">
+        <span class="selection-count">已选 {{ selectedTabIds.size }} 个标签页</span>
+        <div class="selection-actions">
+          <el-button size="small" text @click="clearSelection">清除</el-button>
+          <el-button size="small" type="primary" @click="pickerVisible = true">
+            加入工作组
+          </el-button>
+        </div>
       </div>
 
-      <template v-else>
-        <div v-for="win in visibleWindows" :key="win.id" class="window-node">
-          <!-- 窗口标题行 -->
-          <div class="window-header" @click="toggleWindow(win.id)">
-            <el-icon class="expand-icon" :class="{ 'is-expanded': !collapsedWindows.has(win.id) }">
-              <CaretRight />
-            </el-icon>
-            <el-icon class="window-icon"><Monitor /></el-icon>
-            <span class="window-title">
-              窗口 {{ win.order }}{{ win.id === currentWindowId ? '（当前）' : '' }}
-            </span>
-            <span class="node-count">{{ win.tabCount }}</span>
-          </div>
+      <!-- 树状列表 -->
+      <div class="tree-list">
+        <div v-if="loading" class="hint-state">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>加载中...</span>
+        </div>
 
-          <!-- 窗口内容 -->
-          <div v-show="!collapsedWindows.has(win.id)" class="window-body">
-            <template v-for="item in win.items" :key="item.key">
-              <!-- 标签页分组 -->
-              <div v-if="item.type === 'group'" class="group-node">
-                <div class="group-header">
-                  <el-checkbox
-                    :model-value="groupCheckState(item).checked"
-                    :indeterminate="groupCheckState(item).indeterminate"
-                    @change="(v) => toggleGroup(item, Boolean(v))"
-                    @click.stop
-                  />
-                  <el-icon
-                    class="expand-icon"
-                    :class="{ 'is-expanded': !collapsedGroups.has(item.groupId) }"
-                    @click="toggleGroupCollapse(item.groupId)"
-                  >
-                    <CaretRight />
-                  </el-icon>
-                  <span class="group-dot" :style="{ backgroundColor: groupColorHex(item.color) }" />
-                  <span class="group-title">{{ item.title || '未命名分组' }}</span>
-                  <span class="node-count">{{ item.tabs.length }}</span>
-                </div>
-                <div v-show="!collapsedGroups.has(item.groupId)" class="group-body">
-                  <div
-                    v-for="tab in item.tabs"
-                    :key="tab.chromeTabId"
-                    class="tab-item is-grouped"
-                    :class="{ 'is-active': tab.active }"
-                    @click="activateTab(tab)"
-                  >
+        <div v-else-if="visibleWindows.length === 0" class="hint-state">
+          <span>暂无标签页</span>
+        </div>
+
+        <template v-else>
+          <div v-for="win in visibleWindows" :key="win.id" class="window-node">
+            <!-- 窗口标题行 -->
+            <div class="window-header" @click="toggleWindow(win.id)">
+              <el-icon class="expand-icon" :class="{ 'is-expanded': !collapsedWindows.has(win.id) }">
+                <CaretRight />
+              </el-icon>
+              <el-icon class="window-icon"><Monitor /></el-icon>
+              <span class="window-title">
+                窗口 {{ win.order }}{{ win.id === currentWindowId ? '（当前）' : '' }}
+              </span>
+              <span class="node-count">{{ win.tabCount }}</span>
+            </div>
+
+            <!-- 窗口内容 -->
+            <div v-show="!collapsedWindows.has(win.id)" class="window-body">
+              <template v-for="item in win.items" :key="item.key">
+                <!-- 标签页分组 -->
+                <div v-if="item.type === 'group'" class="group-node">
+                  <div class="group-header">
                     <el-checkbox
-                      :model-value="selectedTabIds.has(tab.chromeTabId)"
-                      @change="(v) => toggleTab(tab.chromeTabId, Boolean(v))"
+                      :model-value="groupCheckState(item).checked"
+                      :indeterminate="groupCheckState(item).indeterminate"
+                      @change="(v) => toggleGroup(item, Boolean(v))"
                       @click.stop
                     />
-                    <img
-                      v-if="tab.favIconUrl"
-                      :src="tab.favIconUrl"
-                      class="tab-favicon"
-                      @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
-                    />
-                    <div v-else class="tab-favicon-placeholder" />
-                    <div class="tab-info">
-                      <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
-                      <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
-                    </div>
-                    <div class="tab-actions" @click.stop>
-                      <el-tooltip content="关闭" placement="top">
-                        <el-button size="small" text circle @click="closeTab(tab.chromeTabId)">
-                          <el-icon><Close /></el-icon>
-                        </el-button>
-                      </el-tooltip>
+                    <el-icon
+                      class="expand-icon"
+                      :class="{ 'is-expanded': !collapsedGroups.has(item.groupId) }"
+                      @click="toggleGroupCollapse(item.groupId)"
+                    >
+                      <CaretRight />
+                    </el-icon>
+                    <span class="group-dot" :style="{ backgroundColor: groupColorHex(item.color) }" />
+                    <span class="group-title">{{ item.title || '未命名分组' }}</span>
+                    <span class="node-count">{{ item.tabs.length }}</span>
+                  </div>
+                  <div v-show="!collapsedGroups.has(item.groupId)" class="group-body">
+                    <div
+                      v-for="tab in item.tabs"
+                      :key="tab.chromeTabId"
+                      class="tab-item is-grouped"
+                      :class="{ 'is-active': tab.active }"
+                      @click="activateTab(tab)"
+                    >
+                      <el-checkbox
+                        :model-value="selectedTabIds.has(tab.chromeTabId)"
+                        @change="(v) => toggleTab(tab.chromeTabId, Boolean(v))"
+                        @click.stop
+                      />
+                      <img
+                        v-if="tab.favIconUrl"
+                        :src="tab.favIconUrl"
+                        class="tab-favicon"
+                        @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                      />
+                      <div v-else class="tab-favicon-placeholder" />
+                      <div class="tab-info">
+                        <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
+                        <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                      </div>
+                      <div class="tab-actions" @click.stop>
+                        <el-tooltip content="关闭" placement="top">
+                          <el-button size="small" text circle @click="closeTab(tab.chromeTabId)">
+                            <el-icon><Close /></el-icon>
+                          </el-button>
+                        </el-tooltip>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- 未分组标签页 -->
-              <div
-                v-else
-                class="tab-item"
-                :class="{ 'is-active': item.active }"
-                @click="activateTab(item)"
-              >
-                <el-checkbox
-                  :model-value="selectedTabIds.has(item.chromeTabId)"
-                  @change="(v) => toggleTab(item.chromeTabId, Boolean(v))"
-                  @click.stop
-                />
-                <img
-                  v-if="item.favIconUrl"
-                  :src="item.favIconUrl"
-                  class="tab-favicon"
-                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
-                />
-                <div v-else class="tab-favicon-placeholder" />
-                <div class="tab-info">
-                  <div class="tab-title" :title="item.title">{{ item.title || '(无标题)' }}</div>
-                  <div class="tab-url" :title="item.url">{{ item.url }}</div>
+                <!-- 未分组标签页 -->
+                <div
+                  v-else
+                  class="tab-item"
+                  :class="{ 'is-active': item.active }"
+                  @click="activateTab(item)"
+                >
+                  <el-checkbox
+                    :model-value="selectedTabIds.has(item.chromeTabId)"
+                    @change="(v) => toggleTab(item.chromeTabId, Boolean(v))"
+                    @click.stop
+                  />
+                  <img
+                    v-if="item.favIconUrl"
+                    :src="item.favIconUrl"
+                    class="tab-favicon"
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
+                  />
+                  <div v-else class="tab-favicon-placeholder" />
+                  <div class="tab-info">
+                    <div class="tab-title" :title="item.title">{{ item.title || '(无标题)' }}</div>
+                    <div class="tab-url" :title="item.url">{{ item.url }}</div>
+                  </div>
+                  <div class="tab-actions" @click.stop>
+                    <el-tooltip content="关闭" placement="top">
+                      <el-button size="small" text circle @click="closeTab(item.chromeTabId)">
+                        <el-icon><Close /></el-icon>
+                      </el-button>
+                    </el-tooltip>
+                  </div>
                 </div>
-                <div class="tab-actions" @click.stop>
-                  <el-tooltip content="关闭" placement="top">
-                    <el-button size="small" text circle @click="closeTab(item.chromeTabId)">
-                      <el-icon><Close /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
-        </div>
-      </template>
-    </div>
+        </template>
+      </div>
+    </template>
 
     <!-- 工作组选择弹窗 -->
     <WorkspacePickerDialog
@@ -174,8 +188,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Search, Close, Loading, CaretRight, Monitor } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '../shared/composables/useMessage'
+import LoginPanel from '@/shared/components/LoginPanel.vue'
 import WorkspacePickerDialog from '../shared/components/WorkspacePickerDialog.vue'
-import type { WorkspaceTreeNode } from '../shared/utils/workspace-tree'
+import type { StateData } from '@/shared/types'
+import type { WorkspaceTreeNode as WsTreeNode } from '@/shared/utils/workspace-tree'
 
 interface TabNode {
   type: 'tab'
@@ -207,6 +223,33 @@ interface WindowNode {
   items: Array<GroupNode | TabNode>
 }
 
+// ============ 登录态（从 popup 迁移） ============
+const authLoading = ref(true)
+const authenticated = ref(false)
+
+async function initAuth() {
+  const res = await sendMessage<StateData>({ action: 'GET_STATE' })
+  authenticated.value = !!(res.success && res.data?.auth?.authenticated)
+  authLoading.value = false
+}
+
+function onLoginSuccess() {
+  authenticated.value = true
+  reload()
+}
+
+async function logout() {
+  await sendMessage({ action: 'LOGOUT' })
+  authenticated.value = false
+  ElMessage.success('已退出登录')
+}
+
+function openSettings() {
+  const url = chrome.runtime.getURL('dashboard.html') + '#/settings'
+  chrome.tabs.create({ url })
+}
+
+// ============ 标签页管理 ============
 const loading = ref(true)
 const searchKeyword = ref('')
 const windowFilter = ref<'all' | number>('all')
@@ -329,8 +372,6 @@ const visibleWindows = computed<WindowNode[]>(() => {
     .filter((w) => w.items.length > 0)
 })
 
-/** 供下拉列表使用的 windows（带 id） */
-
 function groupCheckState(group: GroupNode) {
   const total = group.tabs.length
   const selected = group.tabs.filter((t) => selectedTabIds.value.has(t.chromeTabId)).length
@@ -404,7 +445,7 @@ async function closeTab(chromeTabId: number) {
 }
 
 /** 将当前选中的标签页加入指定工作组 */
-async function handleAddToWorkspace(node: WorkspaceTreeNode) {
+async function handleAddToWorkspace(node: WsTreeNode) {
   const ids = selectedTabIds.value
   const tabs = rawTabs.value
     .filter((t) => t.id != null && ids.has(t.id))
@@ -508,7 +549,7 @@ function registerListeners() {
 }
 
 onMounted(async () => {
-  await reload()
+  await Promise.all([initAuth(), reload()])
   registerListeners()
 })
 
@@ -538,6 +579,12 @@ onUnmounted(() => {
   margin: 0;
   font-size: 15px;
   color: #303133;
+}
+
+.sp-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .toolbar {

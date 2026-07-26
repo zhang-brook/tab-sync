@@ -50,7 +50,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
-import LoginPanel from './components/LoginPanel.vue'
+import LoginPanel from '../shared/components/LoginPanel.vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import type { StateData } from '../shared/types'
 
