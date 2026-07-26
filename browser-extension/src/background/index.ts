@@ -10,6 +10,17 @@ logger.info('Service Worker started')
 // 注册标签页事件监听（必须在顶层同步注册，SW 重启时也能正确绑定）
 initTabMonitor()
 
+// 点击工具栏图标时打开侧边栏（已移除 popup，故 onClicked 会触发）
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.windowId !== undefined) {
+    try {
+      await chrome.sidePanel.open({ windowId: tab.windowId })
+    } catch (err) {
+      logger.error('打开侧边栏失败:', err)
+    }
+  }
+})
+
 // 扩展安装/更新时初始化
 chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Extension installed/updated:', details.reason)

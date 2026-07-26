@@ -28,7 +28,6 @@ export default defineManifest({
       48: 'public/icons/icon-48.png',
       128: 'public/icons/icon-128.png',
     },
-    default_popup: 'src/popup/index.html',
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
