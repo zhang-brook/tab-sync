@@ -13,6 +13,7 @@ export default defineManifest({
     'alarms',
     'activeTab',
     'sidePanel',
+    'notifications',
   ],
   host_permissions: [
     '<all_urls>',
@@ -36,5 +37,11 @@ export default defineManifest({
     16: 'public/icons/icon-16.png',
     48: 'public/icons/icon-48.png',
     128: 'public/icons/icon-128.png',
+  },
+  commands: {
+    'save-and-close': {
+      suggested_key: { default: 'Ctrl+Shift+S' },
+      description: '将当前标签页加入工作组并关闭',
+    },
   },
 })

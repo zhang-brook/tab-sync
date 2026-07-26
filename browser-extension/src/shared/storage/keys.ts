@@ -13,6 +13,8 @@ export const STORAGE_KEYS = {
   DEVICE_NAME: 'device_name',
   /** 后端 API 地址 */
   API_BASE_URL: 'api_base_url',
+  /** 快捷键「加入并关闭」使用的默认收藏工作组 ID */
+  DEFAULT_WORKSPACE_ID: 'default_workspace_id',
 } as const
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS]

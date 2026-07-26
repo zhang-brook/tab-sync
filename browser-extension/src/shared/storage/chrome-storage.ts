@@ -7,6 +7,7 @@ interface StorageSchema {
   [STORAGE_KEYS.DEVICE_ID]: string | null
   [STORAGE_KEYS.DEVICE_NAME]: string | null
   [STORAGE_KEYS.API_BASE_URL]: string
+  [STORAGE_KEYS.DEFAULT_WORKSPACE_ID]: string
 }
 
 /** 默认值 */
@@ -16,6 +17,7 @@ const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,
   [STORAGE_KEYS.API_BASE_URL]: '',
+  [STORAGE_KEYS.DEFAULT_WORKSPACE_ID]: '',
 }
 
 /**

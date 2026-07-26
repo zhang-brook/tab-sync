@@ -60,6 +60,25 @@
             注销
           </el-button>
         </el-form-item>
+        </el-form>
+    </el-card>
+
+    <!-- 快捷键 -->
+    <el-card shadow="never">
+      <template #header>
+        <span class="card-title">快捷键</span>
+      </template>
+
+      <el-form label-width="120px" label-position="left">
+        <el-form-item label="加入并关闭">
+          <span class="form-tip">按 <code>Ctrl+Shift+S</code> 将当前标签页加入默认工作组并关闭</span>
+        </el-form-item>
+        <el-form-item label="默认工作组">
+          <el-select v-model="defaultWorkspaceId" placeholder="选择默认收藏工作组" clearable @change="saveDefaultWorkspace" style="width: 280px">
+            <el-option v-for="w in workspaceOptions" :key="w.id" :label="w.name" :value="w.id" />
+          </el-select>
+          <div class="form-tip">未设置时，快捷键会打开侧边栏引导选择</div>
+        </el-form-item>
       </el-form>
     </el-card>
 
@@ -149,7 +168,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '../../shared/storage'
-import type { StateData } from '../../shared/types'
+import type { StateData, WorkspacesData, Workspace } from '../../shared/types'
 
 const apiBaseUrl = ref('')
 const deviceId = ref('')
@@ -158,6 +177,10 @@ const tabCount = ref({ open: 0, frozen: 0 })
 const tokenInput = ref('')
 const tokenChecking = ref(false)
 const versionChecking = ref(false)
+
+// 快捷键「加入并关闭」默认工作组
+const defaultWorkspaceId = ref('')
+const workspaceOptions = ref<Workspace[]>([])
 
 const extensionVersion = chrome.runtime.getManifest().version
 const extensionId = chrome.runtime.id
@@ -190,6 +213,10 @@ onMounted(async () => {
   if (res.success && res.data) {
     tabCount.value = res.data.tabCount ?? { open: 0, frozen: 0 }
   }
+
+  // 默认收藏工作组
+  defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || ''
+  await loadWorkspaces()
 })
 
 async function handleModeChange() {
@@ -244,6 +271,17 @@ async function handleLogout() {
   await sendMessage({ action: 'LOGOUT' })
   authStatus.value = 'unknown'
   ElMessage.success('已注销')
+}
+
+async function loadWorkspaces() {
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  if (res.success && res.data) {
+    workspaceOptions.value = res.data.workspaces
+  }
+}
+
+function saveDefaultWorkspace() {
+  storage.set(STORAGE_KEYS.DEFAULT_WORKSPACE_ID, defaultWorkspaceId.value || '')
 }
 
 async function checkVersion() {

@@ -4,6 +4,7 @@ import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
 import { storage, STORAGE_KEYS } from '../shared/storage'
+import { sendMessage } from '../shared/composables/useMessage'
 
 logger.info('Service Worker started')
 
@@ -30,6 +31,71 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // 尝试向后端注册设备（后端未部署时静默失败）
   await tryRegisterDevice(deviceId)
 })
+
+// 快捷键：将当前标签页加入工作组并关闭
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'save-and-close') {
+    void handleSaveAndClose()
+  }
+})
+
+/**
+ * 处理「加入并关闭」快捷键：
+ * 1. 取当前激活标签页；2. 校验协议；3. 若已设置默认工作组则收藏并关闭，否则打开侧边栏兜底。
+ */
+async function handleSaveAndClose() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab?.url) return
+
+  // 仅允许 http(s)/file 页面，浏览器内置页面不支持
+  let protocol = ''
+  try {
+    protocol = new URL(tab.url).protocol
+  } catch {
+    return
+  }
+  if (!['http:', 'https:', 'file:'].includes(protocol)) {
+    await notify('无法收藏该页面', '当前页面类型不支持收藏（如浏览器内置页面）')
+    return
+  }
+
+  const wsId = await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)
+  if (!wsId) {
+    // 兜底：打开侧边栏引导用户设置默认工作组
+    try {
+      await chrome.sidePanel.open({ windowId: tab.windowId })
+    } catch {
+      /* ignore */
+    }
+    await notify('未设置默认收藏工作组', '请在设置中选择默认工作组后再使用快捷键')
+    return
+  }
+
+  const res = await sendMessage({
+    action: 'ADD_TABS_TO_WORKSPACE',
+    payload: { workspaceId: wsId, tabs: [{ chromeTabId: tab.id ?? 0, url: tab.url ?? '', title: tab.title ?? '', favIconUrl: tab.favIconUrl ?? '' }] },
+  })
+  if (res.success) {
+    await chrome.tabs.remove(tab.id!)
+    await notify('已加入工作组', '当前标签页已收藏并关闭')
+  } else {
+    await notify('收藏失败', res.error || '请检查后端连接')
+  }
+}
+
+/** 轻量桌面通知 */
+async function notify(title: string, message: string) {
+  try {
+    await chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'public/icons/icon-48.png',
+      title,
+      message,
+    })
+  } catch {
+    /* ignore */
+  }
+}
 
 // 浏览器启动时注册设备
 chrome.runtime.onStartup.addListener(async () => {
