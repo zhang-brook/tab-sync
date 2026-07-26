@@ -53,7 +53,7 @@ func TestWorkspaceService_Update(t *testing.T) {
 	svc := NewWorkspaceService(db, nil)
 
 	result, _ := svc.Create(CreateWorkspacePayload{
-		Name: "原始名称",
+		Name:  "原始名称",
 		Color: "#000000",
 		Tabs: []WorkspaceTabData{
 			{URL: "https://old.com", Title: "Old"},

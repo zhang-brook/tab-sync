@@ -44,18 +44,18 @@ type Config struct {
 // Load 加载配置（环境变量 + 默认值）
 func Load() *Config {
 	cfg := &Config{
-		Port:          getEnv("PORT", "8080"),
-		Version:       getEnv("SERVER_VERSION", "1.0.0"),
-		DataDir:       getEnv("DATA_DIR", "./data"),
-		JWTSecret:     getEnv("JWT_SECRET", generateRandomSecret()),
-		LogLevel:      getEnv("LOG_LEVEL", "info"),
-		LogOutput:     getEnv("LOG_OUTPUT", "stdout"),
-		MinExtVersion: getEnv("MIN_EXT_VERSION", "1.0.0"),
-		MaxExtVersion: getEnv("MAX_EXT_VERSION", "2.0.0"),
-		AdminEnabled:         true,
-		UpstreamURL:          getEnv("UPSTREAM_URL", ""),
-		UpstreamToken:        getEnv("UPSTREAM_TOKEN", ""),
-		UpstreamSyncEnabled:  getEnvBool("UPSTREAM_SYNC_ENABLED"),
+		Port:                getEnv("PORT", "8080"),
+		Version:             getEnv("SERVER_VERSION", "1.0.0"),
+		DataDir:             getEnv("DATA_DIR", "./data"),
+		JWTSecret:           getEnv("JWT_SECRET", generateRandomSecret()),
+		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		LogOutput:           getEnv("LOG_OUTPUT", "stdout"),
+		MinExtVersion:       getEnv("MIN_EXT_VERSION", "1.0.0"),
+		MaxExtVersion:       getEnv("MAX_EXT_VERSION", "2.0.0"),
+		AdminEnabled:        true,
+		UpstreamURL:         getEnv("UPSTREAM_URL", ""),
+		UpstreamToken:       getEnv("UPSTREAM_TOKEN", ""),
+		UpstreamSyncEnabled: getEnvBool("UPSTREAM_SYNC_ENABLED"),
 	}
 
 	// 确保数据目录存在

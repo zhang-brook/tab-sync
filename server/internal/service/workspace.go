@@ -54,14 +54,14 @@ type UpdateWorkspacePayload struct {
 
 // WorkspaceResponse 工作组响应（给前端）
 type WorkspaceResponse struct {
-	ID        string             `json:"id"`
-	ParentID  string             `json:"parentId"`
-	Name      string             `json:"name"`
-	Color     string             `json:"color"`
-	Icon      string             `json:"icon"`
-	Tabs      []TabReference     `json:"tabs"`
-	CreatedAt string             `json:"createdAt"`
-	UpdatedAt string             `json:"updatedAt"`
+	ID        string         `json:"id"`
+	ParentID  string         `json:"parentId"`
+	Name      string         `json:"name"`
+	Color     string         `json:"color"`
+	Icon      string         `json:"icon"`
+	Tabs      []TabReference `json:"tabs"`
+	CreatedAt string         `json:"createdAt"`
+	UpdatedAt string         `json:"updatedAt"`
 }
 
 // TabReference 标签页引用
@@ -402,10 +402,10 @@ func sanitizeFavIconURL(url string) string {
 
 // WorkspaceTabSummary 工作组标签页摘要
 type WorkspaceTabSummary struct {
-	WorkspaceID    string        `json:"workspaceId"`
-	WorkspaceName  string        `json:"workspaceName"`
-	WorkspaceColor string        `json:"workspaceColor"`
-	Tabs           []TabURLPair  `json:"tabs"`
+	WorkspaceID    string       `json:"workspaceId"`
+	WorkspaceName  string       `json:"workspaceName"`
+	WorkspaceColor string       `json:"workspaceColor"`
+	Tabs           []TabURLPair `json:"tabs"`
 }
 
 // TabURLPair 标签页 URL 对

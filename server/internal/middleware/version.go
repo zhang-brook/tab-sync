@@ -27,11 +27,11 @@ func VersionCheck(serverVersion, minExtVersion, maxExtVersion string) gin.Handle
 		// 低于最低版本要求 → 426 Upgrade Required
 		if compareSemVer(extParts, minParts) < 0 {
 			c.JSON(http.StatusUpgradeRequired, gin.H{
-				"code":             426,
-				"success":          false,
-				"message":          "浏览器扩展版本过低，请升级扩展",
-				"min_ext_version":  minExtVersion,
-				"server_version":   serverVersion,
+				"code":            426,
+				"success":         false,
+				"message":         "浏览器扩展版本过低，请升级扩展",
+				"min_ext_version": minExtVersion,
+				"server_version":  serverVersion,
 			})
 			c.Abort()
 			return
@@ -40,11 +40,11 @@ func VersionCheck(serverVersion, minExtVersion, maxExtVersion string) gin.Handle
 		// 高于最高版本 → 也拒绝（扩展版本太新，后端可能不兼容）
 		if compareSemVer(extParts, maxParts) > 0 {
 			c.JSON(http.StatusUpgradeRequired, gin.H{
-				"code":             426,
-				"success":          false,
-				"message":          "浏览器扩展版本过高，后端不支持此版本",
-				"max_ext_version":  maxExtVersion,
-				"server_version":   serverVersion,
+				"code":            426,
+				"success":         false,
+				"message":         "浏览器扩展版本过高，后端不支持此版本",
+				"max_ext_version": maxExtVersion,
+				"server_version":  serverVersion,
 			})
 			c.Abort()
 			return
