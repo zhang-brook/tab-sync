@@ -474,12 +474,14 @@ async function handleSave() {
 }
 
 async function handleDelete(ws: Workspace) {
-  const childCount = collectDescendantIds(workspaces.value, ws.id).length
+  const descendantIds = collectDescendantIds(workspaces.value, ws.id)
+  const childCount = descendantIds.length
+  const tabCount = workspaces.value
+    .filter((w) => w.id === ws.id || descendantIds.includes(w.id))
+    .reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0)
   try {
     await ElMessageBox.confirm(
-      childCount > 0
-        ? `确定要删除工作组「${ws.name}」吗？其 ${childCount} 个子工作组将上移到上一级。`
-        : `确定要删除工作组「${ws.name}」吗？`,
+      `确定要删除工作组「${ws.name}」吗？其 ${childCount} 个子工作组及全部 ${tabCount} 个标签页将一并删除，且不可恢复。`,
       '删除工作组',
       { type: 'warning' },
     )

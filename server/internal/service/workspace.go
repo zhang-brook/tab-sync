@@ -222,28 +222,41 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	return &resp, nil
 }
 
-// Delete 删除工作区（软删除）
+// Delete 递归删除工作区及其整棵子树（含所有子/孙工作组与它们的标签页）
 func (s *WorkspaceService) Delete(id string) error {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		// 读取被删工作组，拿到它的父级，用于把子工作组上提，避免出现游离节点
-		var target model.Workspace
-		if err := tx.Where("workspace_id = ?", id).First(&target).Error; err != nil {
+		// 加载全部未删除工作组，构建 parentId -> 子级 映射
+		var all []model.Workspace
+		if err := tx.Where("is_deleted = ?", false).Find(&all).Error; err != nil {
 			return err
 		}
-		// 将直接子工作组上提到被删节点的父级
-		if err := tx.Model(&model.Workspace{}).
-			Where("parent_id = ?", id).
-			Update("parent_id", target.ParentID).Error; err != nil {
-			return err
+		childrenMap := make(map[string][]string)
+		for _, w := range all {
+			childrenMap[w.ParentID] = append(childrenMap[w.ParentID], w.WorkspaceID)
 		}
-		// 软删除工作组
-		if err := tx.Model(&model.Workspace{}).
-			Where("workspace_id = ?", id).
-			Update("is_deleted", true).Error; err != nil {
-			return err
+
+		// 后序遍历：先递归收集子节点，最后才收集自身，
+		// 保证从最底层的叶子往上层逐个删除，避免删掉父级后丢失查找子级的依据
+		var subtree []string
+		var visit func(wid string)
+		visit = func(wid string) {
+			for _, c := range childrenMap[wid] {
+				visit(c)
+			}
+			subtree = append(subtree, wid)
 		}
-		// 物理删除关联标签页
-		return tx.Where("workspace_id = ?", id).Delete(&model.WorkspaceTab{}).Error
+		visit(id)
+
+		// 物理删除子树内每个工作组的标签页（从叶子到父级）
+		for _, wid := range subtree {
+			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTab{}).Error; err != nil {
+				return err
+			}
+		}
+		// 软删除整棵子树的工作组
+		return tx.Model(&model.Workspace{}).
+			Where("workspace_id IN ?", subtree).
+			Update("is_deleted", true).Error
 	})
 	if err != nil {
 		return err
