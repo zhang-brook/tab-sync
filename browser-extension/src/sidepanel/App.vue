@@ -40,6 +40,9 @@
           :prefix-icon="Search"
           class="search-input"
         />
+        <el-tooltip content="定位到当前激活的标签页" placement="top">
+          <el-button size="small" :icon="Aim" @click="focusActiveTab" />
+        </el-tooltip>
       </div>
 
       <!-- 选择操作栏 -->
@@ -187,7 +190,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { Search, Close, Loading, CaretRight, Monitor } from '@element-plus/icons-vue'
+import { Search, Close, Loading, CaretRight, Monitor, Aim } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '../shared/composables/useMessage'
 import LoginPanel from '@/shared/components/LoginPanel.vue'
@@ -299,6 +302,38 @@ function ensureVisible(tabId: number) {
     }
   }
   scrollToSelected()
+}
+
+/** 点击聚焦按钮：定位到浏览器当前真正激活的标签页，展开其所在窗口/分组并滚动到可视区 */
+async function focusActiveTab() {
+  try {
+    const [t] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (t?.id == null) return
+    selectedTabId.value = t.id
+
+    // 清除可能隐藏该标签页的筛选，确保能定位到它
+    if (searchKeyword.value.trim()) searchKeyword.value = ''
+    if (t.windowId != null && windowFilter.value !== 'all' && windowFilter.value !== t.windowId) {
+      windowFilter.value = 'all'
+    }
+
+    await nextTick()
+
+    // 展开所在窗口
+    if (t.windowId != null && collapsedWindows.value.has(t.windowId)) {
+      toggleWindow(t.windowId)
+    }
+    // 展开所在分组
+    const gid = t.groupId ?? -1
+    if (gid !== -1 && gid !== chrome.tabGroups.TAB_GROUP_ID_NONE && collapsedGroups.value.has(gid)) {
+      toggleGroupCollapse(gid)
+    }
+
+    await nextTick()
+    tabRefs[t.id]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  } catch {
+    /* 忽略：无活动标签页等异常情况 */
+  }
 }
 
 /** 将高亮定位到「当前浏览器窗口」的激活标签页 */
