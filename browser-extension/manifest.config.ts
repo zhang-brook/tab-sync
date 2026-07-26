@@ -40,7 +40,7 @@ export default defineManifest({
   },
   commands: {
     'save-and-close': {
-      suggested_key: { default: 'Ctrl+Shift+S' },
+      suggested_key: { default: 'Shift+Alt+S' },
       description: '将当前标签页加入工作组并关闭',
     },
   },

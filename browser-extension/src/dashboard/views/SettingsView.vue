@@ -71,12 +71,19 @@
 
       <el-form label-width="120px" label-position="left">
         <el-form-item label="加入并关闭">
-          <span class="form-tip">按 <code>Ctrl+Shift+S</code> 将当前标签页加入默认工作组并关闭</span>
+          <span class="form-tip">按 <code>Shift+Alt+S</code> 将当前标签页加入默认工作组并关闭</span>
         </el-form-item>
         <el-form-item label="默认工作组">
-          <el-select v-model="defaultWorkspaceId" placeholder="选择默认收藏工作组" clearable @change="saveDefaultWorkspace" style="width: 280px">
-            <el-option v-for="w in workspaceOptions" :key="w.id" :label="w.name" :value="w.id" />
-          </el-select>
+          <el-tree-select
+            v-model="defaultWorkspaceId"
+            :data="workspaceTree"
+            node-key="value"
+            :props="{ label: 'label', children: 'children' }"
+            placeholder="选择默认收藏工作组"
+            clearable
+            @change="saveDefaultWorkspace"
+            style="width: 280px"
+          />
           <div class="form-tip">未设置时，快捷键会打开侧边栏引导选择</div>
         </el-form-item>
       </el-form>
@@ -164,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '../../shared/storage'
@@ -181,6 +188,30 @@ const versionChecking = ref(false)
 // 快捷键「加入并关闭」默认工作组
 const defaultWorkspaceId = ref('')
 const workspaceOptions = ref<Workspace[]>([])
+
+// 将扁平的工作组列表按 parentId 组装成树，供默认工作组下拉树形展示
+interface WorkspaceTreeNode {
+  value: string
+  label: string
+  children: WorkspaceTreeNode[]
+}
+
+const workspaceTree = computed<WorkspaceTreeNode[]>(() => {
+  const list = workspaceOptions.value
+  const map = new Map<string, WorkspaceTreeNode>()
+  list.forEach((w) => map.set(w.id, { value: w.id, label: w.name, children: [] }))
+  const roots: WorkspaceTreeNode[] = []
+  list.forEach((w) => {
+    const node = map.get(w.id)!
+    const parent = w.parentId ? map.get(w.parentId) : undefined
+    if (parent) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+})
 
 const extensionVersion = chrome.runtime.getManifest().version
 const extensionId = chrome.runtime.id
