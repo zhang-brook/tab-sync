@@ -106,7 +106,8 @@
                       v-for="tab in item.tabs"
                       :key="tab.chromeTabId"
                       class="tab-item is-grouped"
-                      :class="{ 'is-active': tab.active }"
+                      :class="{ 'is-active': tab.chromeTabId === selectedTabId }"
+                      :ref="(el: any) => setTabRef(tab.chromeTabId, el)"
                       @click="activateTab(tab)"
                     >
                       <el-checkbox
@@ -140,7 +141,8 @@
                 <div
                   v-else
                   class="tab-item"
-                  :class="{ 'is-active': item.active }"
+                  :class="{ 'is-active': item.chromeTabId === selectedTabId }"
+                  :ref="(el: any) => setTabRef(item.chromeTabId, el)"
                   @click="activateTab(item)"
                 >
                   <el-checkbox
@@ -184,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Search, Close, Loading, CaretRight, Monitor } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '../shared/composables/useMessage'
@@ -266,6 +268,56 @@ const collapsedGroups = ref<Set<number>>(new Set())
 
 // 选择状态（以 chromeTabId 记录）
 const selectedTabIds = ref<Set<number>>(new Set())
+
+// 当前浏览器激活的标签页（高亮 + 定位用），随浏览器选中页变化而同步
+const selectedTabId = ref<number | null>(null)
+const tabRefs = {} as Record<number, HTMLElement>
+
+function setTabRef(id: number, el: Element | null) {
+  if (el) tabRefs[id] = el as HTMLElement
+  else delete tabRefs[id]
+}
+
+function scrollToSelected() {
+  if (selectedTabId.value == null) return
+  nextTick(() => {
+    tabRefs[selectedTabId.value as number]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+}
+
+/** 展开包含该标签页的窗口并滚动到该标签页 */
+function ensureVisible(tabId: number) {
+  for (const w of visibleWindows.value) {
+    const found = w.items.some((it) =>
+      it.type === 'tab'
+        ? it.chromeTabId === tabId
+        : it.tabs.some((t) => t.chromeTabId === tabId),
+    )
+    if (found && collapsedWindows.value.has(w.id)) {
+      toggleWindow(w.id)
+      break
+    }
+  }
+  scrollToSelected()
+}
+
+/** 将高亮定位到「当前浏览器窗口」的激活标签页 */
+async function syncSelection() {
+  try {
+    const [t] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (t?.id != null) {
+      selectedTabId.value = t.id
+      ensureVisible(t.id)
+    }
+  } catch {
+    /* 忽略：无活动标签页等异常情况 */
+  }
+}
+
+function syncSelectionFromEvent(info: chrome.tabs.OnActivatedInfo) {
+  selectedTabId.value = info.tabId
+  ensureVisible(info.tabId)
+}
 
 const pickerVisible = ref(false)
 
@@ -434,6 +486,8 @@ function groupColorHex(color: string): string {
 function activateTab(tab: TabNode) {
   chrome.tabs.update(tab.chromeTabId, { active: true })
   chrome.windows.update(tab.windowId, { focused: true })
+  selectedTabId.value = tab.chromeTabId
+  ensureVisible(tab.chromeTabId)
 }
 
 async function closeTab(chromeTabId: number) {
@@ -533,7 +587,13 @@ function registerListeners() {
   add(chrome.tabs.onRemoved)
   add(chrome.tabs.onUpdated)
   add(chrome.tabs.onMoved)
-  add(chrome.tabs.onActivated)
+  // 激活标签变化时：刷新列表并同步高亮/定位到当前浏览器选中页
+  const onActivated = (info: chrome.tabs.OnActivatedInfo) => {
+    scheduleReload()
+    syncSelectionFromEvent(info)
+  }
+  chrome.tabs.onActivated.addListener(onActivated)
+  listeners.push(() => chrome.tabs.onActivated.removeListener(onActivated))
   add(chrome.tabs.onAttached)
   add(chrome.tabs.onDetached)
   add(chrome.tabs.onReplaced)
@@ -551,6 +611,7 @@ function registerListeners() {
 onMounted(async () => {
   await Promise.all([initAuth(), reload()])
   registerListeners()
+  await syncSelection()
 })
 
 onUnmounted(() => {
