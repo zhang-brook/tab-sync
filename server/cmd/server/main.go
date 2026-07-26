@@ -113,6 +113,15 @@ func main() {
 
 			// AI 远程查询 tool_calling（织个网上游对接预留）
 			auth.POST("/tool-calling", handlers.SSE.HandleToolCall)
+
+			// 标签管理（标签页标签 + 工作组标签）
+			auth.GET("/tags", handlers.Tag.List)
+			auth.POST("/tags", handlers.Tag.Create)
+			auth.DELETE("/tags/:id", handlers.Tag.Delete)
+			auth.POST("/workspaces/:id/tabs/:tabId/tags", handlers.Tag.AddToTab)
+			auth.DELETE("/workspaces/:id/tabs/:tabId/tags/:tagId", handlers.Tag.RemoveFromTab)
+			auth.POST("/workspaces/:id/tags", handlers.Tag.AddToWorkspace)
+			auth.DELETE("/workspaces/:id/tags/:tagId", handlers.Tag.RemoveFromWorkspace)
 		}
 
 		// 管理接口（支持 Admin Token 或 JWT 会话）

@@ -1,9 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
+import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag } from '../shared/api/tags'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
@@ -75,6 +76,27 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'DEREGISTER_DEVICE':
       return handleDeregisterDevice(message.payload.deviceId)
+
+    case 'GET_TAGS':
+      return handleGetTags(message.payload)
+
+    case 'CREATE_TAG':
+      return handleCreateTag(message.payload)
+
+    case 'DELETE_TAG':
+      return handleDeleteTag(message.payload.tagId)
+
+    case 'ADD_TAB_TAG':
+      return handleAddTabTag(message.payload)
+
+    case 'REMOVE_TAB_TAG':
+      return handleRemoveTabTag(message.payload)
+
+    case 'ADD_WORKSPACE_TAG':
+      return handleAddWorkspaceTag(message.payload)
+
+    case 'REMOVE_WORKSPACE_TAG':
+      return handleRemoveWorkspaceTag(message.payload)
 
     default:
       return { success: false, error: '未知的消息类型' }
@@ -683,4 +705,79 @@ async function handleDeregisterDevice(deviceId: string): Promise<MessageResponse
     logger.error('deregisterDevice error:', err)
     return { success: false, error: '注销设备失败: ' + String(err) }
   }
+}
+
+// ============ 标签操作 ============
+
+/** 获取标签列表 */
+async function handleGetTags(payload?: { scope?: 'tab' | 'workspace' }): Promise<MessageResponse<TagsData>> {
+  const res = await getTags(payload?.scope)
+  if (res.ok && res.data) {
+    return { success: true, data: { tags: res.data.tags } }
+  }
+  return { success: false, error: res.error || '获取标签失败', authError: res.status === 401 }
+}
+
+/** 创建标签 */
+async function handleCreateTag(
+  payload: { name: string; color?: string; scope: 'tab' | 'workspace' },
+): Promise<MessageResponse<TagInfo>> {
+  const res = await createTag(payload)
+  if (res.ok && res.data) {
+    return { success: true, data: res.data }
+  }
+  return { success: false, error: res.error || '创建标签失败', authError: res.status === 401 }
+}
+
+/** 删除标签 */
+async function handleDeleteTag(tagId: number): Promise<MessageResponse> {
+  const res = await deleteTag(tagId)
+  if (res.ok) {
+    return { success: true }
+  }
+  return { success: false, error: res.error || '删除标签失败', authError: res.status === 401 }
+}
+
+/** 给工作组内标签页打标签 */
+async function handleAddTabTag(
+  payload: { workspaceId: string; tabId: string; tagId: number },
+): Promise<MessageResponse> {
+  const res = await addTabTag(payload.workspaceId, payload.tabId, payload.tagId)
+  if (res.ok) {
+    return { success: true }
+  }
+  return { success: false, error: res.error || '添加标签失败', authError: res.status === 401 }
+}
+
+/** 去掉标签页上的标签 */
+async function handleRemoveTabTag(
+  payload: { workspaceId: string; tabId: string; tagId: number },
+): Promise<MessageResponse> {
+  const res = await removeTabTag(payload.workspaceId, payload.tabId, payload.tagId)
+  if (res.ok) {
+    return { success: true }
+  }
+  return { success: false, error: res.error || '移除标签失败', authError: res.status === 401 }
+}
+
+/** 给工作组打标签 */
+async function handleAddWorkspaceTag(
+  payload: { workspaceId: string; tagId: number },
+): Promise<MessageResponse> {
+  const res = await addWorkspaceTag(payload.workspaceId, payload.tagId)
+  if (res.ok) {
+    return { success: true }
+  }
+  return { success: false, error: res.error || '添加标签失败', authError: res.status === 401 }
+}
+
+/** 去掉工作组上的标签 */
+async function handleRemoveWorkspaceTag(
+  payload: { workspaceId: string; tagId: number },
+): Promise<MessageResponse> {
+  const res = await removeWorkspaceTag(payload.workspaceId, payload.tagId)
+  if (res.ok) {
+    return { success: true }
+  }
+  return { success: false, error: res.error || '移除标签失败', authError: res.status === 401 }
 }

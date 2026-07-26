@@ -13,6 +13,7 @@ type Services struct {
 	Sync      *SyncService
 	System    *SystemService
 	SSE       *SSEService
+	Tag       *TagService
 }
 
 // NewServices 创建所有服务实例
@@ -24,6 +25,7 @@ func NewServices(db *database.DB, cfg *config.Config) *Services {
 	workspaceSvc := NewWorkspaceService(db, syncSvc)
 	systemSvc := NewSystemService(db, cfg)
 	sseSvc := NewSSEService(cfg)
+	tagSvc := NewTagService(db)
 
 	return &Services{
 		Auth:      authSvc,
@@ -32,5 +34,6 @@ func NewServices(db *database.DB, cfg *config.Config) *Services {
 		Sync:      syncSvc,
 		System:    systemSvc,
 		SSE:       sseSvc,
+		Tag:       tagSvc,
 	}
 }

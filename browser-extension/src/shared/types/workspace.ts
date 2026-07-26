@@ -1,3 +1,12 @@
+/** 标签（全局资源，按 scope 区分标签页/工作组用途） */
+export interface TagInfo {
+  id: number
+  name: string
+  /** 十六进制颜色，可能为空 */
+  color: string
+  scope: 'tab' | 'workspace'
+}
+
 /** 工作组 */
 export interface Workspace {
   id: string
@@ -10,6 +19,8 @@ export interface Workspace {
   icon?: string
   /** 工作组内的标签页引用 */
   tabs: TabReference[]
+  /** 工作组标签 */
+  tags?: TagInfo[]
   createdAt: string
   updatedAt: string
 }
@@ -28,4 +39,6 @@ export interface TabReference {
   sortOrder: number
   /** 加入工作组的时间 */
   addedAt: string
+  /** 该标签页上的标签 */
+  tags?: TagInfo[]
 }

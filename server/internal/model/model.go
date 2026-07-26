@@ -67,6 +67,7 @@ type Workspace struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
 	// 关联
 	Tabs []WorkspaceTab `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
+	Tags []WorkspaceTag `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
 }
 
 // WorkspaceTab 工作组内标签页
@@ -81,6 +82,7 @@ type WorkspaceTab struct {
 	AddedAt     time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Tags        []TabTag `gorm:"foreignKey:WorkspaceTabID"`
 }
 
 // ===================== 同步事件（预留） =====================
@@ -96,4 +98,32 @@ type SyncEvent struct {
 	Version    int64      `gorm:"default:0"`                    // 数据版本号（用于增量同步）
 	SyncedAt   *time.Time // 已同步到上游的时间（nil 表示未同步）
 	CreatedAt  time.Time
+}
+
+// ===================== 标签 =====================
+
+// Tag 全局标签（不绑定设备，按 scope 区分用途）
+type Tag struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	Name      string    `gorm:"size:32;not null;index"`
+	Color     string    `gorm:"size:7"`
+	Scope     string    `gorm:"size:8;index"`
+	CreatedAt time.Time
+}
+
+// TabTag 标签页与标签的关联（关联 WorkspaceTab）
+type TabTag struct {
+	ID            uint   `gorm:"primaryKey;autoIncrement"`
+	WorkspaceTabID uint  `gorm:"uniqueIndex:uniq_tab_tag;index"`
+	WorkspaceID   string `gorm:"index;size:64"`
+	TagID         uint   `gorm:"uniqueIndex:uniq_tab_tag;index"`
+	Tag           Tag    `gorm:"foreignKey:TagID"`
+}
+
+// WorkspaceTag 工作组与标签的关联
+type WorkspaceTag struct {
+	ID          uint   `gorm:"primaryKey;autoIncrement"`
+	WorkspaceID string `gorm:"uniqueIndex:uniq_ws_tag;index;size:64"`
+	TagID       uint   `gorm:"uniqueIndex:uniq_ws_tag;index"`
+	Tag         Tag    `gorm:"foreignKey:TagID"`
 }

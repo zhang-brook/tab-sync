@@ -60,6 +60,7 @@ type WorkspaceResponse struct {
 	Color     string         `json:"color"`
 	Icon      string         `json:"icon"`
 	Tabs      []TabReference `json:"tabs"`
+	Tags      []TagResponse  `json:"tags"`
 	CreatedAt string         `json:"createdAt"`
 	UpdatedAt string         `json:"updatedAt"`
 }
@@ -72,6 +73,15 @@ type TabReference struct {
 	FavIconURL string `json:"favIconUrl"`
 	SortOrder  int    `json:"sortOrder"`
 	AddedAt    string `json:"addedAt"`
+	Tags       []TagResponse `json:"tags"`
+}
+
+// TagResponse 标签响应（给前端）
+type TagResponse struct {
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+	Scope string `json:"scope"`
 }
 
 // CreateResult 创建工作区结果
@@ -84,8 +94,9 @@ func (s *WorkspaceService) List() ([]WorkspaceResponse, error) {
 	var workspaces []model.Workspace
 	err := s.db.Where("is_deleted = ?", false).
 		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
-			return db.Order("sort_order ASC")
+			return db.Preload("Tags.Tag").Order("sort_order ASC")
 		}).
+		Preload("Tags.Tag").
 		Order("sort_order ASC, created_at DESC").
 		Find(&workspaces).Error
 	if err != nil {
@@ -206,10 +217,12 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 		}
 
 		// 重新加载
-		s.db.Where("workspace_id = ?", id).
+		s.db.Where("workspace_id = ? AND is_deleted = ?", id, false).
 			Preload("Tabs", func(db *gorm.DB) *gorm.DB {
-				return db.Order("sort_order ASC")
-			}).First(&workspace)
+				return db.Preload("Tags.Tag").Order("sort_order ASC")
+			}).
+			Preload("Tags.Tag").
+			First(&workspace)
 	}
 
 	resp := toWorkspaceResponse(workspace)
@@ -370,6 +383,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 			FavIconURL: tab.FavIconURL,
 			SortOrder:  tab.SortOrder,
 			AddedAt:    tab.AddedAt.Format(time.RFC3339),
+			Tags:       tabTagsToResponses(tab.Tags),
 		}
 	}
 	return WorkspaceResponse{
@@ -379,9 +393,30 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 		Color:     ws.Color,
 		Icon:      ws.Icon,
 		Tabs:      tabs,
+		Tags:      workspaceTagsToResponses(ws.Tags),
 		CreatedAt: ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: ws.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+func tagToResponse(t model.Tag) TagResponse {
+	return TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope}
+}
+
+func tabTagsToResponses(rels []model.TabTag) []TagResponse {
+	out := make([]TagResponse, 0, len(rels))
+	for _, rel := range rels {
+		out = append(out, tagToResponse(rel.Tag))
+	}
+	return out
+}
+
+func workspaceTagsToResponses(rels []model.WorkspaceTag) []TagResponse {
+	out := make([]TagResponse, 0, len(rels))
+	for _, rel := range rels {
+		out = append(out, tagToResponse(rel.Tag))
+	}
+	return out
 }
 
 func sanitizeString(s string, maxLen int) string {

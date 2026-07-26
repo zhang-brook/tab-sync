@@ -1,5 +1,5 @@
 import type { TabRecord } from './tab'
-import type { Workspace } from './workspace'
+import type { Workspace, TagInfo } from './workspace'
 import type { Device } from './device'
 import type { AuthState } from './auth'
 
@@ -28,6 +28,13 @@ export type MessageAction =
   | 'GET_WORKSPACE_TABS_SUMMARY'
   | 'CHECK_VERSION'
   | 'SET_CONNECTION_MODE'
+  | 'GET_TAGS'
+  | 'CREATE_TAG'
+  | 'DELETE_TAG'
+  | 'ADD_TAB_TAG'
+  | 'REMOVE_TAB_TAG'
+  | 'ADD_WORKSPACE_TAG'
+  | 'REMOVE_WORKSPACE_TAG'
 
 // ============ 请求消息定义 ============
 
@@ -161,6 +168,50 @@ export interface MoveWorkspaceTabMessage {
   }
 }
 
+// ============ 标签相关消息 ============
+
+/** 获取标签列表（可按 scope 过滤） */
+export interface GetTagsMessage {
+  action: 'GET_TAGS'
+  payload?: { scope?: 'tab' | 'workspace' }
+}
+
+/** 创建标签 */
+export interface CreateTagMessage {
+  action: 'CREATE_TAG'
+  payload: { name: string; color?: string; scope: 'tab' | 'workspace' }
+}
+
+/** 删除标签 */
+export interface DeleteTagMessage {
+  action: 'DELETE_TAG'
+  payload: { tagId: number }
+}
+
+/** 给工作组内标签页打标签 */
+export interface AddTabTagMessage {
+  action: 'ADD_TAB_TAG'
+  payload: { workspaceId: string; tabId: string; tagId: number }
+}
+
+/** 去掉标签页上的标签 */
+export interface RemoveTabTagMessage {
+  action: 'REMOVE_TAB_TAG'
+  payload: { workspaceId: string; tabId: string; tagId: number }
+}
+
+/** 给工作组打标签 */
+export interface AddWorkspaceTagMessage {
+  action: 'ADD_WORKSPACE_TAG'
+  payload: { workspaceId: string; tagId: number }
+}
+
+/** 去掉工作组上的标签 */
+export interface RemoveWorkspaceTagMessage {
+  action: 'REMOVE_WORKSPACE_TAG'
+  payload: { workspaceId: string; tagId: number }
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -184,6 +235,13 @@ export type ExtensionMessage =
   | GetDevicesMessage
   | DeregisterDeviceMessage
   | GetWorkspaceTabsSummaryMessage
+  | GetTagsMessage
+  | CreateTagMessage
+  | DeleteTagMessage
+  | AddTabTagMessage
+  | RemoveTabTagMessage
+  | AddWorkspaceTagMessage
+  | RemoveWorkspaceTagMessage
 
 // ============ 响应定义 ============
 
@@ -229,4 +287,9 @@ export interface WorkspaceTabsSummaryData {
     workspaceColor: string
     tabs: Array<{ tabId: string; url: string }>
   }>
+}
+
+/** GET_TAGS 响应数据 */
+export interface TagsData {
+  tags: TagInfo[]
 }

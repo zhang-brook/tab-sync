@@ -2,6 +2,13 @@
 
 All notable changes to Tab Sync Server will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Tag System**: Global tags with `tab` / `workspace` scope; assign/unassign tags to workspace tabs and workspaces; tag list returned within workspace responses for multi-device sharing
+- **Tag Endpoints**: `GET/POST /v1/tab-sync/tags`, `DELETE /v1/tab-sync/tags/:id`, plus per-tab and per-workspace tag association endpoints
+
 ## [1.0.0] - 2026-07-23
 
 ### Added

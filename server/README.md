@@ -194,6 +194,18 @@ docker compose start
 | `GET` | `/v1/tab-sync/sse/events` | SSE 实时事件流（扩展长连接） |
 | `POST` | `/v1/tab-sync/tool-calling` | AI 远程工具调用（预留） |
 
+标签管理（标签页标签 `tab` + 工作组标签 `workspace`，全局共享、多设备可见）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/v1/tab-sync/tags?scope=tab\|workspace` | 列出标签（按 scope 过滤） |
+| `POST` | `/v1/tab-sync/tags` | 创建标签 |
+| `DELETE` | `/v1/tab-sync/tags/:id` | 删除标签（事务内清理关联记录） |
+| `POST` | `/v1/tab-sync/workspaces/:id/tabs/:tabId/tags` | 给工作组内标签页打标签 |
+| `DELETE` | `/v1/tab-sync/workspaces/:id/tabs/:tabId/tags/:tagId` | 去掉标签页上的标签 |
+| `POST` | `/v1/tab-sync/workspaces/:id/tags` | 给工作组打标签 |
+| `DELETE` | `/v1/tab-sync/workspaces/:id/tags/:tagId` | 去掉工作组上的标签 |
+
 管理接口（Admin Token 或 `/setup` 登录会话）：
 
 | 方法 | 路径 | 说明 |

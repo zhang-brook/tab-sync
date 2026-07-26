@@ -45,6 +45,9 @@ func AutoMigrate(db *DB) error {
 		&model.Workspace{},
 		&model.WorkspaceTab{},
 		&model.SyncEvent{},
+		&model.Tag{},
+		&model.TabTag{},
+		&model.WorkspaceTag{},
 	); err != nil {
 		return err
 	}

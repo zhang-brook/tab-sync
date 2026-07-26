@@ -104,9 +104,15 @@
             <div class="detail-title-row">
               <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
               <span class="ws-name">{{ selectedWorkspace.name }}</span>
+              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
               <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
             <div class="detail-actions">
+              <el-tooltip content="工作组标签" placement="top">
+                <el-button size="small" text @click="openWorkspaceTagEditor(selectedWorkspace)">
+                  <el-icon><PriceTag /></el-icon>
+                </el-button>
+              </el-tooltip>
               <el-tooltip content="打开所有标签页" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, false)">
                   <el-icon><FolderOpened /></el-icon>
@@ -146,6 +152,9 @@
               <el-radio-button value="current">仅本层级</el-radio-button>
               <el-radio-button value="all">包含子工作组</el-radio-button>
             </el-radio-group>
+            <el-select v-model="tagFilter" placeholder="按标签筛选" clearable size="small" style="width: 160px; margin-left: 12px">
+              <el-option v-for="t in allTabTags" :key="t.id" :label="t.name" :value="t.id" />
+            </el-select>
           </div>
 
           <!-- 标签页列表 -->
@@ -175,7 +184,15 @@
                   <div class="tab-text">
                     <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
                     <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                    <div class="tab-tags" v-if="tab.tags && tab.tags.length">
+                      <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                    </div>
                   </div>
+                  <el-tooltip content="标签" placement="top">
+                    <el-button size="small" text @click="openTabTagEditor(selectedWorkspace!.id, tab)">
+                      <el-icon><PriceTag /></el-icon>
+                    </el-button>
+                  </el-tooltip>
                   <el-tooltip content="在新标签页中打开" placement="top">
                     <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
                       <el-icon><View /></el-icon>
@@ -203,6 +220,9 @@
                 <div class="tab-text">
                   <div class="tab-title" :title="item.tab.title" @click="openSingleTab(item.tab.url)">{{ item.tab.title || '(无标题)' }}</div>
                   <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
+                  <div class="tab-tags" v-if="item.tab.tags && item.tab.tags.length">
+                    <el-tag v-for="tg in item.tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                  </div>
                 </div>
                 <el-tag
                   v-if="item.workspaceId !== selectedWorkspace.id"
@@ -212,6 +232,11 @@
                 >
                   {{ item.workspaceName }}
                 </el-tag>
+                <el-tooltip content="标签" placement="top">
+                  <el-button size="small" text @click="openTabTagEditor(item.workspaceId, item.tab)">
+                    <el-icon><PriceTag /></el-icon>
+                  </el-button>
+                </el-tooltip>
                 <el-tooltip content="在新标签页中打开" placement="top">
                   <el-button size="small" text type="primary" @click="openSingleTab(item.tab.url)">
                     <el-icon><View /></el-icon>
@@ -268,23 +293,40 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 标签编辑对话框 -->
+    <TagEditorDialog
+      v-model="tagEditorVisible"
+      :scope="tagEditorScope"
+      :selected-ids="tagEditorSelectedIds"
+      @confirm="onTagEditorConfirm"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
-import type { Workspace, WorkspacesData, TabReference } from '../../shared/types'
+import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '../../shared/types'
+import TagEditorDialog from '../components/TagEditorDialog.vue'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
 const searchKeyword = ref('')
 const selectedId = ref('')
 const tabScope = ref<'current' | 'all'>('current')
+
+// 标签相关状态
+const tagFilter = ref<number | null>(null)
+const allTabTags = ref<TagInfo[]>([])
+const tagEditorVisible = ref(false)
+const tagEditorScope = ref<'tab' | 'workspace'>('tab')
+const tagEditorSelectedIds = ref<number[]>([])
+const tagEditorTarget = ref<{ workspaceId: string; tabId?: string } | null>(null)
 
 const treeRef = ref()
 const treeProps = { label: 'name', children: 'children' }
@@ -352,6 +394,9 @@ const rightTabs = computed<RightTabItem[]>(() => {
     const w = workspaces.value.find((x) => x.id === id)
     if (w) result.push(...collect(w))
   }
+  if (tagFilter.value != null) {
+    return result.filter((item) => item.tab.tags?.some((t) => t.id === tagFilter.value))
+  }
   return result
 })
 
@@ -366,6 +411,7 @@ function filterNode(value: string, data: Record<string, unknown>) {
 
 onMounted(() => {
   loadWorkspaces()
+  void loadTabTags()
 })
 
 async function loadWorkspaces() {
@@ -381,6 +427,57 @@ async function loadWorkspaces() {
     if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
   }
   loading.value = false
+}
+
+// ============ 标签相关 ============
+
+async function loadTabTags() {
+  const res = await sendMessage<TagsData>({ action: 'GET_TAGS', payload: { scope: 'tab' } })
+  if (res.success && res.data) {
+    allTabTags.value = res.data.tags
+  }
+}
+
+function openWorkspaceTagEditor(ws: Workspace) {
+  tagEditorTarget.value = { workspaceId: ws.id }
+  tagEditorScope.value = 'workspace'
+  tagEditorSelectedIds.value = (ws.tags ?? []).map((t) => t.id)
+  tagEditorVisible.value = true
+}
+
+function openTabTagEditor(workspaceId: string, tab: TabReference) {
+  tagEditorTarget.value = { workspaceId, tabId: tab.tabId }
+  tagEditorScope.value = 'tab'
+  tagEditorSelectedIds.value = (tab.tags ?? []).map((t) => t.id)
+  tagEditorVisible.value = true
+}
+
+async function onTagEditorConfirm(ids: number[]) {
+  const target = tagEditorTarget.value
+  if (!target) return
+  const isTab = !!target.tabId
+  const ws = workspaces.value.find((w) => w.id === target.workspaceId)
+  const existingIds = isTab
+    ? (ws?.tabs.find((t) => t.tabId === target.tabId)?.tags ?? []).map((t) => t.id)
+    : (ws?.tags ?? []).map((t) => t.id)
+  const toAdd = ids.filter((id) => !existingIds.includes(id))
+  const toRemove = existingIds.filter((id) => !ids.includes(id))
+  for (const id of toAdd) {
+    if (isTab) {
+      await sendMessage({ action: 'ADD_TAB_TAG', payload: { workspaceId: target.workspaceId, tabId: target.tabId!, tagId: id } })
+    } else {
+      await sendMessage({ action: 'ADD_WORKSPACE_TAG', payload: { workspaceId: target.workspaceId, tagId: id } })
+    }
+  }
+  for (const id of toRemove) {
+    if (isTab) {
+      await sendMessage({ action: 'REMOVE_TAB_TAG', payload: { workspaceId: target.workspaceId, tabId: target.tabId!, tagId: id } })
+    } else {
+      await sendMessage({ action: 'REMOVE_WORKSPACE_TAG', payload: { workspaceId: target.workspaceId, tagId: id } })
+    }
+  }
+  await loadWorkspaces()
+  await loadTabTags()
 }
 
 function onSelectNode(node: WorkspaceTreeNode) {
@@ -776,6 +873,13 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+}
+
+.tab-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 .dialog-hint {

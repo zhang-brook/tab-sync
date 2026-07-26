@@ -11,6 +11,7 @@ type Handlers struct {
 	System    *SystemHandler
 	Setup     *SetupHandler
 	SSE       *SSEHandler
+	Tag       *TagHandler
 }
 
 // NewHandlers 创建所有处理器实例
@@ -23,5 +24,6 @@ func NewHandlers(svc *service.Services) *Handlers {
 		System:    NewSystemHandler(svc.System),
 		Setup:     NewSetupHandler(svc.System, svc.Auth),
 		SSE:       NewSSEHandler(svc.SSE),
+		Tag:       NewTagHandler(svc.Tag),
 	}
 }
