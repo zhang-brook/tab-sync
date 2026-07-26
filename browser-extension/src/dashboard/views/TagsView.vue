@@ -171,7 +171,10 @@ async function createTag() {
 
 async function deleteTag(tag: TagInfo) {
   try {
-    await ElMessageBox.confirm(`确定删除标签「${tag.name}」吗？关联记录会一并清除。`, '删除标签', {
+    await ElMessageBox.confirm(
+      `确定删除标签「${tag.name}」吗？该标签将从相关标签页与工作组上移除，对应的记录不会被删除。`,
+      '删除标签',
+      {
       type: 'warning',
     })
   } catch {

@@ -12,6 +12,15 @@
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
         </el-menu-item>
+        <el-menu-item index="/history" divided>
+          <el-icon><Clock /></el-icon>
+          <span>历史记录</span>
+        </el-menu-item>
+        <el-divider style="margin: 0; opacity: 0.4;" />
+        <el-menu-item index="/synced">
+          <el-icon><Files /></el-icon>
+          <span>已同步标签页</span>
+        </el-menu-item>
         <el-menu-item index="/workspaces">
           <el-icon><FolderOpened /></el-icon>
           <span>工作组</span>
@@ -20,14 +29,7 @@
           <el-icon><PriceTag /></el-icon>
           <span>标签</span>
         </el-menu-item>
-        <el-menu-item index="/synced">
-          <el-icon><Files /></el-icon>
-          <span>已同步标签页</span>
-        </el-menu-item>
-        <el-menu-item index="/history">
-          <el-icon><Clock /></el-icon>
-          <span>历史记录</span>
-        </el-menu-item>
+        <el-divider style="margin: 0; opacity: 0.4;" />
         <el-menu-item index="/devices">
           <el-icon><Monitor /></el-icon>
           <span>设备</span>
