@@ -1,5 +1,5 @@
 {
-  "name": "spidermemos-browser-extension-tab-sync",
+  "name": "tab-sync-browser-extension",
   "type": "module",
   "version": "1.0.0",
   "private": true,
