@@ -44,7 +44,9 @@
     <!-- 批量操作栏 -->
     <div v-if="selectedTabIds.size > 0" class="batch-bar">
       <span class="batch-count">已选 {{ selectedTabIds.size }} 个标签页</span>
-      <el-button type="primary" @click="handleAddToWorkspace">加入工作组</el-button>
+      <el-button type="primary" :icon="Plus" @click="handleAddToWorkspace">加入工作组</el-button>
+      <el-button type="success" :icon="FolderChecked" @click="handleFoldToDefault">收折到默认分组</el-button>
+      <el-button type="success" plain :icon="FolderOpened" @click="showFoldPicker">收折到分组…</el-button>
       <el-button type="danger" :icon="Close" @click="handleCloseSelected">关闭选中</el-button>
       <el-button text @click="clearSelection">取消选择</el-button>
     </div>
@@ -69,51 +71,62 @@
         </div>
 
         <div v-show="winExpanded[win.id]" class="tree-body">
-          <!-- 未分组标签页 -->
-          <div v-for="tab in win.tabs" :key="'u' + tab.id" class="tree-row tab-row">
-            <el-checkbox
-              :model-value="selectedTabIds.has(tab.id)"
-              @change="(val: any) => toggleTab(tab.id, val)"
-              @click.stop
-            />
-            <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
-            <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
-            <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
-            <span class="tab-ws-tags">
-              <el-tag
-                v-for="ws in workspacesForTab(tab)"
-                :key="ws.workspaceId"
-                size="small"
-                :style="{ backgroundColor: ws.workspaceColor ? mapColor(ws.workspaceColor) : '#909399', color: '#fff', cursor: 'pointer' }"
-                @click="openWorkspace(ws.workspaceId)"
-              >{{ ws.workspaceName }}</el-tag>
-            </span>
-            <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
-          </div>
-
-          <!-- 标签分组 -->
-          <div v-for="group in win.groups" :key="'g' + group.id" class="tree-group">
-            <div class="tree-row group-header" @click="toggleGroup(group.id)">
-              <el-icon class="caret" :class="{ collapsed: !groupExpanded[group.id] }"><CaretRight /></el-icon>
-              <span class="group-dot" :style="{ backgroundColor: group.color ? mapColor(group.color) : '#909399' }" />
-              <span class="group-title">{{ group.title || '未命名分组' }}</span>
-              <span class="count-badge">{{ group.tabs.length }}</span>
+          <template v-for="item in win.items" :key="itemKey(item)">
+            <!-- 未分组标签页 -->
+            <div v-if="item.kind === 'tab'" class="tree-row tab-row">
+              <el-checkbox
+                :model-value="selectedTabIds.has(item.tab.id)"
+                @change="(val: any) => toggleTab(item.tab.id, val)"
+                @click.stop
+              />
+              <LazyFavicon v-if="item.tab.favIconUrl" :src="item.tab.favIconUrl" :size="16" class="favicon" />
+              <span class="tab-title" :title="item.tab.title" @click="activateTab(item.tab)">{{ item.tab.title || item.tab.url }}</span>
+              <span class="tab-url" :title="item.tab.url">{{ item.tab.url }}</span>
+              <span class="tab-ws-tags">
+                <el-tag
+                  v-for="ws in workspacesForTab(item.tab)"
+                  :key="ws.workspaceId"
+                  size="small"
+                  :style="{ backgroundColor: ws.workspaceColor ? mapColor(ws.workspaceColor) : '#909399', color: '#fff', cursor: 'pointer' }"
+                  @click="openWorkspace(ws.workspaceId)"
+                >{{ ws.workspaceName }}</el-tag>
+              </span>
+              <el-button class="row-action" text :icon="Close" @click="closeTab(item.tab)" />
             </div>
 
-            <div v-show="groupExpanded[group.id]" class="tree-body">
-              <div v-for="tab in group.tabs" :key="'g' + group.id + 't' + tab.id" class="tree-row tab-row">
-                <el-checkbox
-                  :model-value="selectedTabIds.has(tab.id)"
-                  @change="(val: any) => toggleTab(tab.id, val)"
-                  @click.stop
-                />
-                <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
-                <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
-                <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
-                <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
+            <!-- 标签分组（按真实顺序出现在首个标签页位置） -->
+            <div v-else class="tree-group">
+              <div class="tree-row group-header" @click="toggleGroup(item.group.id)">
+                <el-icon class="caret" :class="{ collapsed: !groupExpanded[item.group.id] }"><CaretRight /></el-icon>
+                <span class="group-dot" :style="{ backgroundColor: item.group.color ? mapColor(item.group.color) : '#909399' }" />
+                <span class="group-title">{{ item.group.title || '未命名分组' }}</span>
+                <span class="count-badge">{{ item.group.tabs.length }}</span>
+              </div>
+
+              <div v-show="groupExpanded[item.group.id]" class="tree-body">
+                <div v-for="tab in item.group.tabs" :key="'t' + tab.id" class="tree-row tab-row">
+                  <el-checkbox
+                    :model-value="selectedTabIds.has(tab.id)"
+                    @change="(val: any) => toggleTab(tab.id, val)"
+                    @click.stop
+                  />
+                  <LazyFavicon v-if="tab.favIconUrl" :src="tab.favIconUrl" :size="16" class="favicon" />
+                  <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
+                  <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
+                  <span class="tab-ws-tags">
+                    <el-tag
+                      v-for="ws in workspacesForTab(tab)"
+                      :key="ws.workspaceId"
+                      size="small"
+                      :style="{ backgroundColor: ws.workspaceColor ? mapColor(ws.workspaceColor) : '#909399', color: '#fff', cursor: 'pointer' }"
+                      @click="openWorkspace(ws.workspaceId)"
+                    >{{ ws.workspaceName }}</el-tag>
+                  </span>
+                  <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
+                </div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>
@@ -121,7 +134,7 @@
     <!-- 加入工作组选择器 -->
     <WorkspacePickerDialog
       v-model="pickerVisible"
-      title="加入工作组"
+      :title="pickerMode === 'fold' ? '收折到工作组' : '加入工作组'"
       @select="handlePickerSelect"
     />
 
@@ -164,11 +177,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd } from '@element-plus/icons-vue'
+import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd, Plus, FolderChecked, FolderOpened } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
-import type { WorkspaceTabsSummaryData } from '@/shared/types'
+import type { WorkspaceTabsSummaryData, WorkspacesData } from '@/shared/types'
 
 interface TreeTab {
   id: number
@@ -185,11 +199,15 @@ interface TreeGroup {
   tabs: TreeTab[]
 }
 
+// 窗口内的有序节点：未分组标签页与分组按真实顺序排列
+type TreeItem =
+  | { kind: 'tab'; tab: TreeTab }
+  | { kind: 'group'; group: TreeGroup }
+
 interface TreeWindow {
   id: number
   title: string
-  tabs: TreeTab[]
-  groups: TreeGroup[]
+  items: TreeItem[]
 }
 
 const loading = ref(false)
@@ -261,7 +279,14 @@ function mapColor(hex: string): string {
 }
 
 function winCount(win: TreeWindow): number {
-  return win.tabs.length + win.groups.reduce((sum, g) => sum + g.tabs.length, 0)
+  return win.items.reduce(
+    (sum, item) => sum + (item.kind === 'group' ? item.group.tabs.length : 1),
+    0,
+  )
+}
+
+function itemKey(item: TreeItem): string {
+  return item.kind === 'tab' ? 't' + item.tab.id : 'g' + item.group.id
 }
 
 function toggleWindow(id: number) {
@@ -290,7 +315,8 @@ async function refresh(showLoading = true) {
       if (win.type !== 'normal') continue
         const winTabs: chrome.tabs.Tab[] = win.tabs || []
       const groupsMap = new Map<number, TreeGroup>()
-      const ungrouped: TreeTab[] = []
+      const winItems: TreeItem[] = []
+      let currentGroupId = 0
       for (const t of winTabs) {
         if (t.id == null || !t.url) continue
         const tab: TreeTab = {
@@ -300,15 +326,22 @@ async function refresh(showLoading = true) {
           favIconUrl: t.favIconUrl,
           windowId: win.id!,
         }
-        if (t.groupId && t.groupId > 0) {
-          let g = groupsMap.get(t.groupId)
-          if (!g) {
-            g = { id: t.groupId, title: '', color: undefined, tabs: [] }
-            groupsMap.set(t.groupId, g)
+        const gid = t.groupId && t.groupId > 0 ? t.groupId : 0
+        if (gid > 0) {
+          // 在真实顺序中，分组作为一个整体出现在它首个标签页所在位置
+          if (gid !== currentGroupId) {
+            let g = groupsMap.get(gid)
+            if (!g) {
+              g = { id: gid, title: '', color: undefined, tabs: [] }
+              groupsMap.set(gid, g)
+            }
+            winItems.push({ kind: 'group', group: g })
+            currentGroupId = gid
           }
-          g.tabs.push(tab)
+          groupsMap.get(gid)!.tabs.push(tab)
         } else {
-          ungrouped.push(tab)
+          currentGroupId = 0
+          winItems.push({ kind: 'tab', tab })
         }
       }
       // 补全分组标题/颜色
@@ -324,8 +357,7 @@ async function refresh(showLoading = true) {
       result.push({
         id: win.id!,
         title: '',
-        tabs: ungrouped,
-        groups: Array.from(groupsMap.values()),
+        items: winItems,
       })
       if (!(win.id! in winExpanded)) winExpanded[win.id!] = true
     }
@@ -342,18 +374,23 @@ async function refresh(showLoading = true) {
 function applyFilters() {
   const kw = searchKeyword.value.trim().toLowerCase()
   const wf = windowFilter.value
+  const matchTab = (t: TreeTab) =>
+    !kw || t.title.toLowerCase().includes(kw) || t.url.toLowerCase().includes(kw)
   filteredWindows.value = windows.value
     .filter((w) => (wf === '' ? true : w.id === wf))
     .map((w) => {
-      const matchTab = (t: TreeTab) =>
-        !kw || t.title.toLowerCase().includes(kw) || t.url.toLowerCase().includes(kw)
-      const tabs = w.tabs.filter(matchTab)
-      const groups = w.groups
-        .map((g) => ({ ...g, tabs: g.tabs.filter(matchTab) }))
-        .filter((g) => g.tabs.length > 0)
-      return { ...w, tabs: tabs.filter((t) => t.title || t.url), groups }
+      const items = w.items
+        .map((item): TreeItem | null => {
+          if (item.kind === 'tab') {
+            return matchTab(item.tab) ? item : null
+          }
+          const tabs = item.group.tabs.filter(matchTab)
+          return tabs.length > 0 ? { kind: 'group', group: { ...item.group, tabs } } : null
+        })
+        .filter((x): x is TreeItem => x !== null)
+      return { ...w, items }
     })
-    .filter((w) => w.tabs.length > 0 || w.groups.length > 0)
+    .filter((w) => w.items.length > 0)
 }
 
 async function activateTab(tab: TreeTab) {
@@ -456,26 +493,51 @@ async function handleCreateWorkspace() {
   }
 }
 
+const pickerMode = ref<'add' | 'fold'>('add')
+
+async function collectSelectedTabs(): Promise<chrome.tabs.Tab[]> {
+  const ids = Array.from(selectedTabIds)
+  const all: chrome.tabs.Tab[] = []
+  for (const id of ids) {
+    try {
+      const t = await chrome.tabs.get(id)
+      all.push(t)
+    } catch {
+      /* 标签页可能已关闭 */
+    }
+  }
+  return all
+}
+
 function handleAddToWorkspace() {
   if (selectedTabIds.size === 0) {
     ElMessage.warning('请先选择标签页')
     return
   }
+  pickerMode.value = 'add'
+  pickerVisible.value = true
+}
+
+function showFoldPicker() {
+  if (selectedTabIds.size === 0) {
+    ElMessage.warning('请先选择标签页')
+    return
+  }
+  pickerMode.value = 'fold'
   pickerVisible.value = true
 }
 
 async function handlePickerSelect(node: WorkspaceTreeNode) {
-  pickerVisible.value = false
-  const ids = Array.from(selectedTabIds)
-  const allTabs: chrome.tabs.Tab[] = []
-  for (const id of ids) {
-    try {
-      const t = await chrome.tabs.get(id)
-      allTabs.push(t)
-    } catch {
-      /* 忽略 */
-    }
+  if (pickerMode.value === 'fold') {
+    await foldToWorkspace(node.id, node.name)
+  } else {
+    await addToWorkspace(node.id, node.name)
   }
+}
+
+async function addToWorkspace(workspaceId: string, workspaceName: string) {
+  const allTabs = await collectSelectedTabs()
+  if (allTabs.length === 0) return
   const payloadTabs = allTabs.map((t) => ({
     url: t.url || '',
     title: t.title || t.url || '',
@@ -483,14 +545,12 @@ async function handlePickerSelect(node: WorkspaceTreeNode) {
     chromeTabId: t.id || 0,
   }))
   try {
-    const res = await sendMessage({ action: 'ADD_TABS_TO_WORKSPACE', payload: {
-      workspaceId: node.id,
-      tabs: payloadTabs,
-    } })
+    const res = await sendMessage({ action: 'ADD_TABS_TO_WORKSPACE', payload: { workspaceId, tabs: payloadTabs } })
     if (res.success) {
       const added = (res.data as { added?: number } | undefined)?.added ?? payloadTabs.length
-      ElMessage.success(`已加入「${node.name}」：${added} 个新标签页`)
+      ElMessage.success(`已加入「${workspaceName}」：${added} 个新标签页`)
       clearSelection()
+      void loadWorkspaceSummary()
     } else if (res.authError) {
       ElMessage.warning('未连接到后端，无法加入工作组')
     } else {
@@ -499,6 +559,73 @@ async function handlePickerSelect(node: WorkspaceTreeNode) {
   } catch (e) {
     ElMessage.error('加入工作组失败：' + (e as Error).message)
   }
+}
+
+// 收折：加入工作组后立即关闭本地标签页
+async function foldToWorkspace(workspaceId: string, workspaceName: string) {
+  const ids = Array.from(selectedTabIds)
+  if (ids.length === 0) return
+  const allTabs = await collectSelectedTabs()
+  if (allTabs.length === 0) {
+    ElMessage.warning('所选标签页已关闭')
+    return
+  }
+  const payloadTabs = allTabs.map((t) => ({
+    url: t.url || '',
+    title: t.title || t.url || '',
+    favIconUrl: t.favIconUrl || '',
+    chromeTabId: t.id || 0,
+  }))
+  try {
+    const res = await sendMessage({ action: 'ADD_TABS_TO_WORKSPACE', payload: { workspaceId, tabs: payloadTabs } })
+    if (res.authError) {
+      ElMessage.warning('收折失败：未连接到后端')
+      return
+    }
+    if (!res.success) {
+      ElMessage.error(res.error || '收折失败')
+      return
+    }
+    await chrome.tabs.remove(ids).catch(() => {})
+    ElMessage.success(`已收折 ${payloadTabs.length} 个标签页到「${workspaceName}」`)
+    clearSelection()
+    void loadWorkspaceSummary()
+  } catch (e) {
+    ElMessage.error('收折失败：' + (e as Error).message)
+  }
+}
+
+// 收折到默认分组：取列表首个工作组；无则自动创建「默认」
+async function handleFoldToDefault() {
+  if (selectedTabIds.size === 0) {
+    ElMessage.warning('请先选择标签页')
+    return
+  }
+  const target = await getDefaultWorkspace()
+  if (!target) return
+  await foldToWorkspace(target.id, target.name)
+}
+
+async function getDefaultWorkspace(): Promise<{ id: string; name: string } | null> {
+  try {
+    const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+    if (res.success && res.data && res.data.workspaces.length > 0) {
+      const ws = res.data.workspaces[0]
+      return { id: ws.id, name: ws.name }
+    }
+  } catch {
+    /* 忽略，走自动创建分支 */
+  }
+  const createRes = await sendMessage({
+    action: 'CREATE_WORKSPACE',
+    payload: { name: '默认', color: '#409EFF' },
+  })
+  if (!createRes.success || !createRes.data) {
+    ElMessage.warning('尚未创建工作组，且自动创建失败')
+    return null
+  }
+  const ws = (createRes.data as { workspace: { id: string; name: string } }).workspace
+  return { id: ws.id, name: ws.name }
 }
 
 // 事件驱动刷新：仅在标签页/窗口/分组真正变化时才静默更新，避免固定轮询造成的频繁刷新
