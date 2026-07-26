@@ -65,14 +65,6 @@ const router = createRouter({
       },
     },
     {
-      path: '/history',
-      name: 'History',
-      component: () => import('./views/HistoryView.vue'),
-      meta: {
-        dataSource: { label: '本地', desc: '数据来自当前浏览器', type: 'info' },
-      },
-    },
-    {
       path: '/devices',
       name: 'Devices',
       component: () => import('./views/DevicesView.vue'),

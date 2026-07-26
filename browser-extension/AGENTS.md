@@ -120,7 +120,6 @@ src/
     views/
       TabsView.vue        # 标签页管理 (搜索/筛选/批量操作)
       WorkspacesView.vue  # 工作组管理 (CRUD + 恢复打开)
-      HistoryView.vue     # 已关闭标签页历史
       DevicesView.vue     # 多设备概览
       SettingsView.vue    # 设置 (认证/同步/数据)
   shared/
@@ -164,7 +163,7 @@ src/
 - 轻量后端 `tab-sync-server` 已实现（Go + Gin + SQLite），支持设备注册、工作组 CRUD、API Key 认证
 - 后端启动后在浏览器访问 `/setup` 完成首次设置，获取 Admin Token
 - API 调用包裹 try-catch，失败时仅记录日志不影响本地功能
-- 扩展的本地功能 (标签页监控、工作组管理、历史记录) 完全独立于后端运行
+- 扩展的本地功能 (标签页监控、工作组管理) 完全独立于后端运行
 - 后端代码位于项目根目录 `tab-sync-server/` 下
 
 ---

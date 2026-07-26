@@ -12,10 +12,6 @@
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
         </el-menu-item>
-        <el-menu-item index="/history" divided>
-          <el-icon><Clock /></el-icon>
-          <span>历史记录</span>
-        </el-menu-item>
         <el-divider style="margin: 0; opacity: 0.4;" />
         <el-menu-item index="/synced">
           <el-icon><Files /></el-icon>
@@ -82,7 +78,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files } from '@element-plus/icons-vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import { STORAGE_KEYS } from '../shared/storage'
 import type { StateData } from '../shared/types'
@@ -96,7 +92,6 @@ const pageTitleMap: Record<string, string> = {
   '/workspaces': '工作组',
   '/tags': '标签',
   '/synced': '已同步标签页',
-  '/history': '历史记录',
   '/devices': '设备管理',
   '/settings': '设置',
 }

@@ -39,8 +39,6 @@ feat: 对于没有设置工作组的标签页，前端展示的时候统一展�
 
 feat: server 端的配置页有些过于简陋了，最好优化一下
 
-fix: 历史记录tab 显示为 No Data
-
 fix: element-plus 的组件是否可以配置为 zh-CN 汉化？而不是要手动指定为中文
     await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
 
