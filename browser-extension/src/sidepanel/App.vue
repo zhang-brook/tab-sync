@@ -250,7 +250,7 @@ async function logout() {
 }
 
 function openSettings() {
-  const url = chrome.runtime.getURL('dashboard.html') + '#/settings'
+  const url = chrome.runtime.getURL('src/dashboard/index.html') + '#/settings'
   chrome.tabs.create({ url })
 }
 
