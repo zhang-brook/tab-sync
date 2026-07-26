@@ -1,4 +1,4 @@
-const PREFIX = '[SpiderMemos]'
+const PREFIX = '[Tab Sync]'
 
 export const logger = {
   info(...args: unknown[]) {

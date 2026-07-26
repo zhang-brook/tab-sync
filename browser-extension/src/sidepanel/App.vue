@@ -2,7 +2,7 @@
   <div class="sidepanel-container">
     <!-- 顶部栏 -->
     <div class="sidepanel-header">
-      <h3>SpiderMemos Tab Sync</h3>
+      <h3>Tab Sync</h3>
       <el-button type="primary" size="small" @click="openDashboard">
         管理面板
       </el-button>

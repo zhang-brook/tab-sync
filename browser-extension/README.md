@@ -1,4 +1,4 @@
-# SpiderMemos Tab Sync Browser Extension
+# Tab Sync Browser Extension
 
 Chrome 浏览器标签页管理扩展，支持标签页实时同步、工作组管理、多设备协作。
 

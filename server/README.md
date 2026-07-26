@@ -1,6 +1,6 @@
 # Tab Sync Server - 轻量级浏览器标签页同步后端
 
-基于 **Go + Gin + SQLite** 的轻量后端服务，为 SpiderMemos Tab Sync 浏览器扩展提供设备注册、工作组管理和多设备同步能力。
+基于 **Go + Gin + SQLite** 的轻量后端服务，为 Tab Sync 浏览器扩展提供设备注册、工作组管理和多设备同步能力。
 
 ## 特性
 
@@ -87,7 +87,7 @@ tab-sync-server.exe
 
 ## 配置浏览器扩展
 
-安装 SpiderMemos Tab Sync 扩展后，按以下步骤配置轻量后端：
+安装 Tab Sync 扩展后，按以下步骤配置轻量后端：
 
 1. 点击扩展图标 → 设置（或打开 Dashboard → 设置）
 2. 连接模式选择 **「轻量后端」**

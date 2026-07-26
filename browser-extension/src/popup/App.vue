@@ -1,7 +1,7 @@
 <template>
   <div class="popup-container">
     <div class="popup-header">
-      <h3>SpiderMemos Tab Sync</h3>
+      <h3>Tab Sync</h3>
     </div>
 
     <!-- 加载中：避免闪现登录页 -->

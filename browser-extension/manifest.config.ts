@@ -3,7 +3,7 @@ import pkg from './package.json'
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'SpiderMemos Tab Sync', // pkg.name,
+  name: 'Tab Sync', // pkg.name,
   version: pkg.version,
   description: '同步和管理浏览器标签页，支持多设备共享、工作组管理',
   permissions: [

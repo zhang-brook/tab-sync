@@ -2,7 +2,7 @@
   <el-container class="dashboard-layout">
     <el-aside width="200px" class="dashboard-aside">
       <div class="aside-logo">
-        <h3>SpiderMemos</h3>
+        <h3>Tab Sync</h3>
       </div>
       <el-menu
         :default-active="activeMenu"
