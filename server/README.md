@@ -5,12 +5,12 @@
 ## 特性
 
 - **单文件部署** — Go 编译为单个可执行文件，内嵌 SQLite，无需外部数据库
-- **API Key 认证** — 类似 API Key 的 Token 机制，用户自助生成和管理
+- **API Key 认证** — Token 机制，用户可在管理后台自助生成与吊销
 - **Docker 友好** — 多架构镜像（amd64 / arm64），一行命令部署
 - **Web 管理后台** — 内置 `/setup` 页面：首次初始化、Token 管理、统计概览
 - **版本协商** — 扩展与后端版本自动适配，不兼容时拒绝连接
-- **多数据源预留** — 架构层预留多数据源接口，未来可切换 PostgreSQL / MySQL
-- **SSE 预留** — 架构层预留 SSE 通道，未来支持 AI 远程查询
+- **可扩展存储层** — 数据访问层接口化，当前使用内嵌 SQLite（架构层预留多数据源接口，未来可切换 PostgreSQL / MySQL）
+- **SSE 实时通道** — 浏览器扩展可建立 SSE 长连接接收实时推送；AI 远程 `tool-calling` 为预留接口
 
 ---
 
@@ -113,6 +113,7 @@ tab-sync-server.exe
 | `MAX_EXT_VERSION` | `2.0.0` | 最高兼容的浏览器扩展版本 |
 | `UPSTREAM_URL` | 空 | 织个网上游服务器地址（预留） |
 | `UPSTREAM_TOKEN` | 空 | 织个网上游认证 Token（预留） |
+| `UPSTREAM_SYNC_ENABLED` | `false` | 是否启用织个网上游同步（预留） |
 
 ---
 
@@ -188,9 +189,22 @@ docker compose start
 | `DELETE` | `/v1/tab-sync/workspaces/:id` | 删除工作组 |
 | `GET` | `/v1/tab-sync/workspaces/tabs-summary` | 标签页摘要 |
 | `POST` | `/v1/tab-sync/workspaces/:id/tabs/move` | 移动标签页 |
-| `POST` | `/v1/tab-sync/sync/push` | 推送同步事件（预留） |
-| `GET` | `/v1/tab-sync/sync/pull` | 拉取同步事件（预留） |
-| `GET` | `/v1/tab-sync/sse/events` | SSE 事件流（预留） |
+| `POST` | `/v1/tab-sync/sync/push` | 推送同步事件 |
+| `GET` | `/v1/tab-sync/sync/pull` | 拉取同步事件（增量） |
+| `GET` | `/v1/tab-sync/sse/events` | SSE 实时事件流（扩展长连接） |
+| `POST` | `/v1/tab-sync/tool-calling` | AI 远程工具调用（预留） |
+
+管理接口（Admin Token 或 `/setup` 登录会话）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/setup` | 完成首次初始化（设置管理员密码） |
+| `GET` | `/api/setup/status` | 查询初始化状态 |
+| `POST` | `/api/admin/login` | 管理后台登录（返回 JWT） |
+| `GET` | `/v1/tab-sync/admin/tokens` | Token 列表 |
+| `POST` | `/v1/tab-sync/admin/tokens` | 生成 API Token |
+| `DELETE` | `/v1/tab-sync/admin/tokens/:tokenId` | 吊销 Token |
+| `GET` | `/v1/tab-sync/admin/stats` | 统计概览 |
 
 ### 认证方式
 
@@ -208,16 +222,15 @@ Authorization: Bearer <your-api-token>
 tab-sync-server/
 ├── cmd/server/
 │   ├── main.go              # 入口、路由注册
-│   └── web/                 # 嵌入式 Web 页面（管理后台 / API 文档）
+│   └── web/                 # 嵌入式 Web 页面（setup / docs）
 ├── internal/
 │   ├── config/              # 配置管理（环境变量 + 默认值）
-│   ├── database/            # 数据库层（接口 + SQLite 实现）
-│   ├── handler/             # HTTP 处理器（统一响应格式 CommonReturn）
-│   ├── middleware/           # 中间件（Auth / CORS / TraceID / VersionCheck）
+│   ├── database/            # 数据库层（SQLite + GORM 自动迁移）
+│   ├── handler/             # HTTP 处理器（统一响应 CommonReturn）
+│   ├── logger/              # 日志系统
+│   ├── middleware/          # 中间件（Auth / CORS / TraceID / VersionCheck）
 │   ├── model/               # 数据模型（GORM）
-│   ├── repository/          # 数据访问层（接口 + 实现）
-│   ├── service/             # 业务逻辑层
-│   └── sse/                 # SSE 预留模块
+│   └── service/             # 业务逻辑层（设备 / 工作组 / 同步 / SSE）
 ├── Dockerfile                # 多架构 Docker 构建
 ├── docker-compose.yml        # Docker 编排（含 Nginx 示例）
 ├── nginx.conf.example        # Nginx 反向代理配置示例

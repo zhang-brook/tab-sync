@@ -1,7 +1,7 @@
-## 项目背景
+## 项目结构
 
-- browser-extension 目录下是浏览器扩展项目
-- server 目录下是配套的 Go 语言实现的后端项目
+- `browser-extension/` — 浏览器扩展项目
+- `server/` — 配套的 Go 语言实现的轻量后端（Gin + SQLite）
 (其他目录不要动)
 
 ## 需求
@@ -48,9 +48,3 @@ feat: 添加标签页时，将 favicon 保存起来， favicon url也保存 (因
 
 
 在浏览器侧的数据，和从后端获取到的数据，在界面上标注一下，避免用户担心隐私问题
-
-ing
-feat: 后台管理-标签页支持展示 打开时间、最后访问时间
-
-TODO：
-使用 Token 登录

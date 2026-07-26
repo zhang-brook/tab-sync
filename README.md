@@ -1,5 +1,13 @@
 # Tab Sync - 浏览器标签页同步工具
 
+浏览器扩展 + 后端，用于管理大量打开的标签页、跨设备同步、工作组归类与去重。
+
+## 组件
+
+| 目录 | 说明 |
+|------|------|
+| `browser-extension/` | 浏览器扩展（Vue 3 + Element Plus + Vite + CRXJS + MV3） |
+| `server/` | 轻量后端（Go + Gin + SQLite），自部署的标签页同步服务 |
 
 ## 项目背景
 

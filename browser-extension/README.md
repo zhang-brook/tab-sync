@@ -37,11 +37,9 @@ npm run build
 6. 将 Token 粘贴到设置页的 Token 输入框
 7. 点击「验证连接」
 
-### 选项 B：连接织个网后端（预留）
+### 选项 B：连接织个网后端（暂未开放）
 
-1. 连接模式选择 **「织个网」**
-2. 填入织个网后端地址
-3. 使用账号密码登录
+扩展中「织个网」模式当前标记为暂未开放，接入待后续实现。
 
 ## 项目结构
 
@@ -68,4 +66,4 @@ src/
 | 后端 | 技术栈 | 适用场景 |
 |------|--------|----------|
 | [Tab Sync Server](https://github.com/spidermemos/tab-sync-server) | Go + Gin + SQLite | 自部署、个人使用、内网环境 |
-| 织个网后端 | SpringBoot + PostgreSQL | 云端多用户、分布式部署（预留） |
+| 织个网后端 | Spring Boot + PostgreSQL | 云端多用户、分布式部署（扩展侧暂未开放） |
