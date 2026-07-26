@@ -320,10 +320,9 @@ async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
   return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
 }
 
-/** 创建工作组（通过后端 API）
- * 前端直接传入标签页完整数据，后端用自增主键 ID 作为每个标签页的公开标识 */
+/** 创建工作组（通过后端 API，不含标签页） */
 async function handleCreateWorkspace(
-  payload: { name: string; color: string; icon?: string; parentId?: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
+  payload: { name: string; color: string; icon?: string; parentId?: string },
 ): Promise<MessageResponse> {
   const res = await createWorkspace(payload)
   if (res.ok && res.data) {

@@ -7,13 +7,12 @@ export function getWorkspaces() {
   return apiClient.get<{ workspaces: Workspace[] }>('/v1/tab-sync/workspaces')
 }
 
-/** 创建工作区 — 前端直接传入标签页完整数据 */
+/** 创建工作区（不含标签页，标签页由后续更新/加入操作添加） */
 export function createWorkspace(payload: {
   name: string
   color: string
   icon?: string
   parentId?: string
-  tabs: WorkspaceTabPayload[]
 }) {
   return apiClient.post<{ workspace: Workspace }>('/v1/tab-sync/workspaces', payload)
 }

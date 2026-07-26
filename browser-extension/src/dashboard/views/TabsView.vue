@@ -566,14 +566,26 @@ async function handleCreateWorkspace() {
     chromeTabId: t.chromeTabId,
   }))
 
+  // 创建接口不再携带标签页：先创建工作组，再把选中标签页加入
   const res = await sendMessage<{ workspace: any }>({
     action: 'CREATE_WORKSPACE',
     payload: {
       name: wsForm.value.name.trim(),
       color: wsForm.value.color,
-      tabs,
     },
   })
+
+  if (res.success && res.data?.workspace?.id) {
+    const updateRes = await sendMessage({
+      action: 'UPDATE_WORKSPACE',
+      payload: { id: res.data.workspace.id, tabs },
+    })
+    if (!updateRes.success) {
+      saving.value = false
+      ElMessage.error(updateRes.error || '工作组已创建，但标签页加入失败')
+      return
+    }
+  }
 
   saving.value = false
   if (res.success) {

@@ -95,7 +95,8 @@ export interface WorkspaceTabPayload {
 
 export interface CreateWorkspaceMessage {
   action: 'CREATE_WORKSPACE'
-  payload: { name: string; color: string; icon?: string; parentId?: string; tabs: WorkspaceTabPayload[] }
+  /** 创建时不携带标签页；标签页通过 UPDATE_WORKSPACE / ADD_TABS_TO_WORKSPACE 添加 */
+  payload: { name: string; color: string; icon?: string; parentId?: string }
 }
 
 export interface UpdateWorkspaceMessage {

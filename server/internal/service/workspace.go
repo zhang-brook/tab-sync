@@ -35,12 +35,12 @@ type WorkspaceTabData struct {
 }
 
 // CreateWorkspacePayload 创建工作区请求体
+// 创建时不携带标签页；标签页通过后续 Update 或加入操作添加
 type CreateWorkspacePayload struct {
-	Name     string             `json:"name"`
-	Color    string             `json:"color"`
-	Icon     string             `json:"icon"`
-	ParentID string             `json:"parentId"` // 父工作组 UUID（空表示根级）
-	Tabs     []WorkspaceTabData `json:"tabs"`
+	Name     string `json:"name"`
+	Color    string `json:"color"`
+	Icon     string `json:"icon"`
+	ParentID string `json:"parentId"` // 父工作组 UUID（空表示根级）
 }
 
 // UpdateWorkspacePayload 更新工作区请求体
@@ -99,8 +99,7 @@ func (s *WorkspaceService) List() ([]WorkspaceResponse, error) {
 	return responses, nil
 }
 
-// Create 创建工作区
-// 标签页直接使用数据库自增主键 ID 作为公开标识（字符串），不再生成额外 UUID
+// Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
 func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult, error) {
 	wsID := uuid.New().String()
 
@@ -110,17 +109,6 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		Name:        payload.Name,
 		Color:       payload.Color,
 		Icon:        payload.Icon,
-	}
-
-	for i, tabData := range payload.Tabs {
-		workspace.Tabs = append(workspace.Tabs, model.WorkspaceTab{
-			WorkspaceID: wsID,
-			URL:         sanitizeString(tabData.URL, 2048),
-			Title:       sanitizeString(tabData.Title, 500),
-			FavIconURL:  sanitizeFavIconURL(tabData.FavIconURL),
-			SortOrder:   i,
-			AddedAt:     time.Now(),
-		})
 	}
 
 	if err := s.db.Create(&workspace).Error; err != nil {
