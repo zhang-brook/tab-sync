@@ -73,6 +73,10 @@
         <el-form-item label="加入并关闭">
           <span class="form-tip">按 <code>Shift+Alt+S</code> 将当前标签页加入默认工作组并关闭</span>
         </el-form-item>
+        <el-form-item label="启用快捷键">
+          <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
+          <div class="form-tip">关闭后 <code>Shift+Alt+S</code> 将不再触发收藏</div>
+        </el-form-item>
         <el-form-item label="默认工作组">
           <el-tree-select
             v-model="defaultWorkspaceId"
@@ -189,6 +193,9 @@ const versionChecking = ref(false)
 const defaultWorkspaceId = ref('')
 const workspaceOptions = ref<Workspace[]>([])
 
+// 是否启用「加入并关闭」快捷键
+const shortcutEnabled = ref(true)
+
 // 将扁平的工作组列表按 parentId 组装成树，供默认工作组下拉树形展示
 interface WorkspaceTreeNode {
   value: string
@@ -248,6 +255,7 @@ onMounted(async () => {
   // 默认收藏工作组
   defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || ''
   await loadWorkspaces()
+  shortcutEnabled.value = await storage.get(STORAGE_KEYS.SHORTCUT_ENABLED)
 })
 
 async function handleModeChange() {
@@ -313,6 +321,10 @@ async function loadWorkspaces() {
 
 function saveDefaultWorkspace() {
   storage.set(STORAGE_KEYS.DEFAULT_WORKSPACE_ID, defaultWorkspaceId.value || '')
+}
+
+function saveShortcutEnabled() {
+  storage.set(STORAGE_KEYS.SHORTCUT_ENABLED, shortcutEnabled.value)
 }
 
 async function checkVersion() {

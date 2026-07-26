@@ -15,6 +15,8 @@ export const STORAGE_KEYS = {
   API_BASE_URL: 'api_base_url',
   /** 快捷键「加入并关闭」使用的默认收藏工作组 ID */
   DEFAULT_WORKSPACE_ID: 'default_workspace_id',
+  /** 是否启用「加入并关闭」快捷键 (Shift+Alt+S) */
+  SHORTCUT_ENABLED: 'shortcut_enabled',
 } as const
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS]

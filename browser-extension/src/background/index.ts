@@ -35,7 +35,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // 快捷键：将当前标签页加入工作组并关闭
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'save-and-close') {
-    void handleSaveAndClose()
+    // 用户可在设置中关闭该快捷键
+    storage.get(STORAGE_KEYS.SHORTCUT_ENABLED).then((enabled) => {
+      if (!enabled) return
+      void handleSaveAndClose()
+    })
   }
 })
 
