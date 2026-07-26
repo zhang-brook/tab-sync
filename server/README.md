@@ -53,8 +53,8 @@ docker compose logs -f
 ### 手动编译部署
 
 ```bash
-git clone https://github.com/spidermemos/tab-sync-server.git
-cd tab-sync-server
+git clone https://github.com/zhang-brook/tab-sync.git
+cd tab-sync/server
 
 # 安装依赖
 go mod tidy
@@ -219,7 +219,7 @@ Authorization: Bearer <your-api-token>
 ## 架构与目录结构
 
 ```
-tab-sync-server/
+server/
 ├── cmd/server/
 │   ├── main.go              # 入口、路由注册
 │   └── web/                 # 嵌入式 Web 页面（setup / docs）

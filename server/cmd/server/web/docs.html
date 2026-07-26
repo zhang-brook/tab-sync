@@ -462,6 +462,18 @@
           <table class="info-table"><tr><td>说明</td><td>SSE 实时事件流（预留，用于 AI 远程查询）</td></tr></table>
         </div>
       </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/tool-calling</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>AI 远程工具调用（预留）</td></tr></table>
+        </div>
+      </div>
     </div>
 
     <!-- 管理后台 -->
@@ -490,6 +502,42 @@
         </div>
         <div class="endpoint-body">
           <table class="info-table"><tr><td>说明</td><td>API 文档页面（本页）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/api/setup</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>完成首次初始化（设置管理员密码）</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/api/setup/status</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>查询初始化状态</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/api/admin/login</span>
+          <span class="ep-auth public">公开</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>管理后台登录，返回 JWT（供后续管理接口使用）</td></tr></table>
         </div>
       </div>
 

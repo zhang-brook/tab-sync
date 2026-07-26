@@ -1,9 +1,9 @@
 # Tab Sync Browser Extension
 
-Chrome 浏览器标签页管理扩展，支持标签页实时同步、工作组管理、多设备协作。
+Chrome / Edge 浏览器标签页管理扩展，支持标签页实时同步、工作组管理、多设备协作。
 
 - **技术栈**: Vue 3 + Element Plus + Vite + CRXJS + TypeScript + Chrome Manifest V3
-- **后端**: 轻量后端 [Tab Sync Server](https://github.com/spidermemos/tab-sync-server)（Go + Gin + SQLite）
+- **后端**: 轻量后端（Go + Gin + SQLite）
 
 ## 快速开始
 
@@ -23,14 +23,14 @@ npm run build
 1. 运行 `npm run build` 或 `npm run dev`
 2. 打开 `chrome://extensions`，启用「开发者模式」
 3. 点击「加载已解压的扩展程序」，选择项目 `dist` 目录
-4. 验证：打开 Popup / Dashboard / SidePanel
+4. 安装后，建议将扩展图标固定到工具栏，方便使用
 
 ## 连接后端
 
 ### 选项 A：连接轻量后端（推荐）
 
-1. 先部署 Tab Sync Server（参见[部署文档](https://github.com/spidermemos/tab-sync-server#readme)）
-2. 打开扩展 Dashboard → 设置
+1. 先部署 Tab Sync Server（参见[部署文档](https://github.com/zhang-brook/tab-sync/tree/main/server#readme)）
+2. 打开扩展「管理面板」→ 设置
 3. 连接模式选择 **「轻量后端」**
 4. 填入后端地址（如 `http://localhost:8080`）
 5. 在管理后台（`http://localhost:8080/setup`）生成 API Token
@@ -46,14 +46,14 @@ npm run build
 ```
 src/
   background/            # Service Worker（数据中心 + 事件监听）
-  popup/                 # 弹出窗口（轻量快捷操作）
-  sidepanel/             # 侧边栏
-  dashboard/             # 完整管理面板（标签页/工作组/设置/历史）
+  sidepanel/             # 侧边栏（标签页总览 + 当前标签定位 + 工作组操作）
+  dashboard/             # 完整管理面板（标签页/工作组/设备/历史/设置）
   shared/
     api/                 # fetch 封装 + 各模块 API
     storage/             # chrome.storage.local 封装
     types/               # TypeScript 类型定义
     composables/         # Vue composables
+    components/          # 共享组件（如登录面板、工作组选择器）
     utils/               # 工具函数
 ```
 
@@ -65,5 +65,5 @@ src/
 
 | 后端 | 技术栈 | 适用场景 |
 |------|--------|----------|
-| [Tab Sync Server](https://github.com/spidermemos/tab-sync-server) | Go + Gin + SQLite | 自部署、个人使用、内网环境 |
+| [Tab Sync Server](https://github.com/zhang-brook/tab-sync/tree/main/server) | Go + Gin + SQLite | 自部署、个人使用、内网环境 |
 | 织个网后端 | Spring Boot + PostgreSQL | 云端多用户、分布式部署（扩展侧暂未开放） |
