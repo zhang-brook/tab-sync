@@ -56,6 +56,7 @@ type Device struct {
 type Workspace struct {
 	ID          uint           `gorm:"primaryKey;autoIncrement"`
 	WorkspaceID string         `gorm:"uniqueIndex;size:64;not null"` // 工作组 UUID
+	ParentID    string         `gorm:"index;size:64;default:''"`     // 父工作组 UUID（空表示根级），用于层级/树结构
 	Name        string         `gorm:"size:200;not null"`
 	Color       string         `gorm:"size:7;default:'#409EFF'"`
 	Icon        string         `gorm:"size:50"`

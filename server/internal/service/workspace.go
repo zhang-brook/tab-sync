@@ -36,23 +36,26 @@ type WorkspaceTabData struct {
 
 // CreateWorkspacePayload 创建工作区请求体
 type CreateWorkspacePayload struct {
-	Name  string             `json:"name"`
-	Color string             `json:"color"`
-	Icon  string             `json:"icon"`
-	Tabs  []WorkspaceTabData `json:"tabs"`
+	Name     string             `json:"name"`
+	Color    string             `json:"color"`
+	Icon     string             `json:"icon"`
+	ParentID string             `json:"parentId"` // 父工作组 UUID（空表示根级）
+	Tabs     []WorkspaceTabData `json:"tabs"`
 }
 
 // UpdateWorkspacePayload 更新工作区请求体
 type UpdateWorkspacePayload struct {
-	Name *string             `json:"name,omitempty"`
-	Color *string            `json:"color,omitempty"`
-	Icon  *string            `json:"icon,omitempty"`
-	Tabs  []WorkspaceTabData `json:"tabs,omitempty"`
+	Name     *string            `json:"name,omitempty"`
+	Color    *string            `json:"color,omitempty"`
+	Icon     *string            `json:"icon,omitempty"`
+	ParentID *string            `json:"parentId,omitempty"` // 移动到新父工作组（空字符串表示移到根级）
+	Tabs     []WorkspaceTabData `json:"tabs,omitempty"`
 }
 
 // WorkspaceResponse 工作组响应（给前端）
 type WorkspaceResponse struct {
 	ID        string             `json:"id"`
+	ParentID  string             `json:"parentId"`
 	Name      string             `json:"name"`
 	Color     string             `json:"color"`
 	Icon      string             `json:"icon"`
@@ -103,6 +106,7 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 
 	workspace := model.Workspace{
 		WorkspaceID: wsID,
+		ParentID:    payload.ParentID,
 		Name:        payload.Name,
 		Color:       payload.Color,
 		Icon:        payload.Icon,
@@ -153,6 +157,9 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	}
 	if payload.Icon != nil {
 		updates["icon"] = *payload.Icon
+	}
+	if payload.ParentID != nil {
+		updates["parent_id"] = *payload.ParentID
 	}
 	if len(updates) > 0 {
 		s.db.Model(&workspace).Updates(updates)
@@ -230,6 +237,17 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 // Delete 删除工作区（软删除）
 func (s *WorkspaceService) Delete(id string) error {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// 读取被删工作组，拿到它的父级，用于把子工作组上提，避免出现游离节点
+		var target model.Workspace
+		if err := tx.Where("workspace_id = ?", id).First(&target).Error; err != nil {
+			return err
+		}
+		// 将直接子工作组上提到被删节点的父级
+		if err := tx.Model(&model.Workspace{}).
+			Where("parent_id = ?", id).
+			Update("parent_id", target.ParentID).Error; err != nil {
+			return err
+		}
 		// 软删除工作组
 		if err := tx.Model(&model.Workspace{}).
 			Where("workspace_id = ?", id).
@@ -355,6 +373,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 	}
 	return WorkspaceResponse{
 		ID:        ws.WorkspaceID,
+		ParentID:  ws.ParentID,
 		Name:      ws.Name,
 		Color:     ws.Color,
 		Icon:      ws.Icon,
