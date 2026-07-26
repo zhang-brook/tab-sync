@@ -38,12 +38,29 @@ func Init(cfg *config.Config) (*DB, error) {
 
 // AutoMigrate 自动创建/更新表结构
 func AutoMigrate(db *DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.ServerConfig{},
 		&model.AuthToken{},
 		&model.Device{},
 		&model.Workspace{},
 		&model.WorkspaceTab{},
 		&model.SyncEvent{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// 清理历史遗留的 tab_id 列与唯一索引（早期版本用 UUID 作为标签页标识）。
+	// 不处理会导致所有新标签页的 tab_id 为空字符串，触发唯一约束冲突（每组仅允许一个 tab）。
+	if db.Migrator().HasColumn(&model.WorkspaceTab{}, "tab_id") {
+		if db.Migrator().HasIndex(&model.WorkspaceTab{}, "ws_tab_unique") {
+			if err := db.Migrator().DropIndex(&model.WorkspaceTab{}, "ws_tab_unique"); err != nil {
+				return err
+			}
+		}
+		if err := db.Migrator().DropColumn(&model.WorkspaceTab{}, "tab_id"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

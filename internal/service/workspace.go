@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +25,8 @@ func NewWorkspaceService(db *database.DB, syncSvc *SyncService) *WorkspaceServic
 
 // WorkspaceTabData 创建/更新时的标签页数据
 type WorkspaceTabData struct {
+	// TabID 为后端主键 ID（字符串）。
+	// 更新已有标签页时由前端回传以便增量匹配；新建时留空，由数据库自增生成。
 	TabID       string `json:"tabId"`
 	URL         string `json:"url"`
 	Title       string `json:"title"`
@@ -69,8 +73,7 @@ type TabReference struct {
 
 // CreateResult 创建工作区结果
 type CreateResult struct {
-	Workspace WorkspaceResponse        `json:"workspace"`
-	Mappings  map[string]string        `json:"mappings"` // chromeTabId -> UUID
+	Workspace WorkspaceResponse `json:"workspace"`
 }
 
 // List 获取所有工作组
@@ -94,6 +97,7 @@ func (s *WorkspaceService) List() ([]WorkspaceResponse, error) {
 }
 
 // Create 创建工作区
+// 标签页直接使用数据库自增主键 ID 作为公开标识（字符串），不再生成额外 UUID
 func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult, error) {
 	wsID := uuid.New().String()
 
@@ -104,23 +108,13 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		Icon:        payload.Icon,
 	}
 
-	// 生成 chromeTabId -> tabUUID 映射
-	mappings := make(map[string]string)
-	for _, tabData := range payload.Tabs {
-		tabUUID := tabData.TabID
-		if tabUUID == "" {
-			tabUUID = uuid.New().String()
-		}
-		if tabData.ChromeTabID > 0 {
-			mappings[formatChromeTabKey(tabData.ChromeTabID)] = tabUUID
-		}
+	for i, tabData := range payload.Tabs {
 		workspace.Tabs = append(workspace.Tabs, model.WorkspaceTab{
 			WorkspaceID: wsID,
-			TabID:       tabUUID,
 			URL:         sanitizeString(tabData.URL, 2048),
 			Title:       sanitizeString(tabData.Title, 500),
 			FavIconURL:  sanitizeFavIconURL(tabData.FavIconURL),
-			SortOrder:   len(workspace.Tabs),
+			SortOrder:   i,
 			AddedAt:     time.Now(),
 		})
 	}
@@ -136,11 +130,12 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 
 	return &CreateResult{
 		Workspace: toWorkspaceResponse(workspace),
-		Mappings:  mappings,
 	}, nil
 }
 
-// Update 更新工作区（合并式更新）
+// Update 更新工作区（基于主键 ID 的增量更新）
+// 带 tabId 的标签页执行 UPDATE；不带 tabId 的作为新增 INSERT；
+// DB 中存在但新列表里缺失的标签页执行 DELETE。这样每个标签页的主键 ID 保持稳定。
 func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*WorkspaceResponse, error) {
 	var workspace model.Workspace
 	if err := s.db.Where("workspace_id = ? AND is_deleted = ?", id, false).
@@ -163,46 +158,57 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 		s.db.Model(&workspace).Updates(updates)
 	}
 
-	// 更新标签页列表
+	// 增量更新标签页列表
 	if payload.Tabs != nil {
-		// 构建新的 tabID 集合
-		newTabIDs := make(map[string]bool)
-		newTabs := make([]model.WorkspaceTab, 0, len(payload.Tabs))
-
-		for i, tabData := range payload.Tabs {
-			tabUUID := tabData.TabID
-			if tabUUID == "" {
-				tabUUID = uuid.New().String()
-			}
-			newTabIDs[tabUUID] = true
-			newTabs = append(newTabs, model.WorkspaceTab{
-				WorkspaceID: id,
-				TabID:       tabUUID,
-				URL:         sanitizeString(tabData.URL, 2048),
-				Title:       sanitizeString(tabData.Title, 500),
-				FavIconURL:  sanitizeFavIconURL(tabData.FavIconURL),
-				SortOrder:   i,
-				AddedAt:     time.Now(),
-			})
+		existingByID := make(map[uint]model.WorkspaceTab)
+		for _, t := range workspace.Tabs {
+			existingByID[t.ID] = t
 		}
+		seen := make(map[uint]bool)
 
-		// 在事务中替换标签页
-		s.db.Transaction(func(tx *gorm.DB) error {
-			// 删除不再需要的标签页
-			for _, tab := range workspace.Tabs {
-				if !newTabIDs[tab.TabID] {
-					tx.Where("workspace_id = ? AND tab_id = ?", id, tab.TabID).
-						Delete(&model.WorkspaceTab{})
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			for i, tabData := range payload.Tabs {
+				var tab model.WorkspaceTab
+				if tabData.TabID != "" {
+					if uid, perr := strconv.ParseUint(tabData.TabID, 10, 64); perr == nil {
+						if existing, ok := existingByID[uint(uid)]; ok {
+							tab = existing
+							seen[uint(uid)] = true
+						}
+					}
+				}
+				if tab.ID == 0 {
+					// 新增标签页
+					tab = model.WorkspaceTab{WorkspaceID: id, AddedAt: time.Now()}
+				}
+				tab.URL = sanitizeString(tabData.URL, 2048)
+				tab.Title = sanitizeString(tabData.Title, 500)
+				tab.FavIconURL = sanitizeFavIconURL(tabData.FavIconURL)
+				tab.SortOrder = i
+
+				if tab.ID == 0 {
+					if cerr := tx.Create(&tab).Error; cerr != nil {
+						return cerr
+					}
+				} else {
+					if serr := tx.Save(&tab).Error; serr != nil {
+						return serr
+					}
 				}
 			}
-			// 删除所有旧标签页
-			tx.Where("workspace_id = ?", id).Delete(&model.WorkspaceTab{})
-			// 插入新标签页
-			for _, tab := range newTabs {
-				tx.Create(&tab)
+			// 删除未出现在新列表中的标签页
+			for uid := range existingByID {
+				if !seen[uid] {
+					if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
+						return derr
+					}
+				}
 			}
 			return nil
 		})
+		if err != nil {
+			return nil, err
+		}
 
 		// 重新加载
 		s.db.Where("workspace_id = ?", id).
@@ -250,7 +256,7 @@ func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 	var workspaces []model.Workspace
 	err := s.db.Where("is_deleted = ?", false).
 		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
-			return db.Select("workspace_id", "tab_id", "url")
+			return db.Select("workspace_id", "id", "url")
 		}).
 		Find(&workspaces).Error
 	if err != nil {
@@ -262,7 +268,7 @@ func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 		tabs := make([]TabURLPair, 0, len(ws.Tabs))
 		for _, tab := range ws.Tabs {
 			tabs = append(tabs, TabURLPair{
-				TabID: tab.TabID,
+				TabID: strconv.FormatUint(uint64(tab.ID), 10),
 				URL:   tab.URL,
 			})
 		}
@@ -277,11 +283,19 @@ func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 }
 
 // MoveTab 移动标签页到目标工作组指定位置
+// tabID 为后端自增主键（字符串）
 func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) error {
+	if workspaceID == "" || tabID == "" {
+		return errors.New("workspaceID 和 tabID 不能为空")
+	}
+	uid, err := strconv.ParseUint(tabID, 10, 64)
+	if err != nil {
+		return errors.New("tabID 格式无效")
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// 先找到要移动的标签页
 		var tab model.WorkspaceTab
-		if err := tx.Where("tab_id = ?", tabID).First(&tab).Error; err != nil {
+		if err := tx.Where("id = ?", uid).First(&tab).Error; err != nil {
 			return err
 		}
 
@@ -300,8 +314,8 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 		// 把目标 tab 插入到指定位置
 		reordered := make([]model.WorkspaceTab, 0, len(tabs))
 		inserted := false
-		for i, t := range tabs {
-			if t.TabID == tabID {
+		for _, t := range tabs {
+			if uint64(t.ID) == uid {
 				continue
 			}
 			if !inserted && len(reordered) >= newIndex {
@@ -310,7 +324,6 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 			}
 			t.SortOrder = len(reordered)
 			reordered = append(reordered, t)
-			_ = i
 		}
 		if !inserted {
 			tab.SortOrder = len(reordered)
@@ -332,7 +345,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 	tabs := make([]TabReference, len(ws.Tabs))
 	for i, tab := range ws.Tabs {
 		tabs[i] = TabReference{
-			TabID:      tab.TabID,
+			TabID:      strconv.FormatUint(uint64(tab.ID), 10),
 			URL:        tab.URL,
 			Title:      tab.Title,
 			FavIconURL: tab.FavIconURL,
@@ -349,10 +362,6 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 		CreatedAt: ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: ws.UpdatedAt.Format(time.RFC3339),
 	}
-}
-
-func formatChromeTabKey(chromeTabID int) string {
-	return uuid.New().String()[:8] // 简化映射
 }
 
 func sanitizeString(s string, maxLen int) string {

@@ -69,10 +69,10 @@ type Workspace struct {
 }
 
 // WorkspaceTab 工作组内标签页
+// 标签页公开标识直接使用数据库自增主键 ID（字符串），不再额外维护 UUID 列
 type WorkspaceTab struct {
 	ID          uint      `gorm:"primaryKey;autoIncrement"`
-	WorkspaceID string    `gorm:"index;size:64;not null"`           // 所属工作组 UUID
-	TabID       string    `gorm:"uniqueIndex:ws_tab_unique;size:64;not null"` // 标签页 UUID
+	WorkspaceID string    `gorm:"index;size:64;not null"` // 所属工作组 UUID
 	URL         string    `gorm:"size:2048;not null"`
 	Title       string    `gorm:"size:500"`
 	FavIconURL  string    `gorm:"size:2048"`
