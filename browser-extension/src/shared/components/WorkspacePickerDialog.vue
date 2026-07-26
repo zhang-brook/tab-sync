@@ -76,9 +76,9 @@ watch(keyword, (val) => {
   treeRef.value?.filter(val)
 })
 
-function filterNode(value: string, data: WorkspaceTreeNode) {
+function filterNode(value: string, data: Record<string, unknown>) {
   if (!value) return true
-  return data.name.toLowerCase().includes(value.toLowerCase())
+  return String((data as unknown as WorkspaceTreeNode).name).toLowerCase().includes(value.toLowerCase())
 }
 
 async function onOpen() {

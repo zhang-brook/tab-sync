@@ -12,10 +12,6 @@
         />
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="showCreateDialog('')">
-          <el-icon><Plus /></el-icon>
-          新建工作组
-        </el-button>
         <el-button @click="loadWorkspaces">
           <el-icon><Refresh /></el-icon>
           刷新
@@ -27,7 +23,16 @@
     <div v-loading="loading" class="split-pane">
       <!-- 左侧：工作组树 -->
       <div class="tree-pane">
-        <div class="pane-title">工作组</div>
+        <div class="pane-title-row">
+          <span class="pane-title">工作组</span>
+          <div class="pane-title-actions">
+            <el-tooltip content="新建工作组" placement="top">
+              <el-button size="small" text type="primary" @click="showCreateDialog('')">
+                <el-icon><Plus /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </div>
+        </div>
         <el-empty
           v-if="treeData.length === 0 && !loading"
           :image-size="60"
@@ -48,8 +53,42 @@
           <template #default="{ data }">
             <span class="tree-node">
               <span class="tree-dot" :style="{ backgroundColor: data.color }" />
-              <span class="tree-name">{{ data.name }}</span>
+              <span class="tree-name" :title="data.name">{{ data.name }}</span>
               <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
+              <el-dropdown
+                trigger="click"
+                @command="(cmd: string) => onNodeMenuCommand(cmd, data)"
+                @click.stop
+              >
+                <el-button size="small" text class="node-dots-btn" @click.stop>
+                  <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item :command="'open'" :icon="FolderOpened" :disabled="data.tabCount === 0">
+                      打开所有标签页
+                      <el-text type="info" style="margin-left: 6.18px;" v-if="data.tabCount > 0">
+                        ({{ data.tabCount }}个标签页)
+                      </el-text>
+                    </el-dropdown-item>
+                    <el-dropdown-item :command="'openNewWindow'" :icon="CopyDocument" :disabled="data.tabCount === 0">
+                      打开所有标签页（新窗口）
+                    </el-dropdown-item>
+                    <el-dropdown-item :command="'openAsGroup'" :icon="Collection" :disabled="data.tabCount === 0">
+                      打开所有标签页（打开为标签组）
+                    </el-dropdown-item>
+                    <el-dropdown-item :command="'createChild'" :icon="FolderAdd" divided>
+                      新建子工作组
+                    </el-dropdown-item>
+                    <el-dropdown-item :command="'edit'" :icon="Edit">
+                      编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item">
+                      删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </span>
           </template>
         </el-tree>
@@ -217,28 +256,10 @@
         <el-form-item label="标识色">
           <el-color-picker v-model="formData.color" :predefine="presetColors" />
         </el-form-item>
-        <el-form-item label="选择标签页">
-          <div class="tab-selector">
-            <el-checkbox-group v-model="formData.checkIds">
-              <div v-for="tab in currentOpenTabs" :key="tab.chromeTabId" class="tab-checkbox-item">
-                <el-checkbox :value="tab.chromeTabId">
-                  <div class="tab-checkbox-content">
-                    <img
-                      v-if="tab.favIconUrl"
-                      :src="tab.favIconUrl"
-                      class="tab-favicon"
-                      @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
-                    />
-                    <div v-else class="tab-favicon-placeholder" />
-                    <span class="tab-checkbox-title" :title="tab.title">{{ tab.title || '(无标题)' }}</span>
-                  </div>
-                </el-checkbox>
-              </div>
-            </el-checkbox-group>
-            <el-empty v-if="currentOpenTabs.length === 0" :image-size="40" description="暂无打开的标签页" />
-          </div>
-        </el-form-item>
       </el-form>
+      <div v-if="!isEditing" class="dialog-hint">
+        创建后可在「标签页」页或侧边栏中选择标签页加入该工作组。
+      </div>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -252,12 +273,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
-import type { Workspace, WorkspacesData, WorkspaceTabPayload, TabReference } from '../../shared/types'
+import type { Workspace, WorkspacesData, TabReference } from '../../shared/types'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -273,13 +294,11 @@ const dialogVisible = ref(false)
 const isEditing = ref(false)
 const saving = ref(false)
 const editingId = ref('')
-const currentOpenTabs = ref<Array<{ chromeTabId: number; url: string; title: string; favIconUrl: string }>>([])
 
 const formData = ref({
   name: '',
   color: '#409EFF',
   parentId: '' as string,
-  checkIds: [] as number[],
 })
 
 const presetColors = [
@@ -340,9 +359,9 @@ watch(searchKeyword, (val) => {
   treeRef.value?.filter(val)
 })
 
-function filterNode(value: string, data: WorkspaceTreeNode) {
+function filterNode(value: string, data: Record<string, unknown>) {
   if (!value) return true
-  return data.name.toLowerCase().includes(value.toLowerCase())
+  return String((data as unknown as WorkspaceTreeNode).name).toLowerCase().includes(value.toLowerCase())
 }
 
 onMounted(() => {
@@ -368,21 +387,10 @@ function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
 }
 
-async function loadOpenTabsForDialog() {
-  const chromeTabs = await chrome.tabs.query({})
-  currentOpenTabs.value = chromeTabs.map((tab) => ({
-    chromeTabId: tab.id ?? 0,
-    url: tab.url || tab.pendingUrl || '',
-    title: tab.title || '',
-    favIconUrl: tab.favIconUrl || '',
-  }))
-}
-
 function showCreateDialog(parentId: string) {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: '#409EFF', parentId, checkIds: [] }
-  loadOpenTabsForDialog()
+  formData.value = { name: '', color: '#409EFF', parentId }
   dialogVisible.value = true
 }
 
@@ -393,10 +401,33 @@ function showEditDialog(ws: Workspace) {
     name: ws.name,
     color: ws.color,
     parentId: ws.parentId || '',
-    checkIds: [],
   }
-  loadOpenTabsForDialog()
   dialogVisible.value = true
+}
+
+/** 树中每个工作组项的「⋮」菜单：对对应工作组执行操作 */
+function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
+  const ws = node.workspace
+  switch (command) {
+    case 'open':
+      handleOpenWorkspace(ws.id, false)
+      break
+    case 'openNewWindow':
+      handleOpenWorkspace(ws.id, true)
+      break
+    case 'openAsGroup':
+      handleOpenAsTabGroup(ws.id)
+      break
+    case 'createChild':
+      showCreateDialog(ws.id)
+      break
+    case 'edit':
+      showEditDialog(ws)
+      break
+    case 'delete':
+      handleDelete(ws)
+      break
+  }
 }
 
 async function handleSave() {
@@ -407,14 +438,6 @@ async function handleSave() {
 
   saving.value = true
 
-  const selectedTabs = currentOpenTabs.value.filter((t) => formData.value.checkIds.includes(t.chromeTabId))
-  const tabs: WorkspaceTabPayload[] = selectedTabs.map((t) => ({
-    url: t.url,
-    title: t.title,
-    favIconUrl: t.favIconUrl,
-    chromeTabId: t.chromeTabId,
-  }))
-
   if (isEditing.value) {
     const res = await sendMessage({
       action: 'UPDATE_WORKSPACE',
@@ -423,20 +446,18 @@ async function handleSave() {
         name: formData.value.name.trim(),
         color: formData.value.color,
         parentId: formData.value.parentId || '',
-        // 编辑时若未勾选标签页则不改动标签页
-        ...(tabs.length > 0 ? { tabs } : {}),
       },
     })
     if (res.success) ElMessage.success('工作组已更新')
     else ElMessage.error(res.error || '更新失败')
   } else {
+    // 创建不携带标签页；后续通过「标签页」页或侧边栏加入
     const res = await sendMessage<{ workspace: Workspace }>({
       action: 'CREATE_WORKSPACE',
       payload: {
         name: formData.value.name.trim(),
         color: formData.value.color,
         parentId: formData.value.parentId || '',
-        tabs,
       },
     })
     if (res.success) {
@@ -586,11 +607,28 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   flex-direction: column;
 }
 
+.pane-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .pane-title {
   font-size: 13px;
   font-weight: 600;
   color: #909399;
-  margin-bottom: 8px;
+}
+
+.pane-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 将水平三个点旋转为竖排 */
+.dots-vertical {
+  transform: rotate(90deg);
 }
 
 .tree-node {
@@ -622,6 +660,17 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   background: #f0f2f5;
   border-radius: 8px;
   padding: 0 6px;
+}
+
+/* 每个工作组项旁的竖三点按钮 */
+.node-dots-btn {
+  margin-left: auto;
+  padding: 2px 4px;
+  color: #909399;
+}
+
+.node-dots-btn:hover {
+  color: #606266;
 }
 
 .detail-header {
@@ -727,31 +776,10 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   margin-top: 2px;
 }
 
-.tab-selector {
-  max-height: 300px;
-  overflow-y: auto;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 8px;
-  width: 100%;
-}
-
-.tab-checkbox-item {
-  padding: 4px 0;
-}
-
-.tab-checkbox-content {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tab-checkbox-title {
-  max-width: 350px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 13px;
+.dialog-hint {
+  font-size: 12px;
+  color: #909399;
+  padding-left: 90px;
 }
 
 .drag-handle {
@@ -777,5 +805,17 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   opacity: 0.4;
   background: #e6f7ff;
   border: 1px dashed #409eff;
+}
+</style>
+
+<!-- 下拉菜单被 teleport 到 body，需非 scoped 样式 -->
+<style>
+/* 下拉菜单的「删除」项：红字 */
+.danger-dropdown-item {
+  color: var(--el-color-danger) !important;
+}
+
+.danger-dropdown-item:hover {
+  background-color: var(--el-color-danger-light-9);
 }
 </style>
