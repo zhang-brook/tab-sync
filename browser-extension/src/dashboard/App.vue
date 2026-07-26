@@ -10,11 +10,19 @@
       >
         <el-menu-item index="/tabs">
           <el-icon><Collection /></el-icon>
-          <span>标签页</span>
+          <span>本地标签页</span>
         </el-menu-item>
         <el-menu-item index="/workspaces">
           <el-icon><FolderOpened /></el-icon>
           <span>工作组</span>
+        </el-menu-item>
+        <el-menu-item index="/tags">
+          <el-icon><PriceTag /></el-icon>
+          <span>标签</span>
+        </el-menu-item>
+        <el-menu-item index="/synced">
+          <el-icon><Files /></el-icon>
+          <span>已同步标签页</span>
         </el-menu-item>
         <el-menu-item index="/history">
           <el-icon><Clock /></el-icon>
@@ -72,7 +80,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled, SwitchButton } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Clock, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files } from '@element-plus/icons-vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import { STORAGE_KEYS } from '../shared/storage'
 import type { StateData } from '../shared/types'
@@ -82,15 +90,17 @@ const route = useRoute()
 const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
 
 const pageTitleMap: Record<string, string> = {
-  '/tabs': '标签页管理',
+  '/tabs': '本地标签页',
   '/workspaces': '工作组',
+  '/tags': '标签',
+  '/synced': '已同步标签页',
   '/history': '历史记录',
   '/devices': '设备管理',
   '/settings': '设置',
 }
 
 const activeMenu = computed(() => route.path)
-const pageTitle = computed(() => pageTitleMap[route.path] || '标签页管理')
+const pageTitle = computed(() => pageTitleMap[route.path] || '本地标签页')
 
 /** 从路由 meta 中读取当前页面的数据来源标识 */
 const dataSource = computed(() => route.meta.dataSource ?? null)

@@ -129,3 +129,18 @@ func (h *TagHandler) RemoveFromWorkspace(c *gin.Context) {
 	}
 	Success(c, gin.H{"success": true})
 }
+
+// GetTabsByTag 获取某个标签下包含的所有云端标签页
+func (h *TagHandler) GetTabsByTag(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		BadRequest(c, "无效的标签 ID")
+		return
+	}
+	tabs, err := h.svc.GetTabsByTag(uint(id))
+	if err != nil {
+		InternalError(c, "获取标签页失败")
+		return
+	}
+	Success(c, gin.H{"tabs": tabs})
+}

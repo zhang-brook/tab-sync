@@ -2,755 +2,475 @@
   <div class="tabs-view">
     <!-- 工具栏 -->
     <div class="toolbar">
-      <div class="toolbar-left">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索标题或 URL..."
-          clearable
-          style="width: 280px"
-          :prefix-icon="Search"
-          @input="handleSearch"
+      <el-select
+        v-model="windowFilter"
+        placeholder="全部窗口"
+        clearable
+        class="window-filter"
+        @change="applyFilters"
+      >
+        <el-option label="全部窗口" value="" />
+        <el-option
+          v-for="w in windows"
+          :key="w.id"
+          :label="w.title || `窗口 ${w.id}`"
+          :value="w.id"
         />
-        <el-select v-model="windowFilter" placeholder="窗口" style="width: 140px" clearable @change="handleFilterChange">
-          <el-option label="全部窗口" value="" />
-          <el-option v-for="winId in windowIds" :key="winId" :label="`窗口 ${winId}`" :value="winId" />
-        </el-select>
-      </div>
-      <div class="toolbar-right">
-        <el-button type="primary" :disabled="selectedTabs.length === 0" @click="showCreateWorkspaceDialog">
-          <el-icon><Plus /></el-icon>
-          创建工作组 ({{ selectedTabs.length }})
-        </el-button>
-        <el-button type="success" :disabled="selectedTabs.length === 0" @click="showAddToWorkspaceDialog">
-          <el-icon><FolderAdd /></el-icon>
-          加入现有工作组 ({{ selectedTabs.length }})
-        </el-button>
-        <el-button :disabled="selectedTabs.length === 0" type="danger" @click="handleBatchClose">
-          <el-icon><Close /></el-icon>
-          批量关闭 ({{ selectedTabs.length }})
-        </el-button>
-        <el-button @click="loadTabs">
-          <el-icon><Refresh /></el-icon>
-          刷新
-        </el-button>
-      </div>
+      </el-select>
+
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索标题或网址"
+        clearable
+        class="search-input"
+        @input="applyFilters"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+
+      <div class="toolbar-spacer" />
+
+      <el-button :icon="Refresh" @click="refresh">刷新</el-button>
     </div>
 
-    <!-- 标签页表格 -->
-    <el-table
-      ref="tableRef"
-      v-loading="loading"
-      :data="pagedTabs"
-      stripe
-      border
-      style="width: 100%"
-      @selection-change="handleSelectionChange"
-    >
-      <el-table-column type="selection" width="40" />
+    <!-- 批量操作栏 -->
+    <div v-if="selectedTabIds.size > 0" class="batch-bar">
+      <span class="batch-count">已选 {{ selectedTabIds.size }} 个标签页</span>
+      <el-button type="primary" @click="handleAddToWorkspace">加入工作组</el-button>
+      <el-button type="danger" :icon="Close" @click="handleCloseSelected">关闭选中</el-button>
+      <el-button text @click="clearSelection">取消选择</el-button>
+    </div>
 
-      <el-table-column label="标签页" min-width="320">
-        <template #default="{ row }">
-          <div class="tab-cell">
-            <img
-              v-if="row.favIconUrl"
-              :src="row.favIconUrl"
-              class="tab-favicon"
-              @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+    <div v-if="loading" class="empty-state">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <span>加载中…</span>
+    </div>
+
+    <div v-else-if="filteredWindows.length === 0" class="empty-state">
+      <el-empty :description="searchKeyword ? '没有匹配的标签页' : '当前没有打开的标签页'" />
+    </div>
+
+    <!-- 树形：窗口 → 分组 → 标签页 -->
+    <div v-else class="tree-scroll">
+      <div v-for="win in filteredWindows" :key="win.id" class="tree-window">
+        <div class="tree-row window-header" @click="toggleWindow(win.id)">
+          <el-icon class="caret" :class="{ collapsed: !winExpanded[win.id] }"><CaretRight /></el-icon>
+          <el-icon><Monitor /></el-icon>
+          <span class="window-title">{{ `窗口 ${win.id}` }}</span>
+          <span class="count-badge">{{ winCount(win) }}</span>
+        </div>
+
+        <div v-show="winExpanded[win.id]" class="tree-body">
+          <!-- 未分组标签页 -->
+          <div v-for="tab in win.tabs" :key="'u' + tab.id" class="tree-row tab-row">
+            <el-checkbox
+              :model-value="selectedTabIds.has(tab.id)"
+              @change="(val: any) => toggleTab(tab.id, val)"
+              @click.stop
             />
-            <div v-else class="tab-favicon-placeholder" />
-            <div class="tab-text">
-              <div class="tab-title" :title="row.title">{{ row.title || '(无标题)' }}</div>
-              <div class="tab-url" :title="row.url">{{ row.url }}</div>
+            <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
+            <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
+            <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
+            <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
+          </div>
+
+          <!-- 标签分组 -->
+          <div v-for="group in win.groups" :key="'g' + group.id" class="tree-group">
+            <div class="tree-row group-header" @click="toggleGroup(group.id)">
+              <el-icon class="caret" :class="{ collapsed: !groupExpanded[group.id] }"><CaretRight /></el-icon>
+              <span class="group-dot" :style="{ backgroundColor: group.color ? mapColor(group.color) : '#909399' }" />
+              <span class="group-title">{{ group.title || '未命名分组' }}</span>
+              <span class="count-badge">{{ group.tabs.length }}</span>
+            </div>
+
+            <div v-show="groupExpanded[group.id]" class="tree-body">
+              <div v-for="tab in group.tabs" :key="'g' + group.id + 't' + tab.id" class="tree-row tab-row">
+                <el-checkbox
+                  :model-value="selectedTabIds.has(tab.id)"
+                  @change="(val: any) => toggleTab(tab.id, val)"
+                  @click.stop
+                />
+                <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
+                <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
+                <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
+                <el-button class="row-action" text :icon="Close" @click="closeTab(tab)" />
+              </div>
             </div>
           </div>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="最后访问时间" width="140" align="center">
-        <template #default="{ row }">
-          <el-tooltip :content="lastAccessedTip(row as TabRow)" placement="top" :disabled="!row.lastAccessedAt">
-            <span class="time-text">{{ formatTime(row.lastAccessedAt) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="工作组" min-width="160" header-align="center">
-        <template #default="{ row }">
-          <div class="workspace-tags">
-            <el-tag
-              v-for="tag in row.workspaceTags"
-              :key="tag.workspaceId"
-              size="small"
-              :color="tag.workspaceColor"
-              effect="dark"
-              style="margin: 1px 2px; cursor: pointer"
-              @click="switchToWorkspaces(tag.workspaceId)"
-            >
-              {{ tag.workspaceName }}
-            </el-tag>
-            <span v-if="row.workspaceTags.length === 0" class="no-tag">--</span>
-          </div>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="状态" width="80" align="center">
-        <template #default="{ row }">
-          <el-tag :type="statusTagType(row.chromeStatus)" size="small">
-            {{ statusLabel(row.chromeStatus) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="所在窗口" width="90" align="center" prop="windowId">
-        <template #default="{ row }">
-          <span class="time-text">窗口 {{ row.windowId }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="操作" width="140" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-tooltip content="切换到该标签页" placement="top">
-            <el-button size="small" text type="primary" @click="handleSwitchToTab(row as TabRow)">
-              <el-icon><View /></el-icon>
-            </el-button>
-          </el-tooltip>
-          <el-tooltip content="关闭标签页" placement="top">
-            <el-button size="small" text type="danger" @click="handleCloseTab(row.chromeTabId)">
-              <el-icon><Close /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 分页 + 统计 -->
-    <div class="table-footer">
-      <span class="footer-text">
-        共 {{ filteredTabs.length }} 个标签页
-        <template v-if="selectedTabs.length > 0">，已选 {{ selectedTabs.length }} 个</template>
-      </span>
-      <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="pageSize"
-        :total="filteredTabs.length"
-        layout="prev, pager, next"
-        type="small"
-        background
-      />
+        </div>
+      </div>
     </div>
 
-    <!-- 创建工作组对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      title="创建工作组"
-      width="560px"
-      destroy-on-close
-    >
-      <el-form label-width="80px" label-position="left">
-        <el-form-item label="名称" required>
-          <el-input v-model="wsForm.name" placeholder="例如: 项目A开发" />
-        </el-form-item>
-        <el-form-item label="标识色">
-          <el-color-picker v-model="wsForm.color" :predefine="presetColors" />
-        </el-form-item>
-        <el-form-item label="选中标签页">
-          <div class="tab-selector">
-            <div v-for="tab in selectedTabs" :key="tab.chromeTabId" class="tab-checkbox-item">
-              <img
-                v-if="tab.favIconUrl"
-                :src="tab.favIconUrl"
-                class="tab-favicon"
-                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-              />
-              <div v-else class="tab-favicon-placeholder" />
-              <span class="tab-checkbox-title" :title="tab.title">{{ tab.title || '(无标题)' }}</span>
-            </div>
-            <el-empty v-if="selectedTabs.length === 0" :image-size="40" description="请在表格中选择标签页" />
-          </div>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleCreateWorkspace">
-          创建
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 加入现有工作组对话框 -->
-    <el-dialog
-      v-model="addToWsDialogVisible"
-      title="加入现有工作组"
-      width="500px"
-      destroy-on-close
-    >
-      <el-form label-width="80px" label-position="left">
-        <el-form-item label="目标工作组" required>
-          <el-select v-model="addToWsTargetId" placeholder="请选择工作组" style="width: 100%">
-            <el-option
-              v-for="ws in availableWorkspaces"
-              :key="ws.id"
-              :label="ws.name"
-              :value="ws.id"
-            >
-              <span class="ws-option">
-                <span class="ws-color-dot" :style="{ backgroundColor: ws.color }" />
-                <span>{{ ws.name }}</span>
-                <el-tag size="small" type="info" style="margin-left: auto">{{ ws.tabs.length }} 个标签页</el-tag>
-              </span>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="选中标签页">
-          <div class="tab-selector">
-            <div v-for="tab in selectedTabs" :key="tab.chromeTabId" class="tab-checkbox-item">
-              <img
-                v-if="tab.favIconUrl"
-                :src="tab.favIconUrl"
-                class="tab-favicon"
-                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
-              />
-              <div v-else class="tab-favicon-placeholder" />
-              <span class="tab-checkbox-title" :title="tab.title">{{ tab.title || '(无标题)' }}</span>
-            </div>
-            <el-empty v-if="selectedTabs.length === 0" :image-size="40" description="请在表格中选择标签页" />
-          </div>
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="addToWsDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="addingToWs" :disabled="!addToWsTargetId" @click="handleAddToWorkspace">
-          加入
-        </el-button>
-      </template>
-    </el-dialog>
+    <!-- 加入工作组选择器 -->
+    <WorkspacePickerDialog
+      v-model="pickerVisible"
+      title="加入工作组"
+      @select="handlePickerSelect"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { Search, Refresh, Close, View, Plus, FolderAdd } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from '../../shared/composables/useMessage'
-import type { WorkspaceTabsSummaryData, WorkspaceTabPayload, Workspace, WorkspacesData } from '../../shared/types'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Search, Refresh, Close, Loading, CaretRight, Monitor } from '@element-plus/icons-vue'
+import { sendMessage } from '@/shared/composables/useMessage'
+import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
-/** 扩展的标签页行数据 */
-interface TabRow {
-  chromeTabId: number
-  url: string
+interface TreeTab {
+  id: number
   title: string
-  favIconUrl: string
+  url: string
+  favIconUrl?: string
   windowId: number
-  chromeStatus: string
-  /** Chrome 最后激活时间（毫秒时间戳，来自 chrome.tabs.Tab.lastAccessed） */
-  lastAccessedAt: number
-  workspaceTags: Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>
 }
 
+interface TreeGroup {
+  id: number
+  title: string
+  color?: string
+  tabs: TreeTab[]
+}
+
+interface TreeWindow {
+  id: number
+  title: string
+  tabs: TreeTab[]
+  groups: TreeGroup[]
+}
+
+const loading = ref(false)
+const windows = ref<TreeWindow[]>([])
 const searchKeyword = ref('')
 const windowFilter = ref<number | ''>('')
-const allTabs = ref<TabRow[]>([])
-const selectedTabs = ref<TabRow[]>([])
-const loading = ref(true)
-const currentPage = ref(1)
-const pageSize = 25
+const filteredWindows = ref<TreeWindow[]>([])
+const winExpanded = reactive<Record<number, boolean>>({})
+const groupExpanded = reactive<Record<number, boolean>>({})
+const selectedTabIds = reactive(new Set<number>())
+const pickerVisible = ref(false)
 
-// 对话框
-const dialogVisible = ref(false)
-const saving = ref(false)
-const wsForm = ref({ name: '', color: '#409EFF' })
+function mapColor(hex: string): string {
+  return hex.startsWith('#') ? hex : `#${hex}`
+}
 
-// 加入现有工作组对话框
-const addToWsDialogVisible = ref(false)
-const addingToWs = ref(false)
-const addToWsTargetId = ref('')
-const availableWorkspaces = ref<Workspace[]>([])
+function winCount(win: TreeWindow): number {
+  return win.tabs.length + win.groups.reduce((sum, g) => sum + g.tabs.length, 0)
+}
 
-const presetColors = [
-  '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
-  '#909399', '#00BCD4', '#9C27B0', '#FF5722',
-]
+function toggleWindow(id: number) {
+  winExpanded[id] = !winExpanded[id]
+}
 
-// 工作组的 URL → workspace 映射
-const urlToWorkspaceMap = ref<Map<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>>>(new Map())
+function toggleGroup(id: number) {
+  groupExpanded[id] = !groupExpanded[id]
+}
 
-/** 所有窗口 ID 列表 */
-const windowIds = computed(() => {
-  const ids = new Set(allTabs.value.map(t => t.windowId))
-  return Array.from(ids).sort((a, b) => a - b)
-})
+function toggleTab(id: number, val: boolean) {
+  if (val) selectedTabIds.add(id)
+  else selectedTabIds.delete(id)
+}
 
-/** 筛选后的标签页 */
-const filteredTabs = computed(() => {
-  let tabs = allTabs.value
-  if (windowFilter.value !== '') {
-    tabs = tabs.filter(t => t.windowId === windowFilter.value)
-  }
-  if (searchKeyword.value.trim()) {
-    const kw = searchKeyword.value.trim().toLowerCase()
-    tabs = tabs.filter(t => t.title.toLowerCase().includes(kw) || t.url.toLowerCase().includes(kw))
-  }
-  return tabs
-})
+function clearSelection() {
+  selectedTabIds.clear()
+}
 
-/** 分页后的标签页 */
-const pagedTabs = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredTabs.value.slice(start, start + pageSize)
-})
-
-onMounted(() => {
-  loadTabs()
-})
-
-async function loadTabs() {
+async function refresh() {
   loading.value = true
   try {
-    // 并行加载浏览器标签页和工作组摘要
-    const [chromeTabs, summaryRes] = await Promise.all([
-      chrome.tabs.query({}),
-      sendMessage<WorkspaceTabsSummaryData>({ action: 'GET_WORKSPACE_TABS_SUMMARY' }),
-    ])
-
-    // 构建 URL → workspace 映射
-    const urlMap = new Map<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>>()
-    if (summaryRes.success && summaryRes.data) {
-      for (const summary of summaryRes.data.summaries) {
-        for (const tab of summary.tabs) {
-          if (!tab.url) continue
-          const existing = urlMap.get(tab.url) || []
-          existing.push({
-            workspaceId: summary.workspaceId,
-            workspaceName: summary.workspaceName,
-            workspaceColor: summary.workspaceColor,
-          })
-          urlMap.set(tab.url, existing)
+    const chromeWindows = await chrome.windows.getAll({ populate: true })
+    const result: TreeWindow[] = []
+    for (const win of chromeWindows) {
+      if (win.type !== 'normal') continue
+        const winTabs: chrome.tabs.Tab[] = win.tabs || []
+      const groupsMap = new Map<number, TreeGroup>()
+      const ungrouped: TreeTab[] = []
+      for (const t of winTabs) {
+        if (t.id == null || !t.url) continue
+        const tab: TreeTab = {
+          id: t.id,
+          title: t.title || t.url,
+          url: t.url,
+          favIconUrl: t.favIconUrl,
+          windowId: win.id!,
+        }
+        if (t.groupId && t.groupId > 0) {
+          let g = groupsMap.get(t.groupId)
+          if (!g) {
+            g = { id: t.groupId, title: '', color: undefined, tabs: [] }
+            groupsMap.set(t.groupId, g)
+          }
+          g.tabs.push(tab)
+        } else {
+          ungrouped.push(tab)
         }
       }
-    }
-    urlToWorkspaceMap.value = urlMap
-
-    // 构建标签页行数据
-    allTabs.value = chromeTabs.map(tab => {
-      const url = tab.url || tab.pendingUrl || ''
-      return {
-        chromeTabId: tab.id ?? 0,
-        url,
-        title: tab.title || '',
-        favIconUrl: tab.favIconUrl || '',
-        windowId: tab.windowId ?? 0,
-        chromeStatus: tab.status || 'complete',
-        lastAccessedAt: tab.lastAccessed ?? 0,
-        workspaceTags: urlMap.get(url) || [],
+      // 补全分组标题/颜色
+      for (const [gid, g] of groupsMap) {
+        try {
+          const info = await chrome.tabGroups.get(gid)
+          g.title = info.title || ''
+          g.color = info.color
+        } catch {
+          /* 分组可能已不存在 */
+        }
       }
+      result.push({
+        id: win.id!,
+        title: '',
+        tabs: ungrouped,
+        groups: Array.from(groupsMap.values()),
+      })
+      if (!(win.id! in winExpanded)) winExpanded[win.id!] = true
+    }
+    windows.value = result
+    applyFilters()
+  } catch (e) {
+    ElMessage.error('加载本地标签页失败：' + (e as Error).message)
+  } finally {
+    loading.value = false
+  }
+}
+
+function applyFilters() {
+  const kw = searchKeyword.value.trim().toLowerCase()
+  const wf = windowFilter.value
+  filteredWindows.value = windows.value
+    .filter((w) => (wf === '' ? true : w.id === wf))
+    .map((w) => {
+      const matchTab = (t: TreeTab) =>
+        !kw || t.title.toLowerCase().includes(kw) || t.url.toLowerCase().includes(kw)
+      const tabs = w.tabs.filter(matchTab)
+      const groups = w.groups
+        .map((g) => ({ ...g, tabs: g.tabs.filter(matchTab) }))
+        .filter((g) => g.tabs.length > 0)
+      return { ...w, tabs: tabs.filter((t) => t.title || t.url), groups }
     })
-  } catch (err) {
-    ElMessage.error('加载标签页失败: ' + String(err))
-  }
-  loading.value = false
-  currentPage.value = 1
+    .filter((w) => w.tabs.length > 0 || w.groups.length > 0)
 }
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-function handleSearch() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    currentPage.value = 1
-  }, 300)
-}
-
-function handleFilterChange() {
-  currentPage.value = 1
-}
-
-function handleSelectionChange(rows: TabRow[]) {
-  selectedTabs.value = rows
-}
-
-function statusTagType(status: string): 'success' | 'warning' | 'info' {
-  if (status === 'complete') return 'success'
-  if (status === 'loading') return 'warning'
-  return 'info'
-}
-
-function statusLabel(status: string): string {
-  if (status === 'unloaded') return '已冻结' // '未加载'
-  if (status === 'loading') return '加载中'
-  if (status === 'complete') return '已加载'
-  return status || '未知'
-}
-
-/** 格式化时间（支持 ISO 字符串或毫秒时间戳） */
-function formatTime(value: string | number): string {
-  if (!value) return '--'
-  const d = typeof value === 'number' ? new Date(value) : new Date(value)
-  if (isNaN(d.getTime())) return '--'
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-
-  // 1 分钟内：刚刚
-  if (diffMin < 1) return '刚刚'
-  // 1 小时内：X分钟前
-  if (diffMin < 60) return `${diffMin}分钟前`
-  // 今天：HH:mm
-  if (isSameDay(d, now)) {
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
-  // 昨天：昨天 HH:mm
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (isSameDay(d, yesterday)) {
-    return `昨天 ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
-  // 今年内：MM-DD HH:mm
-  if (d.getFullYear() === now.getFullYear()) {
-    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
-  // 跨年：YYYY-MM-DD
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-/** 生成 tooltip 用的完整 ISO 时间字符串 */
-function lastAccessedTip(row: TabRow): string {
-  if (!row.lastAccessedAt) return ''
-  return new Date(row.lastAccessedAt).toLocaleString()
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
-
-function pad(n: number): string {
-  return n.toString().padStart(2, '0')
-}
-
-/** 切换到指定标签页 */
-async function handleSwitchToTab(row: TabRow) {
+async function activateTab(tab: TreeTab) {
   try {
-    await chrome.tabs.update(row.chromeTabId, { active: true })
-    await chrome.windows.update(row.windowId, { focused: true })
+    await chrome.tabs.update(tab.id, { active: true })
+    if (tab.windowId != null) {
+      await chrome.windows.update(tab.windowId, { focused: true })
+    }
   } catch {
-    ElMessage.warning('标签页可能已被关闭')
+    /* 忽略 */
   }
 }
 
-/** 关闭单个标签页 */
-async function handleCloseTab(chromeTabId: number) {
+async function closeTab(tab: TreeTab) {
   try {
-    await chrome.tabs.remove(chromeTabId)
-    ElMessage.success('标签页已关闭')
-    await loadTabs()
+    await chrome.tabs.remove(tab.id)
+    selectedTabIds.delete(tab.id)
+    await refresh()
   } catch {
-    ElMessage.warning('关闭失败，标签页可能已被关闭')
+    /* 忽略 */
   }
 }
 
-/** 批量关闭 */
-async function handleBatchClose() {
-  if (selectedTabs.value.length === 0) return
-  try {
-    await ElMessageBox.confirm(
-      `确定要关闭选中的 ${selectedTabs.value.length} 个标签页吗？`,
-      '批量关闭',
-      { type: 'warning' },
-    )
-  } catch {
-    return
-  }
-  const ids = selectedTabs.value.map(t => t.chromeTabId)
+async function handleCloseSelected() {
+  const ids = Array.from(selectedTabIds)
+  if (ids.length === 0) return
   try {
     await chrome.tabs.remove(ids)
-    ElMessage.success(`已关闭 ${ids.length} 个标签页`)
-    selectedTabs.value = []
-    await loadTabs()
+    clearSelection()
+    await refresh()
   } catch {
-    ElMessage.warning('部分标签页关闭失败')
+    /* 忽略 */
   }
 }
 
-/** 显示创建工作组对话框 */
-function showCreateWorkspaceDialog() {
-  wsForm.value = { name: '', color: '#409EFF' }
-  dialogVisible.value = true
-}
-
-/** 显示加入现有工作组对话框 */
-async function showAddToWorkspaceDialog() {
-  addToWsTargetId.value = ''
-  addToWsDialogVisible.value = true
-  // 加载工作组列表
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
-  if (res.success && res.data) {
-    availableWorkspaces.value = res.data.workspaces
-  } else {
-    ElMessage.warning(res.error || '获取工作组列表失败')
-  }
-}
-
-/** 将选中标签页加入指定工作组 */
-async function handleAddToWorkspace() {
-  if (!addToWsTargetId.value) {
-    ElMessage.warning('请选择目标工作组')
+function handleAddToWorkspace() {
+  if (selectedTabIds.size === 0) {
+    ElMessage.warning('请先选择标签页')
     return
   }
-  if (selectedTabs.value.length === 0) {
-    ElMessage.warning('请选择至少一个标签页')
-    return
-  }
+  pickerVisible.value = true
+}
 
-  addingToWs.value = true
-  const tabs: WorkspaceTabPayload[] = selectedTabs.value.map(t => ({
-    url: t.url,
-    title: t.title,
-    favIconUrl: t.favIconUrl,
-    chromeTabId: t.chromeTabId,
+async function handlePickerSelect(node: WorkspaceTreeNode) {
+  pickerVisible.value = false
+  const ids = Array.from(selectedTabIds)
+  const allTabs: chrome.tabs.Tab[] = []
+  for (const id of ids) {
+    try {
+      const t = await chrome.tabs.get(id)
+      allTabs.push(t)
+    } catch {
+      /* 忽略 */
+    }
+  }
+  const payloadTabs = allTabs.map((t) => ({
+    url: t.url || '',
+    title: t.title || t.url || '',
+    favIconUrl: t.favIconUrl || '',
+    chromeTabId: t.id || 0,
   }))
-
-  const res = await sendMessage<{ added: number; skipped: number }>({
-    action: 'ADD_TABS_TO_WORKSPACE',
-    payload: {
-      workspaceId: addToWsTargetId.value,
-      tabs,
-    },
-  })
-
-  addingToWs.value = false
-  if (res.success) {
-    const data = res.data
-    if (data && data.added === 0 && (data.skipped ?? 0) > 0) {
-      ElMessage.info('所选标签页均已存在于该工作组中')
+  try {
+    const res = await sendMessage({ action: 'ADD_TABS_TO_WORKSPACE', payload: {
+      workspaceId: node.id,
+      tabs: payloadTabs,
+    } })
+    if (res.success) {
+      const added = (res.data as { added?: number } | undefined)?.added ?? payloadTabs.length
+      ElMessage.success(`已加入「${node.name}」：${added} 个新标签页`)
+      clearSelection()
+    } else if (res.authError) {
+      ElMessage.warning('未连接到后端，无法加入工作组')
     } else {
-      ElMessage.success(`已将 ${data?.added ?? tabs.length} 个标签页加入工作组`)
+      ElMessage.error(res.error || '加入工作组失败')
     }
-    addToWsDialogVisible.value = false
-    selectedTabs.value = []
-    // 询问是否关闭已保存的标签页
-    try {
-      await ElMessageBox.confirm(
-        `已加入工作组，是否关闭这 ${tabs.length} 个标签页？`,
-        '关闭标签页',
-        { confirmButtonText: '关闭', cancelButtonText: '保留', type: 'info' },
-      )
-      const tabIds = tabs.map(t => t.chromeTabId)
-      try {
-        await chrome.tabs.remove(tabIds)
-      } catch { /* ignore */ }
-      await loadTabs()
-    } catch {
-      await loadTabs() // 刷新以显示新的 tag
-    }
-  } else {
-    ElMessage.error(res.error || '加入失败')
+  } catch (e) {
+    ElMessage.error('加入工作组失败：' + (e as Error).message)
   }
 }
 
-/** 创建工作组 */
-async function handleCreateWorkspace() {
-  if (!wsForm.value.name.trim()) {
-    ElMessage.warning('请输入工作组名称')
-    return
-  }
-  if (selectedTabs.value.length === 0) {
-    ElMessage.warning('请选择至少一个标签页')
-    return
-  }
-
-  saving.value = true
-  const tabs: WorkspaceTabPayload[] = selectedTabs.value.map(t => ({
-    url: t.url,
-    title: t.title,
-    favIconUrl: t.favIconUrl,
-    chromeTabId: t.chromeTabId,
-  }))
-
-  // 创建接口不再携带标签页：先创建工作组，再把选中标签页加入
-  const res = await sendMessage<{ workspace: any }>({
-    action: 'CREATE_WORKSPACE',
-    payload: {
-      name: wsForm.value.name.trim(),
-      color: wsForm.value.color,
-    },
-  })
-
-  if (res.success && res.data?.workspace?.id) {
-    const updateRes = await sendMessage({
-      action: 'UPDATE_WORKSPACE',
-      payload: { id: res.data.workspace.id, tabs },
-    })
-    if (!updateRes.success) {
-      saving.value = false
-      ElMessage.error(updateRes.error || '工作组已创建，但标签页加入失败')
-      return
-    }
-  }
-
-  saving.value = false
-  if (res.success) {
-    ElMessage.success('工作组已创建')
-    dialogVisible.value = false
-    selectedTabs.value = []
-    // 询问是否关闭已保存的标签页
-    try {
-      await ElMessageBox.confirm(
-        `工作组"${wsForm.value.name}"已创建，是否关闭这 ${tabs.length} 个标签页？`,
-        '关闭标签页',
-        { confirmButtonText: '关闭', cancelButtonText: '保留', type: 'info' },
-      )
-      // selectedTabs 已被清空，使用之前的数据
-      const tabIds = tabs.map(t => t.chromeTabId)
-      try {
-        await chrome.tabs.remove(tabIds)
-      } catch { /* ignore */ }
-      await loadTabs()
-    } catch {
-      // 用户选择保留
-      await loadTabs() // 刷新以显示新的 tag
-    }
-  } else {
-    ElMessage.error(res.error || '创建失败')
-  }
-}
-
-/** 点击工作组 tag，切换到工作组视图 */
-function switchToWorkspaces(workspaceId: string) {
-  // 通知 Dashboard 切换 tab
-  window.dispatchEvent(new CustomEvent('navigate', { detail: { tab: 'workspaces', workspaceId } }))
-}
+let refreshTimer: number | undefined
+onMounted(() => {
+  refresh()
+  refreshTimer = window.setInterval(() => {
+    refresh()
+  }, 5000)
+})
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+})
 </script>
 
 <style scoped>
 .tabs-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
 }
-
 .toolbar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.toolbar-left,
-.toolbar-right {
-  display: flex;
   align-items: center;
   gap: 12px;
+  margin-bottom: 12px;
 }
-
-.tab-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.window-filter {
+  width: 200px;
 }
-
-.tab-favicon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  border-radius: 2px;
+.search-input {
+  width: 280px;
 }
-
-.tab-favicon-placeholder {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  background-color: #dcdfe6;
-  border-radius: 2px;
-}
-
-.tab-text {
-  min-width: 0;
+.toolbar-spacer {
   flex: 1;
 }
-
-.tab-title {
-  font-size: 13px;
-  color: #303133;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-url {
-  font-size: 11px;
-  color: #909399;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
-}
-
-.workspace-tags {
+.batch-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
-.no-tag {
-  color: #c0c4cc;
-  font-size: 12px;
-}
-
-.time-text {
-  font-size: 12px;
-  color: #606266;
-}
-
-.table-footer {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--el-color-primary-light-9);
+  border-radius: 6px;
 }
-
-.footer-text {
+.batch-count {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-regular);
 }
-
-/* 对话框内标签页选择器 */
-.tab-selector {
-  max-height: 300px;
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--el-text-color-secondary);
+}
+.tree-scroll {
+  flex: 1;
   overflow-y: auto;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  padding: 8px;
-  width: 100%;
 }
-
-.tab-checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
+.tree-window {
+  margin-bottom: 8px;
 }
-
-.tab-checkbox-title {
-  max-width: 350px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 13px;
-}
-
-/* 加入工作组选择器 */
-.ws-option {
+.tree-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
 }
-
-.ws-color-dot {
-  width: 12px;
-  height: 12px;
+.tree-row:hover {
+  background: var(--el-fill-color-light);
+}
+.window-header {
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--el-fill-color-lighter);
+}
+.window-title {
+  flex: 1;
+}
+.caret {
+  transition: transform 0.2s;
+}
+.caret.collapsed {
+  transform: rotate(0deg);
+}
+.caret:not(.collapsed) {
+  transform: rotate(90deg);
+}
+.tree-body {
+  padding-left: 16px;
+}
+.group-header {
+  cursor: pointer;
+}
+.group-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  flex-shrink: 0;
+  display: inline-block;
+}
+.group-title {
+  flex: 1;
+}
+.tab-row {
+  cursor: default;
+}
+.tab-title {
+  cursor: pointer;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-color-primary);
+}
+.tab-title:hover {
+  text-decoration: underline;
+}
+.tab-url {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+.count-badge {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color);
+  border-radius: 10px;
+  padding: 0 8px;
+}
+.row-action {
+  margin-left: auto;
 }
 </style>

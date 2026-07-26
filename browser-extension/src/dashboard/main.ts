@@ -49,6 +49,22 @@ const router = createRouter({
       },
     },
     {
+      path: '/tags',
+      name: 'Tags',
+      component: () => import('./views/TagsView.vue'),
+      meta: {
+        dataSource: { label: '云端', desc: '数据跨设备同步', type: 'success' },
+      },
+    },
+    {
+      path: '/synced',
+      name: 'Synced',
+      component: () => import('./views/SyncedView.vue'),
+      meta: {
+        dataSource: { label: '云端', desc: '数据跨设备同步', type: 'success' },
+      },
+    },
+    {
       path: '/history',
       name: 'History',
       component: () => import('./views/HistoryView.vue'),

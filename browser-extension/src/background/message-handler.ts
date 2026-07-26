@@ -1,10 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
-import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag } from '../shared/api/tags'
+import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
@@ -97,6 +97,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'REMOVE_WORKSPACE_TAG':
       return handleRemoveWorkspaceTag(message.payload)
+
+    case 'GET_TAG_TABS':
+      return handleGetTagTabs(message.payload.tagId)
 
     default:
       return { success: false, error: '未知的消息类型' }
@@ -780,4 +783,13 @@ async function handleRemoveWorkspaceTag(
     return { success: true }
   }
   return { success: false, error: res.error || '移除标签失败', authError: res.status === 401 }
+}
+
+/** 获取某个标签下包含的所有云端标签页 */
+async function handleGetTagTabs(tagId: number): Promise<MessageResponse<TagTabsData>> {
+  const res = await getTagTabs(tagId)
+  if (res.ok && res.data) {
+    return { success: true, data: { tabs: res.data.tabs } }
+  }
+  return { success: false, error: res.error || '获取标签下的标签页失败', authError: res.status === 401 }
 }

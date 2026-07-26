@@ -13,4 +13,6 @@ export type {
   WorkspaceTabPayload,
   WorkspaceTabsSummaryData,
   TagsData,
+  TagTabsData,
+  GetTagTabsMessage,
 } from './messages'

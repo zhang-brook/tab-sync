@@ -35,6 +35,7 @@ export type MessageAction =
   | 'REMOVE_TAB_TAG'
   | 'ADD_WORKSPACE_TAG'
   | 'REMOVE_WORKSPACE_TAG'
+  | 'GET_TAG_TABS'
 
 // ============ 请求消息定义 ============
 
@@ -212,6 +213,12 @@ export interface RemoveWorkspaceTagMessage {
   payload: { workspaceId: string; tagId: number }
 }
 
+/** 获取某个标签下包含的所有云端标签页 */
+export interface GetTagTabsMessage {
+  action: 'GET_TAG_TABS'
+  payload: { tagId: number }
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -242,6 +249,7 @@ export type ExtensionMessage =
   | RemoveTabTagMessage
   | AddWorkspaceTagMessage
   | RemoveWorkspaceTagMessage
+  | GetTagTabsMessage
 
 // ============ 响应定义 ============
 
@@ -292,4 +300,19 @@ export interface WorkspaceTabsSummaryData {
 /** GET_TAGS 响应数据 */
 export interface TagsData {
   tags: TagInfo[]
+}
+
+/** 标签下的云端标签页条目 */
+export interface TagTabItem {
+  tabId: number
+  url: string
+  title: string
+  favIconUrl: string
+  workspaceId: string
+  workspaceName: string
+}
+
+/** GET_TAG_TABS 响应数据 */
+export interface TagTabsData {
+  tabs: TagTabItem[]
 }

@@ -118,6 +118,7 @@ func main() {
 			auth.GET("/tags", handlers.Tag.List)
 			auth.POST("/tags", handlers.Tag.Create)
 			auth.DELETE("/tags/:id", handlers.Tag.Delete)
+			auth.GET("/tags/:id/tabs", handlers.Tag.GetTabsByTag)
 			auth.POST("/workspaces/:id/tabs/:tabId/tags", handlers.Tag.AddToTab)
 			auth.DELETE("/workspaces/:id/tabs/:tabId/tags/:tagId", handlers.Tag.RemoveFromTab)
 			auth.POST("/workspaces/:id/tags", handlers.Tag.AddToWorkspace)

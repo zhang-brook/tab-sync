@@ -105,3 +105,31 @@ func (s *TagService) RemoveFromWorkspace(workspaceID string, tagID uint) error {
 	return s.db.Where("workspace_id = ? AND tag_id = ?", workspaceID, tagID).
 		Delete(&model.WorkspaceTag{}).Error
 }
+
+// TagTabItem 表示带有某个标签的云端标签页（关联 WorkspaceTab）
+// 用于「标签」页面右侧：展示该标签下包含的所有标签页
+type TagTabItem struct {
+	TabID         uint   `json:"tabId"`
+	URL           string `json:"url"`
+	Title         string `json:"title"`
+	FavIconURL    string `json:"favIconUrl"`
+	WorkspaceID   string `json:"workspaceId"`
+	WorkspaceName string `json:"workspaceName"`
+}
+
+// GetTabsByTag 返回带有指定标签的云端标签页列表（基于 TabTag 关联）
+func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
+	var items []TagTabItem
+	err := s.db.
+		Table("tab_tags").
+		Select("workspace_tabs.id AS tab_id, workspace_tabs.url, workspace_tabs.title, workspace_tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
+		Joins("JOIN workspace_tabs ON workspace_tabs.id = tab_tags.workspace_tab_id").
+		Joins("JOIN workspaces ON workspaces.workspace_id = tab_tags.workspace_id").
+		Where("tab_tags.tag_id = ?", tagID).
+		Order("workspaces.name, workspace_tabs.sort_order").
+		Scan(&items).Error
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 import type { TagInfo } from '../types/workspace'
-import type { TagsData } from '../types/messages'
+import type { TagsData, TagTabsData } from '../types/messages'
 
 /** 获取标签列表，可按 scope（tab | workspace）过滤 */
 export function getTags(scope?: 'tab' | 'workspace') {
@@ -36,4 +36,9 @@ export function addWorkspaceTag(workspaceId: string, tagId: number) {
 /** 去掉工作组上的标签 */
 export function removeWorkspaceTag(workspaceId: string, tagId: number) {
   return apiClient.delete(`/v1/tab-sync/workspaces/${workspaceId}/tags/${tagId}`)
+}
+
+/** 获取某个标签下包含的所有云端标签页 */
+export function getTagTabs(tagId: number) {
+  return apiClient.get<TagTabsData>(`/v1/tab-sync/tags/${tagId}/tabs`)
 }
