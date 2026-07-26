@@ -323,7 +323,7 @@ async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
 /** 创建工作组（通过后端 API）
  * 前端直接传入标签页完整数据，后端用自增主键 ID 作为每个标签页的公开标识 */
 async function handleCreateWorkspace(
-  payload: { name: string; color: string; icon?: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
+  payload: { name: string; color: string; icon?: string; parentId?: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const res = await createWorkspace(payload)
   if (res.ok && res.data) {
@@ -336,7 +336,7 @@ async function handleCreateWorkspace(
 
 /** 更新工作组（通过后端 API） */
 async function handleUpdateWorkspace(
-  payload: { id: string; name?: string; color?: string; icon?: string; tabs?: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
+  payload: { id: string; name?: string; color?: string; icon?: string; parentId?: string; tabs?: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const { id, ...updatePayload } = payload
   const res = await updateWorkspace(id, updatePayload)

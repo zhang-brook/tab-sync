@@ -1,0 +1,147 @@
+<template>
+  <el-dialog
+    :model-value="modelValue"
+    :title="title"
+    width="420px"
+    append-to-body
+    @update:model-value="(v: boolean) => emit('update:modelValue', v)"
+    @open="onOpen"
+  >
+    <el-input
+      v-model="keyword"
+      placeholder="搜索工作组..."
+      size="default"
+      clearable
+      :prefix-icon="Search"
+    />
+
+    <div class="picker-tree">
+      <div v-if="loading" class="picker-hint">加载中...</div>
+      <div v-else-if="treeData.length === 0" class="picker-hint">暂无工作组</div>
+      <el-tree
+        v-else
+        ref="treeRef"
+        :data="treeData"
+        node-key="id"
+        :props="treeProps"
+        :filter-node-method="filterNode"
+        :expand-on-click-node="false"
+        default-expand-all
+        highlight-current
+        @node-click="onNodeClick"
+      >
+        <template #default="{ data }">
+          <span class="picker-node">
+            <span class="picker-dot" :style="{ backgroundColor: data.color }" />
+            <span class="picker-name">{{ data.name }}</span>
+            <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
+          </span>
+        </template>
+      </el-tree>
+    </div>
+
+    <template #footer>
+      <el-button @click="emit('update:modelValue', false)">取消</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, nextTick } from 'vue'
+import { Search } from '@element-plus/icons-vue'
+import { sendMessage } from '../composables/useMessage'
+import { buildWorkspaceTree, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import type { WorkspacesData } from '../types'
+
+const props = defineProps<{
+  modelValue: boolean
+  title?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', v: boolean): void
+  (e: 'select', node: WorkspaceTreeNode): void
+}>()
+
+const title = props.title ?? '选择工作组'
+
+const loading = ref(false)
+const keyword = ref('')
+const treeData = ref<WorkspaceTreeNode[]>([])
+const treeRef = ref()
+
+const treeProps = { label: 'name', children: 'children' }
+
+watch(keyword, (val) => {
+  treeRef.value?.filter(val)
+})
+
+function filterNode(value: string, data: WorkspaceTreeNode) {
+  if (!value) return true
+  return data.name.toLowerCase().includes(value.toLowerCase())
+}
+
+async function onOpen() {
+  keyword.value = ''
+  loading.value = true
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  if (res.success && res.data) {
+    treeData.value = buildWorkspaceTree(res.data.workspaces)
+  } else {
+    treeData.value = []
+  }
+  loading.value = false
+  await nextTick()
+}
+
+function onNodeClick(node: WorkspaceTreeNode) {
+  emit('select', node)
+  emit('update:modelValue', false)
+}
+</script>
+
+<style scoped>
+.picker-tree {
+  margin-top: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.picker-hint {
+  padding: 24px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+
+.picker-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-count {
+  font-size: 11px;
+  color: #909399;
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 0 6px;
+}
+</style>

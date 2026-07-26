@@ -95,12 +95,12 @@ export interface WorkspaceTabPayload {
 
 export interface CreateWorkspaceMessage {
   action: 'CREATE_WORKSPACE'
-  payload: { name: string; color: string; icon?: string; tabs: WorkspaceTabPayload[] }
+  payload: { name: string; color: string; icon?: string; parentId?: string; tabs: WorkspaceTabPayload[] }
 }
 
 export interface UpdateWorkspaceMessage {
   action: 'UPDATE_WORKSPACE'
-  payload: { id: string; name?: string; color?: string; icon?: string; tabs?: WorkspaceTabPayload[] }
+  payload: { id: string; name?: string; color?: string; icon?: string; parentId?: string; tabs?: WorkspaceTabPayload[] }
 }
 
 export interface DeleteWorkspaceMessage {

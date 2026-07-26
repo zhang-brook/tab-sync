@@ -1,6 +1,8 @@
 /** 工作组 */
 export interface Workspace {
   id: string
+  /** 父工作组 ID（空/缺省表示根级），用于层级树结构 */
+  parentId?: string
   name: string
   /** 工作组标识色 (hex) */
   color: string

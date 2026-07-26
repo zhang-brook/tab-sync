@@ -12,6 +12,7 @@ export function createWorkspace(payload: {
   name: string
   color: string
   icon?: string
+  parentId?: string
   tabs: WorkspaceTabPayload[]
 }) {
   return apiClient.post<{ workspace: Workspace }>('/v1/tab-sync/workspaces', payload)
@@ -20,7 +21,7 @@ export function createWorkspace(payload: {
 /** 更新工作区 */
 export function updateWorkspace(
   id: string,
-  payload: { name?: string; color?: string; icon?: string; tabs?: WorkspaceTabPayload[] }
+  payload: { name?: string; color?: string; icon?: string; parentId?: string; tabs?: WorkspaceTabPayload[] }
 ) {
   return apiClient.put<{ workspace: Workspace }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`, payload)
 }
