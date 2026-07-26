@@ -14,7 +14,7 @@ export function createWorkspace(payload: {
   icon?: string
   tabs: WorkspaceTabPayload[]
 }) {
-  return apiClient.post<{ workspace: Workspace; mappings: Record<string, string> }>('/v1/tab-sync/workspaces', payload)
+  return apiClient.post<{ workspace: Workspace }>('/v1/tab-sync/workspaces', payload)
 }
 
 /** 更新工作区 */
@@ -22,7 +22,7 @@ export function updateWorkspace(
   id: string,
   payload: { name?: string; color?: string; icon?: string; tabs?: WorkspaceTabPayload[] }
 ) {
-  return apiClient.put<{ workspace: Workspace; mappings?: Record<string, string> }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`, payload)
+  return apiClient.put<{ workspace: Workspace }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`, payload)
 }
 
 /** 删除工作区 */

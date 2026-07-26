@@ -566,7 +566,7 @@ async function handleCreateWorkspace() {
     chromeTabId: t.chromeTabId,
   }))
 
-  const res = await sendMessage<{ workspace: any; mappings: Record<string, string> }>({
+  const res = await sendMessage<{ workspace: any }>({
     action: 'CREATE_WORKSPACE',
     payload: {
       name: wsForm.value.name.trim(),

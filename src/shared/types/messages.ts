@@ -84,7 +84,7 @@ export interface GetWorkspacesMessage {
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
 export interface WorkspaceTabPayload {
-  /** 标签页 UUID（更新已有标签页时传入，新建时可不传由后端生成） */
+  /** 标签页公开标识：后端主键 ID（字符串）。更新已有标签页时传入以增量匹配；新建时不传由数据库自增生成 */
   tabId?: string
   url: string
   title: string

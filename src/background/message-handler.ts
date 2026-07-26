@@ -321,21 +321,14 @@ async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
 }
 
 /** 创建工作组（通过后端 API）
- * 前端直接传入标签页完整数据，后端为每个标签页分配 UUID */
+ * 前端直接传入标签页完整数据，后端用自增主键 ID 作为每个标签页的公开标识 */
 async function handleCreateWorkspace(
   payload: { name: string; color: string; icon?: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const res = await createWorkspace(payload)
   if (res.ok && res.data) {
-    // 将后端返回的 chromeTabId → UUID 映射存入 session storage
-    if (res.data.mappings) {
-      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-      Object.assign(mappings, res.data.mappings)
-      await chrome.storage.session.set({ tab_id_mappings: mappings })
-    }
     logger.info('Workspace created:', payload.name)
-    return { success: true, data: { workspace: res.data.workspace, mappings: res.data.mappings } }
+    return { success: true, data: { workspace: res.data.workspace } }
   }
   logger.warn('createWorkspace API failed:', res.error)
   return { success: false, error: res.error || '创建工作组失败', authError: res.status === 401 }
@@ -348,13 +341,6 @@ async function handleUpdateWorkspace(
   const { id, ...updatePayload } = payload
   const res = await updateWorkspace(id, updatePayload)
   if (res.ok) {
-    // 将更新的 mappings 存入 session storage
-    if (res.data?.mappings) {
-      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-      Object.assign(mappings, res.data.mappings)
-      await chrome.storage.session.set({ tab_id_mappings: mappings })
-    }
     logger.info('Workspace updated:', id)
     return { success: true }
   }
@@ -413,13 +399,6 @@ async function handleAddTabsToWorkspace(
   const allTabs = [...existingTabPayloads, ...newTabs]
   const updateRes = await updateWorkspace(payload.workspaceId, { tabs: allTabs })
   if (updateRes.ok) {
-    // 将新增标签页的 chromeTabId → UUID 映射写入 session storage
-    if (updateRes.data?.mappings) {
-      const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-      const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-      Object.assign(mappings, updateRes.data.mappings)
-      await chrome.storage.session.set({ tab_id_mappings: mappings })
-    }
     logger.info(`Added ${newTabs.length} tabs to workspace "${workspace.name}"`)
     return { success: true, data: { added: newTabs.length, skipped: payload.tabs.length - newTabs.length } }
   }
@@ -487,39 +466,15 @@ async function handleOpenWorkspace(
     return { success: false, error: '没有可打开的标签页' }
   }
 
-  // 从 session storage 获取当前打开的标签页映射
-  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-  // 构建反向映射: UUID → chromeTabId
-  const uuidToChromeTabId: Record<string, number> = {}
-  for (const [chromeTabIdStr, uuid] of Object.entries(mappings)) {
-    uuidToChromeTabId[uuid] = Number(chromeTabIdStr)
-  }
-
   let opened = 0
-  let alreadyOpen = 0
 
   // 收集所有要归入标签组的 Chrome tabId（用于 asTabGroup 模式）
   const allChromeTabIds: number[] = []
 
-  // 分类: 已打开的标签页 vs 需要重新打开的标签页
-  const toActivate: { chromeTabId: number; windowId?: number }[] = []
-  const toReopen: TabReference[] = []
-
-  for (const tabRef of tabsToOpen) {
-    const chromeTabId = uuidToChromeTabId[tabRef.tabId]
-    if (chromeTabId != null) {
-      // 尝试确认 Chrome 标签页是否真的还存在
-      try {
-        const tab = await chrome.tabs.get(chromeTabId)
-        toActivate.push({ chromeTabId, windowId: tab.windowId })
-        continue
-      } catch {
-        // Chrome 标签页已不存在（可能被用户关闭但事件未捕获），转入重新打开
-      }
-    }
-    toReopen.push(tabRef)
-  }
+  // 所有标签页都按"重新打开"处理：
+  // 工作组 tab 的公开标识是后端主键 ID，并不绑定本地 chromeTabId，
+  // 因此不再做"已打开检测"（依赖 chromeTabId→ID 映射的机制已移除），避免误导。
+  const toReopen: TabReference[] = tabsToOpen
 
   // 确定标签组目标窗口 ID
   let targetWindowId: number | undefined
@@ -537,28 +492,7 @@ async function handleOpenWorkspace(
     }
   }
 
-  // 1) 激活已打开的标签页（当前窗口模式下才激活，新窗口模式下跳过）
-  if (!newWindow) {
-    for (const item of toActivate) {
-      try {
-        await chrome.tabs.update(item.chromeTabId, { active: true })
-        if (item.windowId != null) {
-          await chrome.windows.update(item.windowId, { focused: true })
-        }
-      } catch {
-        // 忽略激活失败
-      }
-      allChromeTabIds.push(item.chromeTabId)
-    }
-  } else {
-    // 新窗口模式，仅收集已有 tabId
-    for (const item of toActivate) {
-      allChromeTabIds.push(item.chromeTabId)
-    }
-  }
-  alreadyOpen = toActivate.length
-
-  // 2) 重新打开已关闭/不存在的标签页
+  // 重新打开标签页
   if (toReopen.length > 0) {
     if (newWindow) {
       // 新窗口模式: 逐个创建以确保每个标签页都能正确预注册
@@ -615,11 +549,11 @@ async function handleOpenWorkspace(
   }
 
   logger.info(
-    `Workspace "${workspace.name}": opened=${opened}, alreadyOpen=${alreadyOpen}${asTabGroup ? ', grouped=' + allChromeTabIds.length : ''}`,
+    `Workspace "${workspace.name}": opened=${opened}${asTabGroup ? ', grouped=' + allChromeTabIds.length : ''}`,
   )
   return {
     success: true,
-    data: { opened, alreadyOpen },
+    data: { opened },
   }
 }
 
