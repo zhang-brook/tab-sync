@@ -281,7 +281,7 @@ async function handleClearData() {
     await ElMessageBox.confirm(
       '确定要清除所有本地数据吗？此操作不可恢复。后端数据不受影响。',
       '清除数据',
-      { type: 'warning' },
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' },
     )
   } catch {
     return // 用户取消

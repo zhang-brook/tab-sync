@@ -112,7 +112,7 @@ async function retryCheckAuth() {
 /** 退出登录 */
 async function handleLogout() {
   try {
-    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning' })
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' })
   } catch {
     return // 用户取消
   }

@@ -483,7 +483,7 @@ async function handleDelete(ws: Workspace) {
     await ElMessageBox.confirm(
       `确定要删除工作组「${ws.name}」吗？其 ${childCount} 个子工作组及全部 ${tabCount} 个标签页将一并删除，且不可恢复。`,
       '删除工作组',
-      { type: 'warning' },
+      { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' },
     )
   } catch {
     return
