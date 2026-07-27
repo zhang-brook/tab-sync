@@ -12,7 +12,7 @@ export async function fetchFavicon(url: string): Promise<string | null> {
       action: 'FETCH_FAVICON',
       payload: { url },
     })
-    if (res.ok && res.data?.dataUrl) return res.data.dataUrl
+    if (res.success && res.data?.dataUrl) return res.data.dataUrl
     return null
   } catch {
     return null

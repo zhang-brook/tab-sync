@@ -97,7 +97,14 @@ watch(
       alt=""
       @error="onError"
     />
-    <span v-else class="lazy-favicon-placeholder" :style="boxStyle()" />
+    <span v-else class="lazy-favicon-placeholder" :style="boxStyle()">
+      <!-- 默认占位图标：无 favicon / 冻结页面代理失败 / 直连也失败时展示 -->
+      <svg class="lazy-favicon-default" viewBox="0 0 24 24" :width="size" :height="size" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="currentColor" stroke-width="1.2" />
+        <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.2" />
+      </svg>
+    </span>
   </span>
 </template>
 
@@ -114,7 +121,12 @@ watch(
   object-fit: contain;
 }
 .lazy-favicon-placeholder {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--el-fill-color-light, #f0f0f0);
+}
+.lazy-favicon-default {
+  color: var(--el-text-color-secondary, #909399);
 }
 </style>
