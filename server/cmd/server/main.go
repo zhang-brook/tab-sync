@@ -51,6 +51,12 @@ func main() {
 	services := service.NewServices(db, cfg)
 	handlers := handler.NewHandlers(services)
 
+	// 确保「未分组」系统工作组存在：新用户自动创建，存量用户幂等补齐，
+	// 保证工作组树始终能显示该节点（回收站恢复、归入未分组等均依赖它）。
+	if _, err := services.Workspace.GetOrCreateUngroupedWorkspace(); err != nil {
+		slog.Error("初始化未分组工作组失败", "error", err)
+	}
+
 	// 设置 Gin 路由
 	r := gin.New()
 

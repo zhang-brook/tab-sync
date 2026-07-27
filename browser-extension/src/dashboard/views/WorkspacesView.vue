@@ -80,10 +80,10 @@
                     <el-dropdown-item :command="'createChild'" :icon="FolderAdd" divided>
                       新建子工作组
                     </el-dropdown-item>
-                    <el-dropdown-item :command="'edit'" :icon="Edit">
+                    <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem">
                       编辑
                     </el-dropdown-item>
-                    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item">
+                    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem">
                       删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -134,12 +134,12 @@
                 </el-button>
               </el-tooltip>
               <el-tooltip content="编辑" placement="top">
-                <el-button size="small" text @click="showEditDialog(selectedWorkspace)">
+                <el-button size="small" text :disabled="selectedWorkspace?.isSystem" @click="showEditDialog(selectedWorkspace)">
                   <el-icon><Edit /></el-icon>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
-                <el-button size="small" text type="danger" @click="handleDelete(selectedWorkspace)">
+                <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem" @click="handleDelete(selectedWorkspace)">
                   <el-icon><Delete /></el-icon>
                 </el-button>
               </el-tooltip>
@@ -408,7 +408,13 @@ const presetColors = [
 ]
 
 /** 左侧树数据 */
-const treeData = computed<WorkspaceTreeNode[]>(() => buildWorkspaceTree(workspaces.value))
+const treeData = computed<WorkspaceTreeNode[]>(() => {
+  const nodes = buildWorkspaceTree(workspaces.value)
+  // 「未分组」等系统工作组固定置顶，避免混入普通分组排序
+  const system = nodes.filter((n) => n.workspace.isSystem)
+  const rest = nodes.filter((n) => !n.workspace.isSystem)
+  return [...system, ...rest]
+})
 
 /** 父工作组下拉树（编辑时排除自身及后代，避免形成环） */
 const parentTreeData = computed<WorkspaceTreeNode[]>(() => {
@@ -475,7 +481,7 @@ onMounted(() => {
 
 async function loadWorkspaces() {
   loading.value = true
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
     workspaces.value = res.data.workspaces
     // 保持/初始化选中项
@@ -564,6 +570,11 @@ function showEditDialog(ws: Workspace) {
 /** 树中每个工作组项的「⋮」菜单：对对应工作组执行操作 */
 function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
   const ws = node.workspace
+  // 系统工作组（如「未分组」）不允许删除或改名，但允许新建子分组
+  if (ws.isSystem && (command === 'edit' || command === 'delete')) {
+    ElMessage.warning('系统分组不可删除或改名')
+    return
+  }
   switch (command) {
     case 'open':
       handleOpenWorkspace(ws.id, false)
