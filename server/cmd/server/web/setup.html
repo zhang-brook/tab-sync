@@ -317,6 +317,16 @@
     }
     .section-title h3 { font-size: 16px; font-weight: 700; color: var(--ink-900); }
     .section-title .count { font-size: 12.5px; color: var(--ink-400); font-weight: 500; }
+    .section-hint {
+      font-size: 12.5px; line-height: 1.6; color: var(--ink-500);
+      background: color-mix(in srgb, var(--primary) 7%, transparent);
+      border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+      border-radius: 10px; padding: 10px 12px; margin: 0 0 16px;
+    }
+    .check-hint {
+      font-size: 12px; line-height: 1.55; color: var(--ink-400);
+      margin: 8px 0 0 30px;
+    }
 
     .token-add {
       background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
@@ -623,6 +633,8 @@
             <span class="count" id="tokenCount"></span>
           </div>
 
+          <p class="section-hint">小贴士：如果你在多个浏览器上使用本扩展，建议为每个浏览器单独创建一个令牌，并以浏览器名称命名（例如「家里的 Firefox」「公司的 Edge」）。这样在令牌列表中一眼就能分辨每个令牌对应哪台设备。</p>
+
           <div class="token-add">
             <div class="row">
               <input type="text" id="newTokenName" placeholder="为新令牌命名，如「我的 Chrome 浏览器」">
@@ -634,8 +646,9 @@
             <label class="check-row" style="margin-top:14px;margin-bottom:0;">
               <input type="checkbox" id="newTokenAdmin">
               <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-              <span class="check-label">授予管理员权限（可管理其他令牌）</span>
+              <span class="check-label">授予管理权限（该令牌除同步外，还可管理其他令牌）</span>
             </label>
+            <p class="check-hint">仅用于标签同步的普通令牌无需勾选。此权限与后台登录密码无关——后台始终用管理员密码登录，令牌本身不能登录后台网页。</p>
           </div>
 
           <div class="token-list" id="tokenList"></div>
@@ -874,7 +887,7 @@
       try {
         const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
         if (v.code === 0) {
-          $('dashServerInfo').textContent = 'Server v' + v.data.server_version + ' · API v' + v.data.api_version;
+          $('dashServerInfo').textContent = 'Server v' + v.data.server_version + ' · API ' + v.data.api_version;
         }
       } catch (e) {}
 
