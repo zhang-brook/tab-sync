@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { fetchFavicon } from '../api/favicon'
 
 const props = withDefaults(
   defineProps<{
@@ -14,7 +13,6 @@ const props = withDefaults(
 
 const imgSrc = ref('')
 const failed = ref(false)
-const useProxy = ref(true)
 const root = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
@@ -26,37 +24,20 @@ function boxStyle() {
   }
 }
 
-async function load() {
+function load() {
   failed.value = false
   const url = props.favIconUrl
   if (!url) {
     failed.value = true
     return
   }
-  // 内联 data URL 直接显示，无需代理
-  if (url.startsWith('data:')) {
-    imgSrc.value = url
-    return
-  }
-  if (useProxy.value) {
-    const dataUrl = await fetchFavicon(url)
-    if (dataUrl) {
-      imgSrc.value = dataUrl
-      return
-    }
-    // 代理失败：回退到直接加载原始 URL（浏览器可跨域加载图片用于展示）
-    useProxy.value = false
-  }
+  // 直接用 URL 加载（无跨域问题），是否真正发起请求由 IntersectionObserver 懒加载控制
   imgSrc.value = url
 }
 
 function onError() {
-  if (useProxy.value && props.favIconUrl && !props.favIconUrl.startsWith('data:')) {
-    useProxy.value = false
-    imgSrc.value = props.favIconUrl
-  } else {
-    failed.value = true
-  }
+  // 直连失败（URL 失效等）：显示默认占位图标
+  failed.value = true
 }
 
 onMounted(() => {
@@ -80,10 +61,7 @@ onBeforeUnmount(() => observer?.disconnect())
 
 watch(
   () => props.favIconUrl,
-  () => {
-    useProxy.value = true
-    load()
-  },
+  () => load(),
 )
 </script>
 
@@ -98,7 +76,7 @@ watch(
       @error="onError"
     />
     <span v-else class="lazy-favicon-placeholder" :style="boxStyle()">
-      <!-- 默认占位图标：无 favicon / 冻结页面代理失败 / 直连也失败时展示 -->
+      <!-- 默认占位图标：无 favicon / 加载失败时展示 -->
       <svg class="lazy-favicon-default" viewBox="0 0 24 24" :width="size" :height="size" aria-hidden="true">
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
         <ellipse cx="12" cy="12" rx="4" ry="9" fill="none" stroke="currentColor" stroke-width="1.2" />

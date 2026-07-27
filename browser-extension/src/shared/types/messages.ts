@@ -36,7 +36,6 @@ export type MessageAction =
   | 'ADD_WORKSPACE_TAG'
   | 'REMOVE_WORKSPACE_TAG'
   | 'GET_TAG_TABS'
-  | 'FETCH_FAVICON'
 
 // ============ 请求消息定义 ============
 
@@ -220,17 +219,6 @@ export interface GetTagTabsMessage {
   payload: { tagId: number }
 }
 
-/** 通过 Background Service Worker 代理抓取网站 favicon（跨域，返回 data URL；前端懒加载显示，不占用后端存储/带宽） */
-export interface FetchFaviconMessage {
-  action: 'FETCH_FAVICON'
-  payload: { url: string }
-}
-
-/** FETCH_FAVICON 响应数据 */
-export interface FetchFaviconData {
-  dataUrl: string
-}
-
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -262,7 +250,6 @@ export type ExtensionMessage =
   | AddWorkspaceTagMessage
   | RemoveWorkspaceTagMessage
   | GetTagTabsMessage
-  | FetchFaviconMessage
 
 // ============ 响应定义 ============
 
