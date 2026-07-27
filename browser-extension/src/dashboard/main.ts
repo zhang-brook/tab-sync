@@ -30,7 +30,12 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/tabs',
+      redirect: '/dashboard',
+    },
+    {
+      path: '/dashboard',
+      name: 'Dashboard',
+      component: () => import('./views/DashboardView.vue'),
     },
     {
       path: '/tabs',

@@ -8,6 +8,10 @@
         :default-active="activeMenu"
         router
       >
+        <el-menu-item index="/dashboard">
+          <el-icon><Odometer /></el-icon>
+          <span>仪表盘</span>
+        </el-menu-item>
         <el-menu-item index="/tabs">
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
@@ -78,7 +82,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer } from '@element-plus/icons-vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import { STORAGE_KEYS } from '../shared/storage'
 import type { StateData } from '../shared/types'
@@ -88,6 +92,7 @@ const route = useRoute()
 const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
 
 const pageTitleMap: Record<string, string> = {
+  '/dashboard': '仪表盘',
   '/tabs': '本地标签页',
   '/workspaces': '工作组',
   '/tags': '标签',
