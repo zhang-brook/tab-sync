@@ -42,16 +42,16 @@
         </el-col>
       </el-row>
 
-      <el-card shadow="never" class="section-card" v-if="totalLocalTabs > 0">
+      <el-card shadow="never" class="section-card" v-if="(stats?.openTabs ?? 0) + (stats?.frozenTabs ?? 0) > 0">
         <template #header>
           <span class="section-title">本地标签页构成</span>
         </template>
         <el-row :gutter="24">
           <el-col :span="8">
-            <el-statistic title="打开中" :value="stats?.openTabs ?? 0" />
+            <el-statistic title="打开中（总数）" :value="stats?.openTabs ?? 0" />
           </el-col>
           <el-col :span="8">
-            <el-statistic title="已冻结 / 同步" :value="stats?.frozenTabs ?? 0" />
+            <el-statistic title="已冻结" :value="stats?.frozenTabs ?? 0" />
           </el-col>
           <el-col :span="8">
             <el-statistic title="冻结占比" :value="frozenPercent" suffix="%" />
@@ -113,11 +113,10 @@ const cards = computed(() => [
   { key: 'workspaceTabs', label: '工作组内标签', value: stats.value?.workspaceTabs ?? 0, icon: Files, color: '#e6fffb', to: '/workspaces' },
 ])
 
-const totalLocalTabs = computed(() => (stats.value?.openTabs ?? 0) + (stats.value?.frozenTabs ?? 0))
-
-const frozenPercent = computed(() =>
-  totalLocalTabs.value > 0 ? Math.round(((stats.value?.frozenTabs ?? 0) / totalLocalTabs.value) * 100) : 0,
-)
+const frozenPercent = computed(() => {
+  const open = stats.value?.openTabs ?? 0
+  return open > 0 ? Math.round(((stats.value?.frozenTabs ?? 0) / open) * 100) : 0
+})
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
