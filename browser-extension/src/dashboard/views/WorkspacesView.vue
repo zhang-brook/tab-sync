@@ -186,6 +186,12 @@
                       <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
                     </div>
                   </div>
+                  <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(tab.addedAt)">{{ formatAddedAt(tab.addedAt) }}</span>
+                  <el-tooltip content="修改添加时间" placement="top">
+                    <el-button size="small" text @click="openEditTimeDialog(selectedWorkspace!.id, tab)">
+                      <el-icon><Clock /></el-icon>
+                    </el-button>
+                  </el-tooltip>
                   <el-tooltip content="标签" placement="top">
                     <el-button size="small" text @click="openTabTagEditor(selectedWorkspace!.id, tab)">
                       <el-icon><PriceTag /></el-icon>
@@ -228,6 +234,12 @@
                 >
                   {{ item.workspaceName }}
                 </el-tag>
+                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(item.tab.addedAt)">{{ formatAddedAt(item.tab.addedAt) }}</span>
+                <el-tooltip content="修改添加时间" placement="top">
+                  <el-button size="small" text @click="openEditTimeDialog(item.workspaceId, item.tab)">
+                    <el-icon><Clock /></el-icon>
+                  </el-button>
+                </el-tooltip>
                 <el-tooltip content="标签" placement="top">
                   <el-button size="small" text @click="openTabTagEditor(item.workspaceId, item.tab)">
                     <el-icon><PriceTag /></el-icon>
@@ -290,6 +302,25 @@
       </template>
     </el-dialog>
 
+    <!-- 修改添加时间对话框 -->
+    <el-dialog v-model="timeDialogVisible" title="修改添加时间" width="420px" destroy-on-close>
+      <el-form label-width="90px" label-position="left">
+        <el-form-item label="添加时间">
+          <el-date-picker
+            v-model="timeValue"
+            type="datetime"
+            placeholder="选择日期时间"
+            :clearable="false"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="timeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="timeSaving" @click="handleSaveAddedTime">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 标签编辑对话框 -->
     <TagEditorDialog
       v-model="tagEditorVisible"
@@ -303,7 +334,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -628,6 +659,60 @@ async function handleRemoveTab(workspaceId: string, tabId: string) {
   }
 }
 
+// ============ 修改添加时间 ============
+
+const timeDialogVisible = ref(false)
+const timeSaving = ref(false)
+const timeValue = ref<Date | null>(null)
+const timeTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
+
+/** 列表内展示：如 07-28 或 2025-12-31 */
+function formatAddedAt(addedAt: string): string {
+  if (!addedAt) return ''
+  const d = new Date(addedAt)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const md = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}-${md}`
+}
+
+/** 悬浮提示：完整日期时间 */
+function formatAddedAtFull(addedAt: string): string {
+  if (!addedAt) return '未知'
+  const d = new Date(addedAt)
+  if (isNaN(d.getTime())) return '未知'
+  return d.toLocaleString()
+}
+
+function openEditTimeDialog(workspaceId: string, tab: TabReference) {
+  timeTarget.value = { workspaceId, tabId: tab.tabId }
+  const d = new Date(tab.addedAt)
+  timeValue.value = isNaN(d.getTime()) ? new Date() : d
+  timeDialogVisible.value = true
+}
+
+async function handleSaveAddedTime() {
+  const target = timeTarget.value
+  if (!target || !timeValue.value) return
+  timeSaving.value = true
+  const res = await sendMessage({
+    action: 'UPDATE_WORKSPACE_TAB',
+    payload: {
+      workspaceId: target.workspaceId,
+      tabId: target.tabId,
+      addedAt: timeValue.value.toISOString(),
+    },
+  })
+  timeSaving.value = false
+  if (res.success) {
+    ElMessage.success('添加时间已更新')
+    timeDialogVisible.value = false
+    await loadWorkspaces()
+  } else {
+    ElMessage.error(res.error || '更新失败')
+  }
+}
+
 /** 同组内拖拽排序 */
 function onDragUpdate(evt: { newIndex: number }) {
   const ws = selectedWorkspace.value
@@ -877,6 +962,13 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
+}
+
+.tab-added {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .dialog-hint {

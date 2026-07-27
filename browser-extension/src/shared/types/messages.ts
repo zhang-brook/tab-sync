@@ -21,6 +21,7 @@ export type MessageAction =
   | 'OPEN_WORKSPACE'
   | 'ADD_TABS_TO_WORKSPACE'
   | 'MOVE_WORKSPACE_TAB'
+  | 'UPDATE_WORKSPACE_TAB'
   | 'REMOVE_WORKSPACE_TAB'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
@@ -169,6 +170,19 @@ export interface MoveWorkspaceTabMessage {
   }
 }
 
+/** 更新工作组内单个标签页属性（当前支持手动设置添加时间） */
+export interface UpdateWorkspaceTabMessage {
+  action: 'UPDATE_WORKSPACE_TAB'
+  payload: {
+    /** 工作组 UUID */
+    workspaceId: string
+    /** 标签页 ID（后端主键，字符串） */
+    tabId: string
+    /** 手动设置的添加时间（RFC3339 格式） */
+    addedAt?: string
+  }
+}
+
 // ============ 标签相关消息 ============
 
 /** 获取标签列表（可按 scope 过滤） */
@@ -237,6 +251,7 @@ export type ExtensionMessage =
   | OpenWorkspaceMessage
   | AddTabsToWorkspaceMessage
   | MoveWorkspaceTabMessage
+  | UpdateWorkspaceTabMessage
   | RemoveWorkspaceTabMessage
   | OpenDashboardMessage
   | GetDevicesMessage

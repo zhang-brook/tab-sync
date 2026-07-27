@@ -371,6 +371,55 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 	})
 }
 
+// UpdateTabPayload 更新工作组内单个标签页属性的请求体（字段均可选，仅更新提供的字段）
+type UpdateTabPayload struct {
+	// AddedAt 手动设置的添加时间（RFC3339 格式）
+	AddedAt *string `json:"addedAt,omitempty"`
+}
+
+// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间）
+// tabID 为后端自增主键（字符串）
+func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTabPayload) error {
+	if workspaceID == "" || tabID == "" {
+		return errors.New("workspaceID 和 tabID 不能为空")
+	}
+	uid, err := strconv.ParseUint(tabID, 10, 64)
+	if err != nil {
+		return errors.New("tabID 格式无效")
+	}
+
+	var tab model.WorkspaceTab
+	if err := s.db.Where("id = ? AND workspace_id = ?", uid, workspaceID).First(&tab).Error; err != nil {
+		return err
+	}
+
+	updates := map[string]interface{}{}
+	if payload.AddedAt != nil {
+		t, perr := time.Parse(time.RFC3339, *payload.AddedAt)
+		if perr != nil {
+			return errors.New("addedAt 格式无效，应为 RFC3339")
+		}
+		updates["added_at"] = t
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+
+	if err := s.db.Model(&tab).Updates(updates).Error; err != nil {
+		return err
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("updated", "workspace", workspaceID, map[string]interface{}{
+			"tabId":   tabID,
+			"payload": payload,
+		})
+	}
+
+	return nil
+}
+
 // ===================== 辅助函数 =====================
 
 func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {

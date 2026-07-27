@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { logger } from '../shared/utils/logger'
@@ -67,6 +67,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'MOVE_WORKSPACE_TAB':
       return handleMoveWorkspaceTab(message.payload)
+
+    case 'UPDATE_WORKSPACE_TAB':
+      return handleUpdateWorkspaceTab(message.payload)
 
     case 'REMOVE_WORKSPACE_TAB':
       return handleRemoveWorkspaceTab(message.payload.workspaceId, message.payload.tabId)
@@ -596,6 +599,24 @@ async function handleMoveWorkspaceTab(
   } catch (err) {
     logger.warn('moveWorkspaceTab error:', err)
     return { success: false, error: '移动标签页失败: ' + String(err) }
+  }
+}
+
+/** 更新工作组内单个标签页属性（当前支持手动设置添加时间 addedAt） */
+async function handleUpdateWorkspaceTab(
+  payload: { workspaceId: string; tabId: string; addedAt?: string },
+): Promise<MessageResponse> {
+  try {
+    const res = await updateWorkspaceTab(payload.workspaceId, payload.tabId, { addedAt: payload.addedAt })
+    if (res.ok) {
+      logger.info(`Tab updated: ${payload.tabId} in workspace=${payload.workspaceId}`)
+      return { success: true }
+    }
+    logger.warn('updateWorkspaceTab API failed:', res.error)
+    return { success: false, error: res.error || '更新标签页失败', authError: res.status === 401 }
+  } catch (err) {
+    logger.warn('updateWorkspaceTab error:', err)
+    return { success: false, error: '更新标签页失败: ' + String(err) }
   }
 }
 

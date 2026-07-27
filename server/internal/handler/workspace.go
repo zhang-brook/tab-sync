@@ -108,3 +108,22 @@ func (h *WorkspaceHandler) MoveTab(c *gin.Context) {
 
 	Success(c, gin.H{"success": true})
 }
+
+// UpdateTab 更新工作组内单个标签页属性（当前支持手动设置添加时间 addedAt）
+func (h *WorkspaceHandler) UpdateTab(c *gin.Context) {
+	workspaceID := c.Param("id")
+	tabID := c.Param("tabId")
+
+	var payload service.UpdateTabPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		BadRequest(c, "请求数据格式错误")
+		return
+	}
+
+	if err := h.svc.UpdateTab(workspaceID, tabID, payload); err != nil {
+		BadRequest(c, "更新标签页失败: "+err.Error())
+		return
+	}
+
+	Success(c, gin.H{"success": true})
+}

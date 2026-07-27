@@ -111,6 +111,7 @@ func main() {
 			auth.DELETE("/workspaces/:id", handlers.Workspace.Delete)
 			auth.GET("/workspaces/tabs-summary", handlers.Workspace.TabsSummary)
 			auth.POST("/workspaces/:id/tabs/move", handlers.Workspace.MoveTab)
+			auth.PATCH("/workspaces/:id/tabs/:tabId", handlers.Workspace.UpdateTab)
 
 			// 同步相关（预留）
 			auth.POST("/sync/push", handlers.Sync.PushEvents)

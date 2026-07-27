@@ -39,3 +39,11 @@ export function getWorkspaceTabsSummary() {
 export function moveWorkspaceTab(targetWorkspaceId: string, tabId: string, newIndex: number) {
   return apiClient.post<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(targetWorkspaceId)}/tabs/move`, { tabId, newIndex })
 }
+
+/** 更新工作组内单个标签页属性（当前支持手动设置添加时间 addedAt，RFC3339 格式） */
+export function updateWorkspaceTab(workspaceId: string, tabId: string, payload: { addedAt?: string }) {
+  return apiClient.patch<{ success: boolean }>(
+    `/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/tabs/${encodeURIComponent(tabId)}`,
+    payload,
+  )
+}
