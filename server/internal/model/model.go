@@ -77,6 +77,7 @@ type WorkspaceTab struct {
 	WorkspaceID string `gorm:"index;size:64;not null"` // 所属工作组 UUID
 	URL         string `gorm:"size:2048;not null"`
 	Title       string `gorm:"size:500"`
+	DisplayName string `gorm:"size:500"` // 用户自定义显示名（重命名），为空时使用 Title
 	FavIconURL  string `gorm:"size:2048"`
 	SortOrder   int    `gorm:"default:0"` // 排序序号
 	AddedAt     time.Time

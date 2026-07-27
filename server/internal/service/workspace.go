@@ -70,10 +70,12 @@ type TabReference struct {
 	TabID      string `json:"tabId"`
 	URL        string `json:"url"`
 	Title      string `json:"title"`
-	FavIconURL string `json:"favIconUrl"`
-	SortOrder  int    `json:"sortOrder"`
-	AddedAt    string `json:"addedAt"`
-	Tags       []TagResponse `json:"tags"`
+	// DisplayName 用户重命名后的显示名（可选，为空时前端应使用 Title）
+	DisplayName string       `json:"displayName,omitempty"`
+	FavIconURL  string       `json:"favIconUrl"`
+	SortOrder   int          `json:"sortOrder"`
+	AddedAt     string       `json:"addedAt"`
+	Tags        []TagResponse `json:"tags"`
 }
 
 // TagResponse 标签响应（给前端）
@@ -375,9 +377,11 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 type UpdateTabPayload struct {
 	// AddedAt 手动设置的添加时间（RFC3339 格式）
 	AddedAt *string `json:"addedAt,omitempty"`
+	// DisplayName 用户重命名后的显示名（空字符串表示清除重命名，恢复使用 Title）
+	DisplayName *string `json:"displayName,omitempty"`
 }
 
-// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间）
+// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间、重命名）
 // tabID 为后端自增主键（字符串）
 func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTabPayload) error {
 	if workspaceID == "" || tabID == "" {
@@ -400,6 +404,9 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 			return errors.New("addedAt 格式无效，应为 RFC3339")
 		}
 		updates["added_at"] = t
+	}
+	if payload.DisplayName != nil {
+		updates["display_name"] = sanitizeString(*payload.DisplayName, 500)
 	}
 	if len(updates) == 0 {
 		return nil
@@ -429,6 +436,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 			TabID:      strconv.FormatUint(uint64(tab.ID), 10),
 			URL:        tab.URL,
 			Title:      tab.Title,
+			DisplayName: tab.DisplayName,
 			FavIconURL: tab.FavIconURL,
 			SortOrder:  tab.SortOrder,
 			AddedAt:    tab.AddedAt.Format(time.RFC3339),
