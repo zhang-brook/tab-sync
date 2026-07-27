@@ -3,573 +3,1053 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tab Sync Server - 初始化设置</title>
+  <title>Tab Sync Server · 控制台</title>
   <style>
+    :root {
+      --primary: #6366f1;
+      --primary-600: #4f46e5;
+      --primary-700: #4338ca;
+      --accent: #8b5cf6;
+      --grad-start: #667eea;
+      --grad-end: #764ba2;
+      --ink-900: #0f172a;
+      --ink-700: #334155;
+      --ink-500: #64748b;
+      --ink-400: #94a3b8;
+      --line: #e8ebf2;
+      --line-soft: #f1f3f9;
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --danger: #ef4444;
+      --danger-soft: #fef2f2;
+      --warn: #f59e0b;
+      --success: #10b981;
+      --success-soft: #ecfdf5;
+      --info: #3b82f6;
+      --info-soft: #eff6ff;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.05);
+      --shadow-md: 0 10px 30px -12px rgba(79,70,229,.35);
+      --shadow-lg: 0 24px 60px -20px rgba(30,27,75,.45);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
+              "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--ink-900);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .app { display: flex; min-height: 100vh; }
+
+    /* ============ 左侧品牌区 ============ */
+    .brand {
+      position: relative;
+      flex: 0 0 42%;
+      max-width: 520px;
+      background: linear-gradient(155deg, var(--grad-start) 0%, var(--grad-end) 100%);
+      color: #fff;
+      padding: 56px 52px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
     }
-    .container {
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      padding: 48px 40px;
-      width: 100%;
-      max-width: 480px;
-    }
-    h1 {
-      font-size: 28px;
-      color: #1a1a2e;
-      margin-bottom: 8px;
-      text-align: center;
-    }
-    .subtitle {
-      color: #666;
-      text-align: center;
-      margin-bottom: 32px;
-      font-size: 14px;
-    }
-    .step-indicator {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-bottom: 32px;
-    }
-    .step-dot {
-      width: 12px;
-      height: 12px;
+    .brand::before, .brand::after {
+      content: "";
+      position: absolute;
       border-radius: 50%;
-      background: #e0e0e0;
+      background: rgba(255,255,255,.08);
+      pointer-events: none;
     }
-    .step-dot.active {
-      background: #667eea;
+    .brand::before { width: 380px; height: 380px; top: -140px; right: -120px; }
+    .brand::after  { width: 260px; height: 260px; bottom: -90px; left: -80px; }
+
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
     }
-    .step-line {
-      width: 40px;
-      height: 2px;
-      background: #e0e0e0;
+    .brand-logo {
+      width: 52px; height: 52px;
+      display: grid; place-items: center;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 14px;
+      backdrop-filter: blur(6px);
     }
-    .step-line.done {
-      background: #667eea;
+    .brand-logo svg { width: 28px; height: 28px; }
+    .brand-name { font-size: 22px; font-weight: 700; letter-spacing: .3px; }
+    .brand-name small { display: block; font-size: 12px; font-weight: 500; opacity: .7; letter-spacing: 2px; text-transform: uppercase; }
+
+    .brand-hero { position: relative; z-index: 1; margin: 32px 0; }
+    .brand-hero h1 {
+      font-size: 34px; line-height: 1.25; font-weight: 700; margin-bottom: 16px;
     }
-    .form-group {
-      margin-bottom: 20px;
+    .brand-hero p { font-size: 15px; line-height: 1.7; opacity: .85; max-width: 380px; }
+
+    .brand-features { position: relative; z-index: 1; list-style: none; display: grid; gap: 14px; }
+    .brand-features li { display: flex; align-items: center; gap: 12px; font-size: 14px; opacity: .92; }
+    .brand-features .ic {
+      flex: 0 0 30px; height: 30px; border-radius: 9px;
+      display: grid; place-items: center;
+      background: rgba(255,255,255,.14);
     }
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 6px;
+    .brand-features .ic svg { width: 16px; height: 16px; }
+
+    .brand-foot { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; font-size: 12.5px; opacity: .8; }
+    .brand-foot .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 4px rgba(74,222,128,.25); }
+
+    /* ============ 右侧内容区 ============ */
+    .panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      overflow-y: auto;
     }
-    input[type="password"], input[type="text"] {
+    .panel-scroll { width: 100%; max-width: 480px; }
+
+    .view { display: none; animation: fadeUp .45s cubic-bezier(.16,1,.3,1); }
+    .view.active { display: block; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .view-head { margin-bottom: 28px; }
+    .view-head .eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--primary-600);
+      background: var(--info-soft);
+      padding: 4px 10px; border-radius: 999px; margin-bottom: 14px;
+    }
+    .view-head h2 { font-size: 26px; font-weight: 700; color: var(--ink-900); letter-spacing: -.3px; }
+    .view-head p { margin-top: 8px; font-size: 14.5px; color: var(--ink-500); line-height: 1.6; }
+
+    /* ============ 表单 ============ */
+    .field { margin-bottom: 18px; }
+    .field > label {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13.5px; font-weight: 600; color: var(--ink-700); margin-bottom: 8px;
+    }
+    .field .req { color: var(--danger); }
+    .input-wrap { position: relative; }
+    .input-wrap input {
       width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 15px;
-      transition: border-color 0.2s;
+      padding: 13px 44px 13px 15px;
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius-sm);
+      font-size: 15px; font-family: var(--font); color: var(--ink-900);
+      background: #fff;
+      transition: border-color .18s, box-shadow .18s;
       outline: none;
     }
-    input:focus {
-      border-color: #667eea;
+    .input-wrap input::placeholder { color: var(--ink-400); }
+    .input-wrap input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(99,102,241,.14);
     }
-    .hint {
-      font-size: 12px;
-      color: #999;
-      margin-top: 4px;
+    .input-wrap input[type="text"] { padding-right: 15px; }
+    .toggle-eye {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      width: 30px; height: 30px; display: grid; place-items: center;
+      border: none; background: transparent; cursor: pointer; color: var(--ink-400);
+      border-radius: 8px; transition: color .15s, background .15s;
     }
-    button {
+    .toggle-eye:hover { color: var(--ink-700); background: var(--line-soft); }
+    .toggle-eye svg { width: 18px; height: 18px; }
+
+    .hint { font-size: 12.5px; color: var(--ink-400); margin-top: 7px; line-height: 1.5; }
+
+    /* 密码强度 */
+    .strength { margin-top: 10px; display: none; }
+    .strength.show { display: block; }
+    .strength-bars { display: flex; gap: 6px; }
+    .strength-bars span {
+      flex: 1; height: 5px; border-radius: 3px; background: var(--line);
+      transition: background .25s;
+    }
+    .strength-label { font-size: 12px; margin-top: 6px; color: var(--ink-400); font-weight: 500; }
+
+    /* 复选 / 开关 */
+    .check-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 18px; cursor: pointer; user-select: none; }
+    .check-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .check-box {
+      width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line);
+      display: grid; place-items: center; transition: all .18s; flex: 0 0 20px;
+      background: #fff;
+    }
+    .check-box svg { width: 13px; height: 13px; color: #fff; opacity: 0; transform: scale(.6); transition: all .18s; }
+    .check-row input:checked + .check-box { background: var(--primary); border-color: var(--primary); }
+    .check-row input:checked + .check-box svg { opacity: 1; transform: scale(1); }
+    .check-label { font-size: 13.5px; color: var(--ink-700); }
+
+    /* ============ 按钮 ============ */
+    .btn {
       width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-      margin-top: 8px;
+      padding: 14px 18px;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 15px; font-weight: 600; font-family: var(--font);
+      cursor: pointer; color: #fff;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      box-shadow: var(--shadow-md);
+      transition: transform .12s, box-shadow .18s, opacity .18s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
     }
-    button:hover { opacity: 0.9; }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 16px 36px -12px rgba(79,70,229,.5); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: var(--shadow-md); }
+    .btn svg { width: 18px; height: 18px; }
+    .btn .spinner { width: 17px; height: 17px; }
+
+    .btn-ghost {
+      background: #fff; color: var(--ink-700);
+      border: 1.5px solid var(--line); box-shadow: none;
     }
+    .btn-ghost:hover { background: var(--line-soft); box-shadow: none; transform: translateY(-1px); }
+    .btn-danger { background: var(--danger); box-shadow: 0 10px 24px -10px rgba(239,68,68,.55); }
+    .btn-danger:hover { box-shadow: 0 14px 30px -10px rgba(239,68,68,.65); }
+    .btn-sm { width: auto; padding: 9px 16px; font-size: 13.5px; border-radius: 9px; }
+    .btn-sm svg { width: 15px; height: 15px; }
+
+    .btn-row { display: flex; gap: 12px; margin-top: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ============ 提示条 ============ */
     .alert {
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      margin-bottom: 16px;
-    }
-    .alert-error {
-      background: #fee;
-      color: #c33;
-      border: 1px solid #fcc;
-    }
-    .alert-success {
-      background: #efe;
-      color: #3a3;
-      border: 1px solid #cfc;
-    }
-    .result-box {
-      background: #f8f9ff;
-      border: 2px dashed #667eea;
-      border-radius: 8px;
-      padding: 20px;
-      margin: 20px 0;
-      text-align: center;
-    }
-    .token-display {
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      word-break: break-all;
-      background: #1a1a2e;
-      color: #4ecb71;
-      padding: 12px;
-      border-radius: 6px;
-      margin: 12px 0;
-      user-select: all;
-    }
-    .warning {
-      color: #e67e22;
-      font-size: 13px;
-      margin-top: 8px;
-    }
-    .section {
       display: none;
+      align-items: flex-start; gap: 10px;
+      padding: 12px 14px; border-radius: var(--radius-sm);
+      font-size: 13.5px; line-height: 1.5; margin-bottom: 18px;
+      border: 1px solid transparent;
     }
-    .section.active {
-      display: block;
+    .alert.show { display: flex; animation: fadeUp .3s ease; }
+    .alert svg { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 1px; }
+    .alert-error { background: var(--danger-soft); color: #b91c1c; border-color: #fecaca; }
+    .alert-warn  { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .alert-info  { background: var(--info-soft); color: #1d4ed8; border-color: #bfdbfe; }
+
+    /* ============ Token 展示（结果页） ============ */
+    .token-card {
+      background: linear-gradient(155deg, #1e1b4b 0%, #312e81 100%);
+      border-radius: var(--radius); padding: 22px; margin: 22px 0;
+      position: relative; overflow: hidden;
+      box-shadow: var(--shadow-lg);
     }
-    .token-list {
-      list-style: none;
+    .token-card::after {
+      content: ""; position: absolute; width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(139,92,246,.5), transparent 70%);
+      top: -80px; right: -60px;
     }
+    .token-card .label { font-size: 12px; color: #c7d2fe; letter-spacing: 1px; text-transform: uppercase; position: relative; z-index: 1; }
+    .token-card .value {
+      font-family: "SF Mono", "Cascadia Code", "Courier New", monospace;
+      font-size: 14px; color: #a5f3d0; word-break: break-all;
+      margin: 10px 0 16px; line-height: 1.6; position: relative; z-index: 1;
+    }
+    .token-card .actions { position: relative; z-index: 1; display: flex; gap: 10px; }
+    .token-card .actions .btn { background: rgba(255,255,255,.14); box-shadow: none; border: 1px solid rgba(255,255,255,.2); }
+    .token-card .actions .btn:hover { background: rgba(255,255,255,.24); box-shadow: none; }
+
+    .warn-banner {
+      display: flex; gap: 11px; align-items: flex-start;
+      background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+      padding: 13px 15px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.55;
+    }
+    .warn-banner svg { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 1px; }
+
+    /* ============ 仪表盘 ============ */
+    .dash-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid var(--line-soft);
+    }
+    .dash-top .who { display: flex; align-items: center; gap: 12px; }
+    .dash-top .avatar {
+      width: 42px; height: 42px; border-radius: 12px; flex: 0 0 42px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: grid; place-items: center; color: #fff;
+    }
+    .dash-top .avatar svg { width: 22px; height: 22px; }
+    .dash-top .who .name { font-weight: 700; font-size: 15px; color: var(--ink-900); }
+    .dash-top .who .sub { font-size: 12.5px; color: var(--ink-400); margin-top: 1px; }
+    .dash-top .logout {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13.5px; font-weight: 600; color: var(--ink-500);
+      background: #fff; border: 1.5px solid var(--line); padding: 9px 14px; border-radius: 10px;
+      cursor: pointer; transition: all .15s;
+    }
+    .dash-top .logout:hover { color: var(--danger); border-color: #fecaca; background: var(--danger-soft); }
+    .dash-top .logout svg { width: 16px; height: 16px; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 30px; }
+    .stat {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 18px 16px; box-shadow: var(--shadow-sm);
+      transition: transform .15s, box-shadow .2s;
+    }
+    .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .stat .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 12px; }
+    .stat .ic svg { width: 20px; height: 20px; }
+    .stat.dev .ic { background: var(--info-soft); color: var(--info); }
+    .stat.wsp .ic { background: #f3e8ff; color: #9333ea; }
+    .stat.tab .ic { background: var(--success-soft); color: var(--success); }
+    .stat .num { font-size: 27px; font-weight: 750; color: var(--ink-900); letter-spacing: -.5px; }
+    .stat .lab { font-size: 12.5px; color: var(--ink-400); margin-top: 3px; }
+
+    .section-title {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title h3 { font-size: 16px; font-weight: 700; color: var(--ink-900); }
+    .section-title .count { font-size: 12.5px; color: var(--ink-400); font-weight: 500; }
+
+    .token-add {
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 16px; margin-bottom: 18px; box-shadow: var(--shadow-sm);
+    }
+    .token-add .row { display: flex; gap: 10px; }
+    .token-add input {
+      flex: 1; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+      font-size: 14px; outline: none; transition: border-color .18s, box-shadow .18s; font-family: var(--font);
+      color: var(--ink-900);
+    }
+    .token-add input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99,102,241,.14); }
+
+    .token-list { display: grid; gap: 12px; }
     .token-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px;
-      border: 1px solid #eee;
-      border-radius: 8px;
-      margin-bottom: 8px;
+      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 15px 16px; display: flex; align-items: center; gap: 14px;
+      box-shadow: var(--shadow-sm); transition: border-color .15s, box-shadow .2s, transform .15s;
     }
-    .token-item .info {
-      flex: 1;
+    .token-item:hover { border-color: #d6d9e6; box-shadow: var(--shadow-md); }
+    .token-item .tk-ic {
+      width: 40px; height: 40px; border-radius: 11px; flex: 0 0 40px;
+      display: grid; place-items: center; background: var(--info-soft); color: var(--info);
     }
-    .token-item .name {
-      font-weight: 600;
-      color: #333;
-    }
-    .token-item .meta {
-      font-size: 12px;
-      color: #999;
-      margin-top: 2px;
-    }
+    .token-item .tk-ic svg { width: 20px; height: 20px; }
+    .token-item .tk-main { flex: 1; min-width: 0; }
+    .token-item .tk-name { font-weight: 650; font-size: 14.5px; color: var(--ink-900); display: flex; align-items: center; gap: 8px; }
+    .token-item .tk-meta { font-size: 12.5px; color: var(--ink-400); margin-top: 4px; line-height: 1.5; }
+    .token-item .tk-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+
     .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+      letter-spacing: .2px;
     }
-    .badge-admin { background: #fef3e2; color: #e67e22; }
-    .badge-user { background: #e8f4fd; color: #3498db; }
-    .badge-revoked { background: #fde8e8; color: #c33; }
-    .badge-active { background: #e8fde8; color: #3a3; }
-    .btn-small {
-      padding: 6px 14px;
-      font-size: 13px;
-      width: auto;
-      margin: 0;
+    .badge-admin { background: #fef3c7; color: #b45309; }
+    .badge-user  { background: var(--info-soft); color: var(--info); }
+    .badge-on    { background: var(--success-soft); color: #059669; }
+    .badge-off   { background: #f1f5f9; color: var(--ink-400); }
+
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line);
+      background: #fff; cursor: pointer; display: grid; place-items: center;
+      color: var(--ink-500); transition: all .15s;
     }
-    .btn-danger {
-      background: #e74c3c;
+    .icon-btn:hover { color: var(--primary); border-color: #c7cadb; background: var(--line-soft); }
+    .icon-btn.danger:hover { color: var(--danger); border-color: #fecaca; background: var(--danger-soft); }
+    .icon-btn svg { width: 16px; height: 16px; }
+
+    .empty {
+      text-align: center; padding: 40px 20px; color: var(--ink-400); font-size: 14px;
+      border: 1.5px dashed var(--line); border-radius: var(--radius);
     }
-    .btn-outline {
-      background: transparent;
-      border: 2px solid #667eea;
-      color: #667eea;
+    .empty svg { width: 34px; height: 34px; opacity: .4; margin-bottom: 10px; }
+
+    /* ============ 加载 ============ */
+    .loading-wrap { text-align: center; padding: 40px 0; }
+    .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid var(--line); border-top-color: var(--primary);
+      animation: spin .8s linear infinite; margin: 0 auto 16px;
     }
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin: 20px 0;
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-wrap p { color: var(--ink-400); font-size: 14px; }
+
+    /* ============ Toast ============ */
+    .toast-wrap {
+      position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; display: flex; flex-direction: column; gap: 10px; align-items: center;
+      pointer-events: none;
     }
-    .stat-card {
-      background: #f8f9ff;
-      padding: 16px;
-      border-radius: 8px;
-      text-align: center;
+    .toast {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--ink-900); color: #fff; padding: 12px 18px; border-radius: 12px;
+      font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg);
+      animation: toastIn .35s cubic-bezier(.16,1,.3,1);
+      max-width: 90vw;
     }
-    .stat-card .number {
-      font-size: 28px;
-      font-weight: 700;
-      color: #667eea;
+    .toast.out { animation: toastOut .3s ease forwards; }
+    .toast svg { width: 18px; height: 18px; flex: 0 0 18px; }
+    .toast.success svg { color: #4ade80; }
+    .toast.error svg { color: #f87171; }
+    .toast.info svg { color: #60a5fa; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateY(-14px); } }
+
+    /* ============ Modal ============ */
+    .modal-mask {
+      position: fixed; inset: 0; background: rgba(15,23,42,.5); backdrop-filter: blur(3px);
+      display: none; align-items: center; justify-content: center; z-index: 900; padding: 20px;
+      animation: fadeIn .2s ease;
     }
-    .stat-card .label {
-      font-size: 12px;
-      color: #999;
-      margin-top: 4px;
+    .modal-mask.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal {
+      background: #fff; border-radius: 18px; padding: 26px; width: 100%; max-width: 400px;
+      box-shadow: var(--shadow-lg); animation: modalIn .3s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+    .modal .m-ic {
+      width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center;
+      background: var(--danger-soft); color: var(--danger); margin-bottom: 16px;
+    }
+    .modal .m-ic svg { width: 24px; height: 24px; }
+    .modal h3 { font-size: 18px; font-weight: 700; color: var(--ink-900); margin-bottom: 8px; }
+    .modal p { font-size: 14px; color: var(--ink-500); line-height: 1.6; margin-bottom: 22px; }
+    .modal p b { color: var(--ink-900); }
+
+    /* ============ 响应式 ============ */
+    @media (max-width: 880px) {
+      .app { flex-direction: column; }
+      .brand { flex: none; max-width: none; padding: 36px 28px; }
+      .brand-hero h1 { font-size: 26px; }
+      .brand-features { display: none; }
+      .panel { padding: 32px 22px; align-items: flex-start; }
+      .panel-scroll { max-width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .stats { grid-template-columns: 1fr; }
+      .token-add .row { flex-direction: column; }
+      .view-head h2 { font-size: 22px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- 步骤 1: 设置管理员密码 -->
-    <div id="section-setup" class="section active">
-      <h1>Tab Sync Server</h1>
-      <p class="subtitle">欢迎使用！请完成初始化设置</p>
-      <div class="step-indicator">
-        <div class="step-dot active"></div>
-        <div class="step-line"></div>
-        <div class="step-dot"></div>
-        <div class="step-line"></div>
-        <div class="step-dot"></div>
+  <div class="app" id="app">
+    <!-- 左侧品牌区 -->
+    <aside class="brand">
+      <div class="brand-mark">
+        <span class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 7h11a3 3 0 0 1 3 3v7"/>
+            <rect x="2" y="3" width="13" height="11" rx="2"/>
+            <path d="M20 17h-3a3 3 0 0 1-3-3V4"/>
+            <rect x="9" y="10" width="13" height="11" rx="2"/>
+          </svg>
+        </span>
+        <span class="brand-name" style="font-size:22px;font-weight:700;letter-spacing:.3px;">
+          Tab Sync
+          <small>Server Console</small>
+        </span>
       </div>
-      <div id="setup-error" class="alert alert-error" style="display:none;"></div>
-      <div class="form-group">
-        <label>管理员密码</label>
-        <input type="password" id="admin-password" placeholder="请设置管理员密码（至少6位）" minlength="6">
-        <p class="hint">此密码用于管理后台登录，请妥善保管</p>
-      </div>
-      <div class="form-group">
-        <label>确认密码</label>
-        <input type="password" id="admin-password-confirm" placeholder="请再次输入密码" minlength="6">
-      </div>
-      <button id="btn-setup" onclick="completeSetup()">完成初始化</button>
-    </div>
 
-    <!-- 步骤 2: 显示生成的 Token -->
-    <div id="section-result" class="section">
-      <h1>初始化完成！</h1>
-      <p class="subtitle">您的管理员 Token 已生成</p>
-      <div class="step-indicator">
-        <div class="step-dot active"></div>
-        <div class="step-line done"></div>
-        <div class="step-dot active"></div>
-        <div class="step-line"></div>
-        <div class="step-dot"></div>
+      <div class="brand-hero">
+        <h1 id="brandTitle">让标签页<br>在设备间自由流动</h1>
+        <p id="brandDesc">轻量级同步中枢，集中管理你的浏览器扩展、工作组与标签页。</p>
       </div>
-      <div class="result-box">
-        <p style="color:#666;font-size:14px;">请在浏览器扩展中填写以下信息：</p>
-        <div style="margin-top:12px;">
-          <strong>Token（API Key）：</strong>
-          <div class="token-display" id="result-token"></div>
-        </div>
-        <p class="warning">⚠ 此 Token 仅显示一次，请立即复制保存！</p>
-      </div>
-      <button id="btn-goto-admin" onclick="gotoAdmin()">进入管理后台</button>
-    </div>
 
-    <!-- 管理后台 -->
-    <div id="section-admin" class="section">
-      <h1>管理后台</h1>
-      <p class="subtitle" id="admin-server-info"></p>
-      <div id="admin-error" class="alert alert-error" style="display:none;"></div>
-      <div id="admin-content" style="display:none;">
-        <!-- 统计 -->
-        <div class="stats" id="admin-stats"></div>
-        <!-- Token 管理 -->
-        <h3 style="margin-top:24px;margin-bottom:12px;color:#333;">Token 管理</h3>
-        <div id="new-token-section" style="display:none;" class="result-box">
-          <p style="color:#666;font-size:14px;">新 Token 已生成：</p>
-          <div class="token-display" id="new-token-value"></div>
-          <p class="warning">⚠ 此 Token 仅显示一次！</p>
-        </div>
-        <div class="form-group">
-          <label>Token 名称（备注）</label>
-          <div style="display:flex;gap:8px;">
-            <input type="text" id="new-token-name" placeholder="例如：我的 Chrome 浏览器" style="flex:1;">
-            <button class="btn-small" onclick="generateToken()" style="flex-shrink:0;">生成</button>
+      <ul class="brand-features" id="brandFeatures">
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg></span>多设备实时同步</li>
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg></span>工作组与标签页集中管理</li>
+        <li><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>管理员 Token 精细授权</li>
+      </ul>
+
+      <div class="brand-foot">
+        <span class="dot"></span>
+        <span>服务运行中 · v<span id="brandVersion">—</span></span>
+      </div>
+    </aside>
+
+    <!-- 右侧内容区 -->
+    <main class="panel">
+      <div class="panel-scroll">
+
+        <!-- 加载中 -->
+        <section class="view" data-view="loading">
+          <div class="loading-wrap">
+            <div class="spinner"></div>
+            <p>正在连接服务…</p>
           </div>
-        </div>
-        <ul class="token-list" id="token-list"></ul>
-        <!-- 退出 -->
-        <button class="btn-outline" onclick="logout()" style="margin-top:20px;">退出登录</button>
+        </section>
+
+        <!-- 初始化设置 -->
+        <section class="view" data-view="setup">
+          <div class="view-head">
+            <span class="eyebrow"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>首次设置</span>
+            <h2>创建管理员账户</h2>
+            <p>设置用于登录管理后台的密码，请务必牢记并妥善保管。</p>
+          </div>
+
+          <div class="alert alert-error" id="setupAlert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span class="msg"></span>
+          </div>
+
+          <div class="field">
+            <label>管理员密码 <span class="req">*</span></label>
+            <div class="input-wrap">
+              <input type="password" id="setupPwd" placeholder="至少 6 位，建议含字母与数字" autocomplete="new-password">
+              <button class="toggle-eye" type="button" data-target="setupPwd" aria-label="显示/隐藏密码">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.16 3.19M1 1l22 22M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
+            </div>
+            <div class="strength" id="setupStrength">
+              <div class="strength-bars"><span></span><span></span><span></span><span></span></div>
+              <div class="strength-label" id="setupStrengthLabel"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>确认密码 <span class="req">*</span></label>
+            <div class="input-wrap">
+              <input type="password" id="setupPwd2" placeholder="请再次输入密码" autocomplete="new-password">
+              <button class="toggle-eye" type="button" data-target="setupPwd2" aria-label="显示/隐藏密码">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.16 3.19M1 1l22 22M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn" id="btnSetup">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            完成初始化
+          </button>
+        </section>
+
+        <!-- 初始化完成 / Token 展示 -->
+        <section class="view" data-view="token">
+          <div class="view-head">
+            <span class="eyebrow" style="color:#059669;background:var(--success-soft);"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>设置完成</span>
+            <h2>管理员 Token 已生成</h2>
+            <p>请在浏览器扩展中填入此 Token 以完成连接。</p>
+          </div>
+
+          <div class="token-card">
+            <div class="label">Token · API Key</div>
+            <div class="value" id="resultToken"></div>
+            <div class="actions">
+              <button class="btn btn-sm" id="btnCopyToken">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                复制 Token
+              </button>
+            </div>
+          </div>
+
+          <div class="warn-banner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <span>此 Token <b>仅显示一次</b>，关闭页面后将无法再次查看。请立即复制并妥善保存到密码管理器。</span>
+          </div>
+
+          <button class="btn" id="btnToDash" style="margin-top:22px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            进入管理控制台
+          </button>
+        </section>
+
+        <!-- 管理后台登录 -->
+        <section class="view" data-view="login">
+          <div class="view-head">
+            <span class="eyebrow"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>管理员登录</span>
+            <h2>欢迎回来</h2>
+            <p>请输入管理员密码以访问控制台。</p>
+          </div>
+
+          <div class="alert alert-error" id="loginAlert">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span class="msg"></span>
+          </div>
+
+          <div class="field">
+            <label>管理员密码 <span class="req">*</span></label>
+            <div class="input-wrap">
+              <input type="password" id="loginPwd" placeholder="请输入管理员密码" autocomplete="current-password">
+              <button class="toggle-eye" type="button" data-target="loginPwd" aria-label="显示/隐藏密码">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10 10 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.16 3.19M1 1l22 22M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn" id="btnLogin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+            登录
+          </button>
+        </section>
+
+        <!-- 管理控制台 -->
+        <section class="view" data-view="dashboard">
+          <div class="dash-top">
+            <div class="who">
+              <span class="avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </span>
+              <div>
+                <div class="name">管理员控制台</div>
+                <div class="sub" id="dashServerInfo">—</div>
+              </div>
+            </div>
+            <button class="logout" id="btnLogout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+              退出
+            </button>
+          </div>
+
+          <div class="stats" id="dashStats">
+            <div class="stat dev"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><div class="num">—</div><div class="lab">已连接设备</div></div>
+            <div class="stat wsp"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><div class="num">—</div><div class="lab">工作组</div></div>
+            <div class="stat tab"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></div><div class="num">—</div><div class="lab">标签页</div></div>
+          </div>
+
+          <div class="section-title">
+            <h3>访问令牌</h3>
+            <span class="count" id="tokenCount"></span>
+          </div>
+
+          <div class="token-add">
+            <div class="row">
+              <input type="text" id="newTokenName" placeholder="为新令牌命名，如「我的 Chrome 浏览器」">
+              <button class="btn btn-sm" id="btnGenToken">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                生成
+              </button>
+            </div>
+            <label class="check-row" style="margin-top:14px;margin-bottom:0;">
+              <input type="checkbox" id="newTokenAdmin">
+              <span class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="check-label">授予管理员权限（可管理其他令牌）</span>
+            </label>
+          </div>
+
+          <div class="token-list" id="tokenList"></div>
+        </section>
+
       </div>
-      <!-- 登录表单 -->
-      <div id="admin-login">
-        <div class="form-group">
-          <label>管理员密码</label>
-          <input type="password" id="login-password" placeholder="请输入管理员密码">
-        </div>
-        <button id="btn-login" onclick="adminLogin()">登录</button>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <!-- 吊销确认 Modal -->
+  <div class="modal-mask" id="revokeModal">
+    <div class="modal">
+      <div class="m-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </div>
+      <h3>吊销该令牌？</h3>
+      <p>令牌 <b id="revokeName">—</b> 被吊销后将立即失效，使用该令牌的扩展无法继续同步。此操作不可撤销。</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btnRevokeCancel">取消</button>
+        <button class="btn btn-danger" id="btnRevokeConfirm">确认吊销</button>
       </div>
     </div>
   </div>
 
   <script>
-    const API_BASE = '';
+    const API = '';
+    const $ = (id) => document.getElementById(id);
+    let pendingRevoke = null;
+
+    // ============ 视图切换 ============
+    function showView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const el = document.querySelector('.view[data-view="' + name + '"]');
+      if (el) el.classList.add('active');
+    }
+
+    // ============ 品牌文案随状态变化 ============
+    function setBrand(title, desc) {
+      $('brandTitle').innerHTML = title;
+      $('brandDesc').textContent = desc;
+    }
+
+    // ============ 提示条 ============
+    function alert(elId, msg) {
+      const el = $(elId);
+      el.querySelector('.msg').textContent = msg;
+      el.classList.add('show');
+    }
+    function clearAlert(elId) { $(elId).classList.remove('show'); }
+
+    // ============ Toast ============
+    function toast(msg, type = 'info') {
+      const icons = {
+        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+        error:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>',
+        info:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+      };
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.innerHTML = (icons[type] || icons.info) + '<span>' + escapeHtml(msg) + '</span>';
+      $('toastWrap').appendChild(t);
+      setTimeout(() => {
+        t.classList.add('out');
+        setTimeout(() => t.remove(), 300);
+      }, 2600);
+    }
+
+    // ============ 复制 ============
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        ta.remove(); return true;
+      }
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str == null ? '' : String(str);
+      return d.innerHTML;
+    }
+    function formatTime(ts) {
+      if (!ts) return null;
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ============ 密码显隐 ============
+    document.querySelectorAll('.toggle-eye').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = $(btn.dataset.target);
+        const open = btn.querySelector('.eye-open');
+        const off = btn.querySelector('.eye-off');
+        if (input.type === 'password') {
+          input.type = 'text'; open.style.display = 'none'; off.style.display = 'block';
+        } else {
+          input.type = 'password'; open.style.display = 'block'; off.style.display = 'none';
+        }
+      });
+    });
+
+    // ============ 密码强度 ============
+    function scorePassword(p) {
+      let s = 0;
+      if (p.length >= 6) s++;
+      if (p.length >= 10) s++;
+      if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++;
+      if (/\d/.test(p)) s++;
+      if (/[^A-Za-z0-9]/.test(p)) s++;
+      return Math.min(s, 4);
+    }
+    function updateStrength() {
+      const p = $('setupPwd').value;
+      const box = $('setupStrength');
+      const bars = box.querySelectorAll('.strength-bars span');
+      const label = $('setupStrengthLabel');
+      if (!p) { box.classList.remove('show'); return; }
+      box.classList.add('show');
+      const score = scorePassword(p);
+      const colors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#10b981'];
+      const labels = ['弱', '一般', '中等', '强', '很强'];
+      bars.forEach((b, i) => {
+        b.style.background = i < score ? colors[score] : 'var(--line)';
+      });
+      label.textContent = '强度：' + labels[score];
+      label.style.color = colors[score];
+    }
+    $('setupPwd').addEventListener('input', () => { updateStrength(); clearAlert('setupAlert'); });
+    $('setupPwd2').addEventListener('input', () => clearAlert('setupAlert'));
 
     // ============ 初始化流程 ============
-
     async function completeSetup() {
-      const pwd = document.getElementById('admin-password').value;
-      const confirm = document.getElementById('admin-password-confirm').value;
-      const errEl = document.getElementById('setup-error');
+      const pwd = $('setupPwd').value;
+      const pwd2 = $('setupPwd2').value;
+      clearAlert('setupAlert');
 
-      if (!pwd || pwd.length < 6) {
-        showError(errEl, '密码至少需要 6 位');
-        return;
-      }
-      if (pwd !== confirm) {
-        showError(errEl, '两次输入的密码不一致');
-        return;
-      }
+      if (!pwd || pwd.length < 6) { alert('setupAlert', '密码至少需要 6 位'); return; }
+      if (pwd !== pwd2) { alert('setupAlert', '两次输入的密码不一致'); return; }
 
-      const btn = document.getElementById('btn-setup');
+      const btn = $('btnSetup');
       btn.disabled = true;
-      btn.textContent = '正在初始化...';
-      hideError(errEl);
+      btn.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.4)"></span> 正在初始化…';
 
       try {
-        const res = await fetch(API_BASE + '/api/setup', {
+        const res = await fetch(API + '/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminPassword: pwd })
         });
         const data = await res.json();
-
         if (res.ok && data.code === 0) {
-          document.getElementById('result-token').textContent = data.data.adminToken;
-          switchSection('section-result');
-          // 存储 JWT 用于后续管理后台登录
-          if (data.data.jwt) {
-            localStorage.setItem('admin_jwt', data.data.jwt);
-          }
+          $('resultToken').textContent = data.data.adminToken;
+          if (data.data.jwt) localStorage.setItem('admin_jwt', data.data.jwt);
+          setBrand('设置已完成 🎉', '管理员令牌已生成，复制并配置到你的浏览器扩展即可开始同步。');
+          showView('token');
         } else {
-          showError(errEl, data.msg || '初始化失败');
+          alert('setupAlert', data.msg || '初始化失败，请重试');
+          btn.disabled = false;
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> 完成初始化';
         }
       } catch (e) {
-        showError(errEl, '网络错误：无法连接到服务器');
-      } finally {
+        alert('setupAlert', '网络错误：无法连接到服务器');
         btn.disabled = false;
-        btn.textContent = '完成初始化';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> 完成初始化';
       }
     }
-
-    function gotoAdmin() {
-      switchSection('section-admin');
-    }
-
-    // ============ 管理后台 ============
 
     async function adminLogin() {
-      const pwd = document.getElementById('login-password').value;
-      const errEl = document.getElementById('admin-error');
+      const pwd = $('loginPwd').value;
+      clearAlert('loginAlert');
+      if (!pwd) { alert('loginAlert', '请输入管理员密码'); return; }
 
-      if (!pwd) {
-        showError(errEl, '请输入管理员密码');
-        return;
-      }
-
-      const btn = document.getElementById('btn-login');
+      const btn = $('btnLogin');
       btn.disabled = true;
-      btn.textContent = '登录中...';
-      hideError(errEl);
+      btn.innerHTML = '<span class="spinner" style="border-top-color:#fff;border-color:rgba(255,255,255,.4)"></span> 登录中…';
 
       try {
-        const res = await fetch(API_BASE + '/api/admin/login', {
+        const res = await fetch(API + '/api/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password: pwd })
         });
         const data = await res.json();
-
         if (res.ok && data.code === 0) {
           localStorage.setItem('admin_jwt', data.data.jwt);
-          await loadAdminPanel();
+          setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
+          await loadDashboard();
+          showView('dashboard');
         } else {
-          showError(errEl, data.msg || '密码错误');
+          alert('loginAlert', data.msg || '密码错误');
+          resetLoginBtn();
         }
       } catch (e) {
-        showError(errEl, '网络错误：无法连接到服务器');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '登录';
+        alert('loginAlert', '网络错误：无法连接到服务器');
+        resetLoginBtn();
       }
     }
+    function resetLoginBtn() {
+      const btn = $('btnLogin');
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> 登录';
+    }
 
-    async function loadAdminPanel() {
+    // ============ 仪表盘 ============
+    async function loadDashboard() {
       const jwt = localStorage.getItem('admin_jwt');
-      if (!jwt) {
-        document.getElementById('admin-login').style.display = 'block';
-        document.getElementById('admin-content').style.display = 'none';
-        return;
-      }
+      if (!jwt) { doLogout(); return; }
 
-      document.getElementById('admin-login').style.display = 'none';
-      document.getElementById('admin-content').style.display = 'block';
+      const headers = { 'Authorization': 'Bearer ' + jwt };
+      setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
 
-      // 显示服务信息
+      // 版本信息
       try {
-        const vRes = await fetch(API_BASE + '/v1/tab-sync/version');
-        const vData = await vRes.json();
-        if (vData.code === 0) {
-          document.getElementById('admin-server-info').textContent =
-            'Server v' + vData.data.server_version + ' | API ' + vData.data.api_version;
+        const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
+        if (v.code === 0) {
+          $('dashServerInfo').textContent = 'Server v' + v.data.server_version + ' · API v' + v.data.api_version;
         }
       } catch (e) {}
 
-      await loadStats();
-      await loadTokens();
-    }
-
-    async function loadStats() {
+      // 统计
       try {
-        const res = await fetch(API_BASE + '/v1/tab-sync/admin/stats', {
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_jwt') }
-        });
-        const data = await res.json();
-        if (data.code === 0) {
-          const s = data.data;
-          document.getElementById('admin-stats').innerHTML =
-            '<div class="stat-card"><div class="number">' + (s.devices || 0) + '</div><div class="label">设备</div></div>' +
-            '<div class="stat-card"><div class="number">' + (s.workspaces || 0) + '</div><div class="label">工作组</div></div>' +
-            '<div class="stat-card"><div class="number">' + (s.tabs || 0) + '</div><div class="label">标签页</div></div>';
+        const s = await fetch(API + '/v1/tab-sync/admin/stats', { headers }).then(r => r.json());
+        if (s.code === 0) {
+          const nums = $('dashStats').querySelectorAll('.num');
+          nums[0].textContent = s.data.devices || 0;
+          nums[1].textContent = s.data.workspaces || 0;
+          nums[2].textContent = s.data.tabs || 0;
         }
       } catch (e) {}
-    }
 
-    async function loadTokens() {
+      // 令牌列表
       try {
-        const res = await fetch(API_BASE + '/v1/tab-sync/admin/tokens', {
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_jwt') }
-        });
-        const data = await res.json();
-        if (data.code === 0 && data.data.tokens) {
-          renderTokens(data.data.tokens);
-        }
+        const t = await fetch(API + '/v1/tab-sync/admin/tokens', { headers }).then(r => r.json());
+        if (t.code === 0) renderTokens(t.data.tokens || []);
       } catch (e) {}
     }
 
     function renderTokens(tokens) {
-      const list = document.getElementById('token-list');
-      list.innerHTML = tokens.map(t =>
-        '<li class="token-item">' +
-          '<div class="info">' +
-            '<div class="name">' +
-              escapeHtml(t.name || '未命名') + ' ' +
-              '<span class="badge ' + (t.isAdmin ? 'badge-admin' : 'badge-user') + '">' +
-                (t.isAdmin ? '管理员' : '普通') +
-              '</span>' +
-              '<span class="badge ' + (t.isRevoked ? 'badge-revoked' : 'badge-active') + '">' +
-                (t.isRevoked ? '已吊销' : '有效') +
-              '</span>' +
+      const list = $('tokenList');
+      $('tokenCount').textContent = tokens.length ? tokens.length + ' 个令牌' : '';
+      if (!tokens.length) {
+        list.innerHTML = '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><div>还没有访问令牌，在上方生成一个吧。</div></div>';
+        return;
+      }
+      list.innerHTML = tokens.map(t => {
+        const created = formatTime(t.createdAt);
+        const used = formatTime(t.lastUsed);
+        const meta = '创建于 ' + (created || '—') + (used ? ' · 最近使用 ' + used : ' · 从未使用');
+        return (
+          '<div class="token-item">' +
+            '<div class="tk-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>' +
+            '<div class="tk-main">' +
+              '<div class="tk-name">' + escapeHtml(t.name || '未命名') +
+                (t.isAdmin ? '<span class="badge badge-admin">管理员</span>' : '<span class="badge badge-user">普通</span>') +
+                (t.isRevoked ? '<span class="badge badge-off">已吊销</span>' : '<span class="badge badge-on">有效</span>') +
+              '</div>' +
+              '<div class="tk-meta">' + meta + '</div>' +
             '</div>' +
-            '<div class="meta">ID: ' + escapeHtml(t.tokenId || '') +
-              (t.lastUsed ? ' | 最近使用: ' + formatTime(t.lastUsed) : '') +
-              ' | 创建: ' + formatTime(t.createdAt) +
-            '</div>' +
-          '</div>' +
-          (t.isRevoked ? '' :
-            '<button class="btn-small btn-danger" onclick="revokeToken(\'' + t.tokenId + '\')">吊销</button>'
-          ) +
-        '</li>'
-      ).join('');
+            (t.isRevoked ? '' :
+              '<div class="tk-actions">' +
+                '<button class="icon-btn danger" title="吊销" data-revoke="' + escapeHtml(t.tokenId) + '" data-name="' + escapeHtml(t.name || '未命名') + '">' +
+                  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+                '</button>' +
+              '</div>'
+            ) +
+          '</div>'
+        );
+      }).join('');
+
+      list.querySelectorAll('[data-revoke]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          pendingRevoke = btn.dataset.revoke;
+          $('revokeName').textContent = btn.dataset.name;
+          $('revokeModal').classList.add('show');
+        });
+      });
     }
 
     async function generateToken() {
-      const name = document.getElementById('new-token-name').value || '未命名 Token';
+      const name = $('newTokenName').value.trim() || '未命名令牌';
+      const isAdmin = $('newTokenAdmin').checked;
+      const jwt = localStorage.getItem('admin_jwt');
       try {
-        const res = await fetch(API_BASE + '/v1/tab-sync/admin/tokens', {
+        const res = await fetch(API + '/v1/tab-sync/admin/tokens', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('admin_jwt')
-          },
-          body: JSON.stringify({ name: name, isAdmin: false })
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+          body: JSON.stringify({ name, isAdmin })
         });
         const data = await res.json();
         if (data.code === 0) {
-          document.getElementById('new-token-value').textContent = data.data.token;
-          document.getElementById('new-token-section').style.display = 'block';
-          document.getElementById('new-token-name').value = '';
-          await loadTokens();
+          showTokenModal(data.data.token, data.data.name);
+          $('newTokenName').value = '';
+          $('newTokenAdmin').checked = false;
+          await loadTokensOnly();
         } else {
-          alert(data.msg || '生成失败');
+          toast(data.msg || '生成失败', 'error');
         }
-      } catch (e) {
-        alert('网络错误');
-      }
+      } catch (e) { toast('网络错误，生成失败', 'error'); }
     }
 
-    async function revokeToken(tokenId) {
-      if (!confirm('确认吊销此 Token？吊销后该 Token 将无法使用。')) return;
+    async function loadTokensOnly() {
+      const jwt = localStorage.getItem('admin_jwt');
       try {
-        const res = await fetch(API_BASE + '/v1/tab-sync/admin/tokens/' + tokenId, {
+        const t = await fetch(API + '/v1/tab-sync/admin/tokens', { headers: { 'Authorization': 'Bearer ' + jwt } }).then(r => r.json());
+        if (t.code === 0) renderTokens(t.data.tokens || []);
+      } catch (e) {}
+    }
+
+    function showTokenModal(token, name) {
+      // 复用 token-card 风格的弹窗
+      const mask = document.createElement('div');
+      mask.className = 'modal-mask show';
+      mask.innerHTML =
+        '<div class="modal" style="max-width:440px;">' +
+          '<div class="m-ic" style="background:var(--success-soft);color:var(--success);">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
+          '</div>' +
+          '<h3>新令牌已生成</h3>' +
+          '<p>请立即复制并保存到密码管理器。<b>此令牌仅显示这一次</b>。</p>' +
+          '<div class="token-card"><div class="label">' + escapeHtml(name || '令牌') + '</div><div class="value">' + escapeHtml(token) + '</div></div>' +
+          '<div class="btn-row">' +
+            '<button class="btn btn-ghost" data-act="close">关闭</button>' +
+            '<button class="btn" data-act="copy">复制令牌</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(mask);
+      mask.querySelector('[data-act="close"]').onclick = () => mask.remove();
+      mask.querySelector('[data-act="copy"]').onclick = async () => {
+        await copyText(token);
+        toast('已复制到剪贴板', 'success');
+        mask.remove();
+      };
+      mask.addEventListener('click', e => { if (e.target === mask) mask.remove(); });
+    }
+
+    async function confirmRevoke() {
+      if (!pendingRevoke) return;
+      const jwt = localStorage.getItem('admin_jwt');
+      const id = pendingRevoke;
+      pendingRevoke = null;
+      $('revokeModal').classList.remove('show');
+      try {
+        const res = await fetch(API + '/v1/tab-sync/admin/tokens/' + id, {
           method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('admin_jwt') }
+          headers: { 'Authorization': 'Bearer ' + jwt }
         });
         const data = await res.json();
         if (data.code === 0) {
-          await loadTokens();
+          toast('令牌已吊销', 'success');
+          await loadTokensOnly();
         } else {
-          alert(data.msg || '吊销失败');
+          toast(data.msg || '吊销失败', 'error');
         }
-      } catch (e) {
-        alert('网络错误');
-      }
+      } catch (e) { toast('网络错误，吊销失败', 'error'); }
     }
 
-    function logout() {
+    function doLogout() {
       localStorage.removeItem('admin_jwt');
-      document.getElementById('admin-login').style.display = 'block';
-      document.getElementById('admin-content').style.display = 'none';
+      $('loginPwd').value = '';
+      setBrand('欢迎回来', '请输入管理员密码以访问控制台。');
+      resetLoginBtn();
+      showView('login');
     }
 
-    // ============ 辅助函数 ============
+    // ============ 事件绑定 ============
+    $('btnSetup').addEventListener('click', completeSetup);
+    $('btnLogin').addEventListener('click', adminLogin);
+    $('btnToDash').addEventListener('click', async () => { await loadDashboard(); showView('dashboard'); });
+    $('btnCopyToken').addEventListener('click', async () => {
+      await copyText($('resultToken').textContent);
+      toast('Token 已复制到剪贴板', 'success');
+    });
+    $('btnGenToken').addEventListener('click', generateToken);
+    $('btnLogout').addEventListener('click', doLogout);
+    $('btnRevokeCancel').addEventListener('click', () => { pendingRevoke = null; $('revokeModal').classList.remove('show'); });
+    $('btnRevokeConfirm').addEventListener('click', confirmRevoke);
+    $('revokeModal').addEventListener('click', e => { if (e.target === $('revokeModal')) { pendingRevoke = null; $('revokeModal').classList.remove('show'); } });
 
-    function switchSection(id) {
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-      if (id === 'section-admin') {
-        loadAdminPanel();
-      }
-    }
+    // 回车提交
+    $('setupPwd2').addEventListener('keydown', e => { if (e.key === 'Enter') completeSetup(); });
+    $('loginPwd').addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
+    $('newTokenName').addEventListener('keydown', e => { if (e.key === 'Enter') generateToken(); });
 
-    function showError(el, msg) {
-      el.textContent = msg;
-      el.style.display = 'block';
-    }
-
-    function hideError(el) {
-      el.style.display = 'none';
-    }
-
-    function escapeHtml(str) {
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
-    }
-
-    function formatTime(ts) {
-      if (!ts) return '-';
-      const d = new Date(ts);
-      return d.toLocaleString('zh-CN');
-    }
-
-    // 页面加载时检测状态
+    // ============ 启动 ============
     (async function init() {
       try {
-        const res = await fetch(API_BASE + '/api/setup/status');
+        const res = await fetch(API + '/api/setup/status');
         const data = await res.json();
         if (data.code === 0 && data.data.setupDone) {
-          switchSection('section-admin');
+          const jwt = localStorage.getItem('admin_jwt');
+          if (jwt) {
+            setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
+            await loadDashboard();
+            showView('dashboard');
+          } else {
+            setBrand('欢迎回来', '请输入管理员密码以访问控制台。');
+            showView('login');
+          }
+        } else {
+          setBrand('让标签页<br>在设备间自由流动', '轻量级同步中枢，集中管理你的浏览器扩展、工作组与标签页。');
+          showView('setup');
         }
       } catch (e) {
-        // 服务未启动，什么都不做
+        showView('login');
       }
+      // 拉取版本号填充品牌页脚
+      try {
+        const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
+        if (v.code === 0) $('brandVersion').textContent = v.data.server_version;
+      } catch (e) {}
     })();
   </script>
 </body>
