@@ -7,7 +7,7 @@
   >
     <div class="tag-editor">
       <el-checkbox-group v-model="selected">
-        <el-checkbox v-for="t in tags" :key="t.id" :label="t.id">{{ t.name }}</el-checkbox>
+        <el-checkbox v-for="t in tags" :key="t.id" :value="t.id">{{ t.name }}</el-checkbox>
       </el-checkbox-group>
       <el-empty v-if="tags.length === 0" description="暂无标签，可在下方新建" :image-size="60" />
       <el-divider />
