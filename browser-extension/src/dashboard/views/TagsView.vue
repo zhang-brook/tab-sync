@@ -4,7 +4,17 @@
     <div class="tags-left">
       <div class="left-header">
         <span class="left-title">标签</span>
-        <el-button size="small" type="primary" :icon="Plus" @click="openCreate">新建</el-button>
+        <div class="left-actions">
+          <el-button
+            size="small"
+            text
+            :icon="Refresh"
+            :loading="tagsLoading"
+            title="刷新"
+            @click="refresh"
+          />
+          <el-button size="small" type="primary" :icon="Plus" @click="openCreate">新建</el-button>
+        </div>
       </div>
 
       <div v-if="tagsLoading" class="left-loading">
@@ -93,7 +103,7 @@
 import { ref, onMounted } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Close, Loading } from '@element-plus/icons-vue'
+import { Plus, Close, Loading, Refresh } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TagInfo } from '@/shared/types/workspace'
@@ -226,6 +236,14 @@ async function removeTagFromTab(tab: TagTabItem) {
   }
 }
 
+async function refresh() {
+  await loadTags()
+  if (selectedTag.value) {
+    await loadTagTabs(selectedTag.value.id)
+  }
+  ElMessage.success('已刷新')
+}
+
 onMounted(loadTags)
 </script>
 
@@ -252,6 +270,11 @@ onMounted(loadTags)
 .left-title {
   font-weight: 600;
   font-size: 14px;
+}
+.left-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .left-loading,
 .right-loading {
