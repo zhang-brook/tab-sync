@@ -47,13 +47,16 @@
           <span class="section-title">本地标签页构成</span>
         </template>
         <el-row :gutter="24">
-          <el-col :span="8">
+          <el-col :span="6">
             <el-statistic title="打开中（总数）" :value="stats?.openTabs ?? 0" />
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-statistic title="已冻结" :value="stats?.frozenTabs ?? 0" />
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
+            <el-statistic title="未冻结" :value="unfrozenTabs" />
+          </el-col>
+          <el-col :span="6">
             <el-statistic title="冻结占比" :value="frozenPercent" suffix="%" />
           </el-col>
         </el-row>
@@ -116,6 +119,13 @@ const cards = computed(() => [
 const frozenPercent = computed(() => {
   const open = stats.value?.openTabs ?? 0
   return open > 0 ? Math.round(((stats.value?.frozenTabs ?? 0) / open) * 100) : 0
+})
+
+/** 未冻结（仍加载中）的标签页数 = 打开总数 - 已冻结 */
+const unfrozenTabs = computed(() => {
+  const open = stats.value?.openTabs ?? 0
+  const frozen = stats.value?.frozenTabs ?? 0
+  return Math.max(open - frozen, 0)
 })
 
 function formatTime(iso: string): string {
