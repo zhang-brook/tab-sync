@@ -62,6 +62,11 @@ func main() {
 
 	// 嵌入的静态资源（web/ 目录）
 	webSub, _ := fs.Sub(webFS, "web")
+
+	// 访问根路径自动跳转到管理控制台（设置向导 / 后台）
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/setup")
+	})
 	r.GET("/setup", func(c *gin.Context) {
 		c.FileFromFS("/setup.html", http.FS(webSub))
 	})
