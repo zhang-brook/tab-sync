@@ -175,7 +175,6 @@
                 <div class="ws-tab-item">
                   <span class="drag-handle" title="拖拽排序">⋮⋮</span>
                   <LazyFavicon
-                    v-if="tab.favIconUrl"
                     :favIconUrl="tab.favIconUrl"
                     :size="16"
                     class="tab-favicon"
@@ -210,7 +209,6 @@
             <div v-else class="flat-tabs">
               <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item">
                 <LazyFavicon
-                  v-if="item.tab.favIconUrl"
                   :favIconUrl="item.tab.favIconUrl"
                   :size="16"
                   class="tab-favicon"

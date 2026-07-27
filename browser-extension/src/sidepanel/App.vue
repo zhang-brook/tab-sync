@@ -119,7 +119,6 @@
                         @click.stop
                       />
                       <LazyFavicon
-                        v-if="tab.favIconUrl"
                         :favIconUrl="tab.favIconUrl"
                         :size="16"
                         class="tab-favicon"
@@ -153,7 +152,6 @@
                     @click.stop
                   />
                   <LazyFavicon
-                    v-if="item.favIconUrl"
                     :favIconUrl="item.favIconUrl"
                     :size="16"
                     class="tab-favicon"

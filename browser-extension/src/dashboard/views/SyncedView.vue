@@ -27,7 +27,7 @@
 
     <div v-else class="tab-scroll">
       <div v-for="item in filtered" :key="item.workspaceId + '-' + item.tab.tabId" class="synced-item">
-        <LazyFavicon v-if="item.tab.favIconUrl" :favIconUrl="item.tab.favIconUrl" :size="16" class="favicon" />
+        <LazyFavicon :favIconUrl="item.tab.favIconUrl" :size="16" class="favicon" />
         <div class="main" @click="openTab(item.tab.url)">
           <div class="title">{{ item.tab.title || item.tab.url }}</div>
           <div class="url">{{ item.tab.url }}</div>
