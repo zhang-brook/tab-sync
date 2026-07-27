@@ -27,7 +27,7 @@
 
     <div v-else class="tab-scroll">
       <div v-for="item in filtered" :key="item.workspaceId + '-' + item.tab.tabId" class="synced-item">
-        <img v-if="item.tab.favIconUrl" :src="item.tab.favIconUrl" class="favicon" alt="" />
+        <LazyFavicon v-if="item.tab.favIconUrl" :favIconUrl="item.tab.favIconUrl" :size="16" class="favicon" />
         <div class="main" @click="openTab(item.tab.url)">
           <div class="title">{{ item.tab.title || item.tab.url }}</div>
           <div class="url">{{ item.tab.url }}</div>
@@ -46,6 +46,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'

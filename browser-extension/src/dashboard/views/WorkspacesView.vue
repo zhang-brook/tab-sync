@@ -174,13 +174,12 @@
               <template #item="{ element: tab }">
                 <div class="ws-tab-item">
                   <span class="drag-handle" title="拖拽排序">⋮⋮</span>
-                  <img
+                  <LazyFavicon
                     v-if="tab.favIconUrl"
-                    :src="tab.favIconUrl"
+                    :favIconUrl="tab.favIconUrl"
+                    :size="16"
                     class="tab-favicon"
-                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                   />
-                  <div v-else class="tab-favicon-placeholder" />
                   <div class="tab-text">
                     <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
                     <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
@@ -210,13 +209,12 @@
             <!-- 包含子工作组：只读列表，带来源标记 -->
             <div v-else class="flat-tabs">
               <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item">
-                <img
+                <LazyFavicon
                   v-if="item.tab.favIconUrl"
-                  :src="item.tab.favIconUrl"
+                  :favIconUrl="item.tab.favIconUrl"
+                  :size="16"
                   class="tab-favicon"
-                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
-                <div v-else class="tab-favicon-placeholder" />
                 <div class="tab-text">
                   <div class="tab-title" :title="item.tab.title" @click="openSingleTab(item.tab.url)">{{ item.tab.title || '(无标题)' }}</div>
                   <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
@@ -306,6 +304,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'

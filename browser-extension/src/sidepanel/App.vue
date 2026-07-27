@@ -118,13 +118,12 @@
                         @change="(v) => toggleTab(tab.chromeTabId, Boolean(v))"
                         @click.stop
                       />
-                      <img
+                      <LazyFavicon
                         v-if="tab.favIconUrl"
-                        :src="tab.favIconUrl"
+                        :favIconUrl="tab.favIconUrl"
+                        :size="16"
                         class="tab-favicon"
-                        @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                       />
-                      <div v-else class="tab-favicon-placeholder" />
                       <div class="tab-info">
                         <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
                         <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
@@ -153,13 +152,12 @@
                     @change="(v) => toggleTab(item.chromeTabId, Boolean(v))"
                     @click.stop
                   />
-                  <img
+                  <LazyFavicon
                     v-if="item.favIconUrl"
-                    :src="item.favIconUrl"
+                    :favIconUrl="item.favIconUrl"
+                    :size="16"
                     class="tab-favicon"
-                    @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                   />
-                  <div v-else class="tab-favicon-placeholder" />
                   <div class="tab-info">
                     <div class="tab-title" :title="item.title">{{ item.title || '(无标题)' }}</div>
                     <div class="tab-url" :title="item.url">{{ item.url }}</div>
@@ -190,6 +188,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { Search, Close, Loading, CaretRight, Monitor, Aim } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '../shared/composables/useMessage'

@@ -79,7 +79,7 @@
                 @change="(val: any) => toggleTab(item.tab.id, val)"
                 @click.stop
               />
-              <LazyFavicon v-if="item.tab.favIconUrl" :src="item.tab.favIconUrl" :size="16" class="favicon" />
+              <LazyFavicon v-if="item.tab.favIconUrl" :favIconUrl="item.tab.favIconUrl" :size="16" class="favicon" />
               <span class="tab-title" :title="item.tab.title" @click="activateTab(item.tab)">{{ item.tab.title || item.tab.url }}</span>
               <span class="tab-url" :title="item.tab.url">{{ item.tab.url }}</span>
               <span class="tab-ws-tags">
@@ -110,7 +110,7 @@
                     @change="(val: any) => toggleTab(tab.id, val)"
                     @click.stop
                   />
-                  <LazyFavicon v-if="tab.favIconUrl" :src="tab.favIconUrl" :size="16" class="favicon" />
+                  <LazyFavicon v-if="tab.favIconUrl" :favIconUrl="tab.favIconUrl" :size="16" class="favicon" />
                   <span class="tab-title" :title="tab.title" @click="activateTab(tab)">{{ tab.title || tab.url }}</span>
                   <span class="tab-url" :title="tab.url">{{ tab.url }}</span>
                   <span class="tab-ws-tags">

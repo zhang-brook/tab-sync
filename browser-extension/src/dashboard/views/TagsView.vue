@@ -53,7 +53,7 @@
         <el-empty v-else-if="tabs.length === 0" description="该标签下暂无标签页" :image-size="60" />
         <div v-else class="tab-list">
           <div v-for="tab in tabs" :key="tab.workspaceId + '-' + tab.tabId" class="tab-item">
-            <img v-if="tab.favIconUrl" :src="tab.favIconUrl" class="favicon" alt="" />
+            <LazyFavicon v-if="tab.favIconUrl" :favIconUrl="tab.favIconUrl" :size="16" class="favicon" />
             <div class="tab-main" @click="openTab(tab)">
               <div class="tab-title">{{ tab.title || tab.url }}</div>
               <div class="tab-url">{{ tab.url }}</div>
@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'

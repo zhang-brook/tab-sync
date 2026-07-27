@@ -1,4 +1,4 @@
-import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, FetchFaviconData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
@@ -100,6 +100,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'GET_TAG_TABS':
       return handleGetTagTabs(message.payload.tagId)
+
+    case 'FETCH_FAVICON':
+      return handleFetchFavicon(message.payload.url)
 
     default:
       return { success: false, error: '未知的消息类型' }
@@ -792,4 +795,50 @@ async function handleGetTagTabs(tagId: number): Promise<MessageResponse<TagTabsD
     return { success: true, data: { tabs: res.data.tabs } }
   }
   return { success: false, error: res.error || '获取标签下的标签页失败', authError: res.status === 401 }
+}
+
+// favicon 抓取结果缓存（Service Worker 生命周期内），避免重复跨域请求
+const faviconCache = new Map<string, string>()
+const FAVICON_CACHE_MAX = 1000
+
+/**
+ * 通过 Background Service Worker 跨域抓取 favicon，转为 data URL 返回。
+ * 由前端懒加载时调用：不把图标存到后端（规避存储清理与服务器带宽问题），
+ * 也不直接依赖第三方跨域加载（SW 具备 <all_urls> 权限，可正常抓取）。
+ */
+async function handleFetchFavicon(url: string): Promise<MessageResponse<FetchFaviconData>> {
+  if (!/^https?:\/\//i.test(url)) {
+    return { success: false, error: '不支持的 favicon 地址' }
+  }
+  const cached = faviconCache.get(url)
+  if (cached) {
+    return { success: true, data: { dataUrl: cached } }
+  }
+  try {
+    const resp = await fetch(url, { method: 'GET', cache: 'force-cache' })
+    if (!resp.ok) {
+      return { success: false, error: `favicon 抓取失败: ${resp.status}` }
+    }
+    const buf = await resp.arrayBuffer()
+    const contentType = resp.headers.get('content-type') || 'image/x-icon'
+    const dataUrl = `data:${contentType};base64,${arrayBufferToBase64(buf)}`
+    if (faviconCache.size >= FAVICON_CACHE_MAX) {
+      faviconCache.clear()
+    }
+    faviconCache.set(url, dataUrl)
+    return { success: true, data: { dataUrl } }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'favicon 抓取异常' }
+  }
+}
+
+/** ArrayBuffer -> base64（分块，避免 String.fromCharCode 参数过多） */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 0x4000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)))
+  }
+  return btoa(binary)
 }
