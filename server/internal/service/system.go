@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"os"
 
 	"github.com/spidermemos/tab-sync-server/internal/config"
 	"github.com/spidermemos/tab-sync-server/internal/database"
@@ -66,14 +67,46 @@ func (s *SystemService) IsSetupDone() bool {
 }
 
 // CompleteSetup 完成初始化设置
-// 将管理员密码哈希后存储到数据库
+// 将管理员密码哈希后存储到数据库，并持久化当前 JWT 签名密钥，
+// 保证后续后端重启后管理员登录态依然有效。
 func (s *SystemService) CompleteSetup(adminPassword string) error {
-	config := model.ServerConfig{
-		SetupDone:     true,
-		AdminUser:     "admin",
-		AdminPassword: hashPassword(adminPassword),
+	var config model.ServerConfig
+	// 复用单例配置行（不新建重复记录）
+	if err := s.db.First(&config).Error; err != nil {
+		config = model.ServerConfig{}
 	}
-	return s.db.Create(&config).Error
+	config.SetupDone = true
+	config.AdminUser = "admin"
+	config.AdminPassword = hashPassword(adminPassword)
+	config.JWTSecret = s.cfg.JWTSecret
+	return s.db.Save(&config).Error
+}
+
+// ResolveJWTSecret 解析并持久化 JWT 签名密钥，保证后端重启后管理员
+// 登录态依然有效：
+//  1. 若设置了 JWT_SECRET 环境变量，优先使用；
+//  2. 否则尝试读取数据库中已持久化的密钥；
+//  3. 若数据库无密钥（历史数据或未初始化），则生成随机密钥：
+//     - 已初始化：写回单例配置行；
+//     - 未初始化：保留在内存，待 CompleteSetup 时持久化。
+func ResolveJWTSecret(db *database.DB, cfg *config.Config) {
+	if env := os.Getenv("JWT_SECRET"); env != "" {
+		cfg.JWTSecret = env
+		return
+	}
+	var sc model.ServerConfig
+	if err := db.First(&sc).Error; err == nil {
+		if sc.JWTSecret != "" {
+			cfg.JWTSecret = sc.JWTSecret
+			return
+		}
+		// 已初始化但密钥未持久化（历史数据）：生成并写回
+		sc.JWTSecret = config.GenerateRandomSecret()
+		cfg.JWTSecret = sc.JWTSecret
+		db.Save(&sc)
+		return
+	}
+	// 尚未初始化：内存密钥已由 buildConfig 生成，待 CompleteSetup 持久化
 }
 
 // VerifyAdminPassword 验证管理员密码

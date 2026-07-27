@@ -47,7 +47,7 @@ func Load() *Config {
 		Port:                getEnv("PORT", "8080"),
 		Version:             getEnv("SERVER_VERSION", "1.0.0"),
 		DataDir:             getEnv("DATA_DIR", "./data"),
-		JWTSecret:           getEnv("JWT_SECRET", generateRandomSecret()),
+		JWTSecret:           getEnv("JWT_SECRET", GenerateRandomSecret()),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
 		LogOutput:           getEnv("LOG_OUTPUT", "stdout"),
 		MinExtVersion:       getEnv("MIN_EXT_VERSION", "1.0.0"),
@@ -110,10 +110,10 @@ func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
 	return d
 }
 
-// generateRandomSecret 生成随机密钥（32 字节 hex）
+// GenerateRandomSecret 生成随机密钥（32 字节 hex）
 // 在未设置 JWT_SECRET 环境变量时作为默认值
-// 首次设置完成后，密钥会持久化到数据库
-func generateRandomSecret() string {
+// 首次设置完成后，密钥会持久化到数据库（见 service.ResolveJWTSecret）
+func GenerateRandomSecret() string {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		// 极端情况下回退到固定值（不应该发生）

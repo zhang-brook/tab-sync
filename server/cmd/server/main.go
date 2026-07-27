@@ -44,6 +44,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 解析并持久化 JWT 签名密钥（保证重启后管理员登录态有效）
+	service.ResolveJWTSecret(db, cfg)
+
 	// 初始化各层
 	services := service.NewServices(db, cfg)
 	handlers := handler.NewHandlers(services)

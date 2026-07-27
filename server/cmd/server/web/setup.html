@@ -252,12 +252,16 @@
       background: radial-gradient(circle, rgba(139,92,246,.5), transparent 70%);
       top: -80px; right: -60px;
     }
-    .token-card .label { font-size: 12px; color: #c7d2fe; letter-spacing: 1px; text-transform: uppercase; position: relative; z-index: 1; }
-    .token-card .value {
+    /* 防止任何继承的列表标记/序号混入 token 展示 */
+    .token-card, .token-card * { list-style: none; }
+    .token-card .value-box {
+      width: 100%; resize: none; border: none; outline: none; background: transparent;
       font-family: "SF Mono", "Cascadia Code", "Courier New", monospace;
-      font-size: 14px; color: #a5f3d0; word-break: break-all;
-      margin: 10px 0 16px; line-height: 1.6; position: relative; z-index: 1;
+      font-size: 14px; color: #a5f3d0; line-height: 1.6;
+      margin: 10px 0 16px; position: relative; z-index: 1; cursor: text;
+      word-break: break-all; white-space: pre-wrap;
     }
+    .token-card .label { font-size: 12px; color: #c7d2fe; letter-spacing: 1px; text-transform: uppercase; position: relative; z-index: 1; }
     .token-card .actions { position: relative; z-index: 1; display: flex; gap: 10px; }
     .token-card .actions .btn { background: rgba(255,255,255,.14); box-shadow: none; border: 1px solid rgba(255,255,255,.2); }
     .token-card .actions .btn:hover { background: rgba(255,255,255,.24); box-shadow: none; }
@@ -540,7 +544,7 @@
 
           <div class="token-card">
             <div class="label">Token · API Key</div>
-            <div class="value" id="resultToken"></div>
+            <textarea class="value-box" id="resultToken" rows="3" readonly></textarea>
             <div class="actions">
               <button class="btn btn-sm" id="btnCopyToken">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -791,7 +795,7 @@
         });
         const data = await res.json();
         if (res.ok && data.code === 0) {
-          $('resultToken').textContent = data.data.adminToken;
+          $('resultToken').value = data.data.adminToken;
           if (data.data.jwt) localStorage.setItem('admin_jwt', data.data.jwt);
           setBrand('设置已完成 🎉', '管理员令牌已生成，复制并配置到你的浏览器扩展即可开始同步。');
           showView('token');
@@ -844,14 +848,29 @@
     }
 
     // ============ 仪表盘 ============
+    // 统一的鉴权请求封装：自动携带 JWT；若后端返回 401（如密钥轮换/重启后旧会话失效），
+    // 则清除本地会话并跳转到登录页，避免停留在内容残缺的后台界面。
+    async function apiFetch(path, opts = {}) {
+      const jwt = localStorage.getItem('admin_jwt');
+      const headers = Object.assign({}, opts.headers || {});
+      if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+      const res = await fetch(API + path, Object.assign({}, opts, { headers }));
+      if (res.status === 401) {
+        doLogout();
+        const err = new Error('unauthorized');
+        err.unauthorized = true;
+        throw err;
+      }
+      return res;
+    }
+
     async function loadDashboard() {
       const jwt = localStorage.getItem('admin_jwt');
-      if (!jwt) { doLogout(); return; }
+      if (!jwt) { doLogout(); return false; }
 
-      const headers = { 'Authorization': 'Bearer ' + jwt };
       setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
 
-      // 版本信息
+      // 版本信息（公开接口）
       try {
         const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
         if (v.code === 0) {
@@ -859,22 +878,24 @@
         }
       } catch (e) {}
 
-      // 统计
+      // 统计（需鉴权）
       try {
-        const s = await fetch(API + '/v1/tab-sync/admin/stats', { headers }).then(r => r.json());
+        const s = await apiFetch('/v1/tab-sync/admin/stats').then(r => r.json());
         if (s.code === 0) {
           const nums = $('dashStats').querySelectorAll('.num');
           nums[0].textContent = s.data.devices || 0;
           nums[1].textContent = s.data.workspaces || 0;
           nums[2].textContent = s.data.tabs || 0;
         }
-      } catch (e) {}
+      } catch (e) { if (e.unauthorized) return false; }
 
-      // 令牌列表
+      // 令牌列表（需鉴权）
       try {
-        const t = await fetch(API + '/v1/tab-sync/admin/tokens', { headers }).then(r => r.json());
+        const t = await apiFetch('/v1/tab-sync/admin/tokens').then(r => r.json());
         if (t.code === 0) renderTokens(t.data.tokens || []);
-      } catch (e) {}
+      } catch (e) { if (e.unauthorized) return false; }
+
+      return true;
     }
 
     function renderTokens(tokens) {
@@ -921,11 +942,10 @@
     async function generateToken() {
       const name = $('newTokenName').value.trim() || '未命名令牌';
       const isAdmin = $('newTokenAdmin').checked;
-      const jwt = localStorage.getItem('admin_jwt');
       try {
-        const res = await fetch(API + '/v1/tab-sync/admin/tokens', {
+        const res = await apiFetch('/v1/tab-sync/admin/tokens', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, isAdmin })
         });
         const data = await res.json();
@@ -937,15 +957,14 @@
         } else {
           toast(data.msg || '生成失败', 'error');
         }
-      } catch (e) { toast('网络错误，生成失败', 'error'); }
+      } catch (e) { if (!e.unauthorized) toast('网络错误，生成失败', 'error'); }
     }
 
     async function loadTokensOnly() {
-      const jwt = localStorage.getItem('admin_jwt');
       try {
-        const t = await fetch(API + '/v1/tab-sync/admin/tokens', { headers: { 'Authorization': 'Bearer ' + jwt } }).then(r => r.json());
+        const t = await apiFetch('/v1/tab-sync/admin/tokens').then(r => r.json());
         if (t.code === 0) renderTokens(t.data.tokens || []);
-      } catch (e) {}
+      } catch (e) { if (e.unauthorized) return; }
     }
 
     function showTokenModal(token, name) {
@@ -958,8 +977,8 @@
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>' +
           '</div>' +
           '<h3>新令牌已生成</h3>' +
-          '<p>请立即复制并保存到密码管理器。<b>此令牌仅显示这一次</b>。</p>' +
-          '<div class="token-card"><div class="label">' + escapeHtml(name || '令牌') + '</div><div class="value">' + escapeHtml(token) + '</div></div>' +
+          '<p>' + (name ? '已为 <b>' + escapeHtml(name) + '</b> 生成访问令牌。' : '') + '请立即复制并保存到密码管理器。<b>此令牌仅显示这一次</b>。</p>' +
+          '<div class="token-card"><textarea class="value-box" rows="3" readonly>' + escapeHtml(token) + '</textarea></div>' +
           '<div class="btn-row">' +
             '<button class="btn btn-ghost" data-act="close">关闭</button>' +
             '<button class="btn" data-act="copy">复制令牌</button>' +
@@ -977,15 +996,11 @@
 
     async function confirmRevoke() {
       if (!pendingRevoke) return;
-      const jwt = localStorage.getItem('admin_jwt');
       const id = pendingRevoke;
       pendingRevoke = null;
       $('revokeModal').classList.remove('show');
       try {
-        const res = await fetch(API + '/v1/tab-sync/admin/tokens/' + id, {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + jwt }
-        });
+        const res = await apiFetch(API + '/v1/tab-sync/admin/tokens/' + id, { method: 'DELETE' });
         const data = await res.json();
         if (data.code === 0) {
           toast('令牌已吊销', 'success');
@@ -993,7 +1008,7 @@
         } else {
           toast(data.msg || '吊销失败', 'error');
         }
-      } catch (e) { toast('网络错误，吊销失败', 'error'); }
+      } catch (e) { if (!e.unauthorized) toast('网络错误，吊销失败', 'error'); }
     }
 
     function doLogout() {
@@ -1007,9 +1022,9 @@
     // ============ 事件绑定 ============
     $('btnSetup').addEventListener('click', completeSetup);
     $('btnLogin').addEventListener('click', adminLogin);
-    $('btnToDash').addEventListener('click', async () => { await loadDashboard(); showView('dashboard'); });
+    $('btnToDash').addEventListener('click', async () => { await loadDashboard(); if (localStorage.getItem('admin_jwt')) showView('dashboard'); });
     $('btnCopyToken').addEventListener('click', async () => {
-      await copyText($('resultToken').textContent);
+      await copyText($('resultToken').value);
       toast('Token 已复制到剪贴板', 'success');
     });
     $('btnGenToken').addEventListener('click', generateToken);
@@ -1031,8 +1046,10 @@
         if (data.code === 0 && data.data.setupDone) {
           const jwt = localStorage.getItem('admin_jwt');
           if (jwt) {
-            setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
             await loadDashboard();
+            // 若加载过程中因会话失效（如后端重启导致 401）已退至登录页，则不再切回后台
+            if (!localStorage.getItem('admin_jwt')) return;
+            setBrand('控制台已就绪', '在这里管理访问令牌，并查看服务运行概览。');
             showView('dashboard');
           } else {
             setBrand('欢迎回来', '请输入管理员密码以访问控制台。');
