@@ -180,7 +180,7 @@
                     class="tab-favicon"
                   />
                   <div class="tab-text">
-                    <div class="tab-title" :title="tab.title" @click="openSingleTab(tab.url)">{{ tab.title || '(无标题)' }}</div>
+                    <div class="tab-title" :title="tab.displayName ? tab.displayName + '（原：' + tab.title + '）' : tab.title" @click="openSingleTab(tab.url)">{{ displayTitle(tab) }}</div>
                     <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
                     <div class="tab-tags" v-if="tab.tags && tab.tags.length">
                       <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
@@ -190,6 +190,11 @@
                   <el-tooltip content="修改添加时间" placement="top">
                     <el-button size="small" text @click="openEditTimeDialog(selectedWorkspace!.id, tab)">
                       <el-icon><Clock /></el-icon>
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip content="重命名" placement="top">
+                    <el-button size="small" text @click="openRenameDialog(selectedWorkspace!.id, tab)">
+                      <el-icon><Edit /></el-icon>
                     </el-button>
                   </el-tooltip>
                   <el-tooltip content="标签" placement="top">
@@ -220,7 +225,7 @@
                   class="tab-favicon"
                 />
                 <div class="tab-text">
-                  <div class="tab-title" :title="item.tab.title" @click="openSingleTab(item.tab.url)">{{ item.tab.title || '(无标题)' }}</div>
+                  <div class="tab-title" :title="item.tab.displayName ? item.tab.displayName + '（原：' + item.tab.title + '）' : item.tab.title" @click="openSingleTab(item.tab.url)">{{ displayTitle(item.tab) }}</div>
                   <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
                   <div class="tab-tags" v-if="item.tab.tags && item.tab.tags.length">
                     <el-tag v-for="tg in item.tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
@@ -238,6 +243,11 @@
                 <el-tooltip content="修改添加时间" placement="top">
                   <el-button size="small" text @click="openEditTimeDialog(item.workspaceId, item.tab)">
                     <el-icon><Clock /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip content="重命名" placement="top">
+                  <el-button size="small" text @click="openRenameDialog(item.workspaceId, item.tab)">
+                    <el-icon><Edit /></el-icon>
                   </el-button>
                 </el-tooltip>
                 <el-tooltip content="标签" placement="top">
@@ -321,6 +331,26 @@
       </template>
     </el-dialog>
 
+    <!-- 重命名对话框 -->
+    <el-dialog v-model="renameDialogVisible" title="重命名标签页" width="420px" destroy-on-close>
+      <el-form label-width="80px" label-position="left">
+        <el-form-item label="名称">
+          <el-input
+            v-model="renameValue"
+            placeholder="输入新的显示名称（留空则恢复原始标题）"
+            maxlength="500"
+            show-word-limit
+            clearable
+            @keyup.enter="handleSaveRename"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="renameDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="renameSaving" @click="handleSaveRename">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 标签编辑对话框 -->
     <TagEditorDialog
       v-model="tagEditorVisible"
@@ -339,6 +369,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
+import { openTabAfterActive } from '../../shared/utils/tab-utils'
 import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '../../shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
 
@@ -642,8 +673,8 @@ async function handleOpenAsTabGroup(id: string) {
   else ElMessage.error(res.error || '打开失败')
 }
 
-function openSingleTab(url: string) {
-  chrome.tabs.create({ url })
+async function openSingleTab(url: string) {
+  await openTabAfterActive(url)
 }
 
 async function handleRemoveTab(workspaceId: string, tabId: string) {
@@ -665,6 +696,17 @@ const timeDialogVisible = ref(false)
 const timeSaving = ref(false)
 const timeValue = ref<Date | null>(null)
 const timeTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
+
+// 重命名标签页
+const renameDialogVisible = ref(false)
+const renameSaving = ref(false)
+const renameValue = ref('')
+const renameTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
+
+/** 列表中优先展示重命名后的显示名，否则回退到原始标题 */
+function displayTitle(tab: TabReference): string {
+  return tab.displayName || tab.title || '(无标题)'
+}
 
 /** 列表内展示：如 07-28 或 2025-12-31 */
 function formatAddedAt(addedAt: string): string {
@@ -707,6 +749,36 @@ async function handleSaveAddedTime() {
   if (res.success) {
     ElMessage.success('添加时间已更新')
     timeDialogVisible.value = false
+    await loadWorkspaces()
+  } else {
+    ElMessage.error(res.error || '更新失败')
+  }
+}
+
+function openRenameDialog(workspaceId: string, tab: TabReference) {
+  renameTarget.value = { workspaceId, tabId: tab.tabId }
+  renameValue.value = tab.displayName || tab.title || ''
+  renameDialogVisible.value = true
+}
+
+async function handleSaveRename() {
+  const target = renameTarget.value
+  if (!target) return
+  // 允许留空以清除重命名，恢复使用原始标题
+  const name = renameValue.value.trim()
+  renameSaving.value = true
+  const res = await sendMessage({
+    action: 'UPDATE_WORKSPACE_TAB',
+    payload: {
+      workspaceId: target.workspaceId,
+      tabId: target.tabId,
+      displayName: name,
+    },
+  })
+  renameSaving.value = false
+  if (res.success) {
+    ElMessage.success(name ? '已重命名' : '已恢复原始标题')
+    renameDialogVisible.value = false
     await loadWorkspaces()
   } else {
     ElMessage.error(res.error || '更新失败')

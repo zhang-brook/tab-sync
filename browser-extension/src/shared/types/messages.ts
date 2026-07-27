@@ -170,7 +170,7 @@ export interface MoveWorkspaceTabMessage {
   }
 }
 
-/** 更新工作组内单个标签页属性（当前支持手动设置添加时间） */
+/** 更新工作组内单个标签页属性（支持手动设置添加时间、重命名） */
 export interface UpdateWorkspaceTabMessage {
   action: 'UPDATE_WORKSPACE_TAB'
   payload: {
@@ -180,6 +180,8 @@ export interface UpdateWorkspaceTabMessage {
     tabId: string
     /** 手动设置的添加时间（RFC3339 格式） */
     addedAt?: string
+    /** 重命名后的显示名（空字符串表示清除重命名，恢复使用 title） */
+    displayName?: string
   }
 }
 

@@ -33,6 +33,8 @@ export interface TabReference {
   url: string
   /** 标题快照 */
   title: string
+  /** 用户重命名后的显示名（可选，为空时使用 title） */
+  displayName?: string
   /** 图标快照 */
   favIconUrl: string
   /** 排序序号 */

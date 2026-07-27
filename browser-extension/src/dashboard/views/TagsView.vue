@@ -95,6 +95,7 @@ import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TagInfo } from '@/shared/types/workspace'
 import type { TagTabItem, TagsData, TagTabsData } from '@/shared/types/messages'
 
@@ -201,7 +202,7 @@ async function deleteTag(tag: TagInfo) {
 }
 
 async function openTab(tab: TagTabItem) {
-  if (tab.url) await chrome.tabs.create({ url: tab.url })
+  if (tab.url) await openTabAfterActive(tab.url)
 }
 
 async function removeTagFromTab(tab: TagTabItem) {

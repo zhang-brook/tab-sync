@@ -50,6 +50,7 @@ import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TabReference } from '@/shared/types/workspace'
 import type { WorkspacesData } from '@/shared/types/messages'
 
@@ -101,8 +102,8 @@ function applySearch() {
   )
 }
 
-function openTab(url?: string) {
-  if (url) chrome.tabs.create({ url })
+async function openTab(url?: string) {
+  if (url) await openTabAfterActive(url)
 }
 
 async function remove(item: SyncedItem) {

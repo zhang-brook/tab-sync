@@ -6,6 +6,7 @@ import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devi
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
+import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
 import { registerPendingReopen } from './tab-monitor'
 
@@ -331,7 +332,7 @@ async function handleCloseTabsBatch(tabIds: string[]): Promise<MessageResponse> 
 
 /** 重新打开标签页 */
 async function handleReopenTab(url: string): Promise<MessageResponse> {
-  await chrome.tabs.create({ url })
+  await openTabAfterActive(url)
   logger.info('Reopened tab:', url)
   return { success: true }
 }
@@ -543,10 +544,11 @@ async function handleOpenWorkspace(
         }
       }
     } else {
-      // 当前窗口模式
-      for (const tabRef of toReopen) {
+      // 当前窗口模式：在激活标签之后依次打开，保持原有顺序
+      for (let i = 0; i < toReopen.length; i++) {
+        const tabRef = toReopen[i]
         registerPendingReopen(tabRef.url, tabRef.tabId)
-        const tab = await chrome.tabs.create({ url: tabRef.url })
+        const tab = await openTabAfterActive(tabRef.url, i)
         opened++
         if (tab?.id != null) {
           allChromeTabIds.push(tab.id)
@@ -602,12 +604,15 @@ async function handleMoveWorkspaceTab(
   }
 }
 
-/** 更新工作组内单个标签页属性（当前支持手动设置添加时间 addedAt） */
+/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName） */
 async function handleUpdateWorkspaceTab(
-  payload: { workspaceId: string; tabId: string; addedAt?: string },
+  payload: { workspaceId: string; tabId: string; addedAt?: string; displayName?: string },
 ): Promise<MessageResponse> {
   try {
-    const res = await updateWorkspaceTab(payload.workspaceId, payload.tabId, { addedAt: payload.addedAt })
+    const res = await updateWorkspaceTab(payload.workspaceId, payload.tabId, {
+      addedAt: payload.addedAt,
+      displayName: payload.displayName,
+    })
     if (res.ok) {
       logger.info(`Tab updated: ${payload.tabId} in workspace=${payload.workspaceId}`)
       return { success: true }
