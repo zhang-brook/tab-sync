@@ -106,20 +106,20 @@ type SyncEvent struct {
 
 // Tag 全局标签（不绑定设备，按 scope 区分用途）
 type Tag struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement"`
-	Name      string    `gorm:"size:32;not null;index"`
-	Color     string    `gorm:"size:7"`
-	Scope     string    `gorm:"size:8;index"`
+	ID        uint   `gorm:"primaryKey;autoIncrement"`
+	Name      string `gorm:"size:32;not null;index"`
+	Color     string `gorm:"size:7"`
+	Scope     string `gorm:"size:8;index"`
 	CreatedAt time.Time
 }
 
 // TabTag 标签页与标签的关联（关联 WorkspaceTab）
 type TabTag struct {
-	ID            uint   `gorm:"primaryKey;autoIncrement"`
-	WorkspaceTabID uint  `gorm:"uniqueIndex:uniq_tab_tag;index"`
-	WorkspaceID   string `gorm:"index;size:64"`
-	TagID         uint   `gorm:"uniqueIndex:uniq_tab_tag;index"`
-	Tag           Tag    `gorm:"foreignKey:TagID"`
+	ID             uint   `gorm:"primaryKey;autoIncrement"`
+	WorkspaceTabID uint   `gorm:"uniqueIndex:uniq_tab_tag;index"`
+	WorkspaceID    string `gorm:"index;size:64"`
+	TagID          uint   `gorm:"uniqueIndex:uniq_tab_tag;index"`
+	Tag            Tag    `gorm:"foreignKey:TagID"`
 }
 
 // WorkspaceTag 工作组与标签的关联
@@ -135,14 +135,14 @@ type WorkspaceTag struct {
 // RecycleBinTab 回收站中的标签页：从工作组移除后暂存于此，可恢复或彻底删除。
 // 恢复时统一归入「未分组」系统工作组（见 service.WorkspaceService.GetOrCreateUngroupedWorkspace）。
 type RecycleBinTab struct {
-	ID                   uint      `gorm:"primaryKey;autoIncrement"`
-	OriginalWorkspaceID   string   `gorm:"index;size:64;not null"` // 被移除时所属工作组 UUID
-	OriginalWorkspaceName string   `gorm:"size:200"`               // 被移除时所属工作组名称（快照，便于展示）
-	URL                  string   `gorm:"size:2048;not null"`
-	Title                string   `gorm:"size:500"`
-	DisplayName          string   `gorm:"size:500"` // 用户自定义显示名
-	FavIconURL           string   `gorm:"size:2048"`
-	SortOrder            int      `gorm:"default:0"`
-	DeletedAt            time.Time // 移入回收站的时间
-	CreatedAt            time.Time
+	ID                    uint      `gorm:"primaryKey;autoIncrement"`
+	OriginalWorkspaceID   string    `gorm:"index;size:64;not null"` // 被移除时所属工作组 UUID
+	OriginalWorkspaceName string    `gorm:"size:200"`               // 被移除时所属工作组名称（快照，便于展示）
+	URL                   string    `gorm:"size:2048;not null"`
+	Title                 string    `gorm:"size:500"`
+	DisplayName           string    `gorm:"size:500"` // 用户自定义显示名
+	FavIconURL            string    `gorm:"size:2048"`
+	SortOrder             int       `gorm:"default:0"`
+	DeletedAt             time.Time // 移入回收站的时间
+	CreatedAt             time.Time
 }

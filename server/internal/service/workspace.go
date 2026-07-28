@@ -69,14 +69,14 @@ type WorkspaceResponse struct {
 
 // TabReference 标签页引用
 type TabReference struct {
-	TabID      string `json:"tabId"`
-	URL        string `json:"url"`
-	Title      string `json:"title"`
+	TabID string `json:"tabId"`
+	URL   string `json:"url"`
+	Title string `json:"title"`
 	// DisplayName 用户重命名后的显示名（可选，为空时前端应使用 Title）
-	DisplayName string       `json:"displayName,omitempty"`
-	FavIconURL  string       `json:"favIconUrl"`
-	SortOrder   int          `json:"sortOrder"`
-	AddedAt     string       `json:"addedAt"`
+	DisplayName string        `json:"displayName,omitempty"`
+	FavIconURL  string        `json:"favIconUrl"`
+	SortOrder   int           `json:"sortOrder"`
+	AddedAt     string        `json:"addedAt"`
 	Tags        []TagResponse `json:"tags"`
 }
 
@@ -212,20 +212,20 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 					}
 				}
 			}
-		// 软删除：将未出现在新列表中的标签页移入回收站（而非直接物理删除）
-		for uid := range existingByID {
-			if !seen[uid] {
-				removed := existingByID[uid]
-				if s.RecycleBin != nil {
-					if aerr := s.RecycleBin.Add(tx, workspace.WorkspaceID, workspace.Name, removed); aerr != nil {
-						return aerr
+			// 软删除：将未出现在新列表中的标签页移入回收站（而非直接物理删除）
+			for uid := range existingByID {
+				if !seen[uid] {
+					removed := existingByID[uid]
+					if s.RecycleBin != nil {
+						if aerr := s.RecycleBin.Add(tx, workspace.WorkspaceID, workspace.Name, removed); aerr != nil {
+							return aerr
+						}
+					}
+					if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
+						return derr
 					}
 				}
-				if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
-					return derr
-				}
 			}
-		}
 			return nil
 		})
 		if err != nil {
@@ -450,14 +450,14 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 	tabs := make([]TabReference, len(ws.Tabs))
 	for i, tab := range ws.Tabs {
 		tabs[i] = TabReference{
-			TabID:      strconv.FormatUint(uint64(tab.ID), 10),
-			URL:        tab.URL,
-			Title:      tab.Title,
+			TabID:       strconv.FormatUint(uint64(tab.ID), 10),
+			URL:         tab.URL,
+			Title:       tab.Title,
 			DisplayName: tab.DisplayName,
-			FavIconURL: tab.FavIconURL,
-			SortOrder:  tab.SortOrder,
-			AddedAt:    tab.AddedAt.Format(time.RFC3339),
-			Tags:       tabTagsToResponses(tab.Tags),
+			FavIconURL:  tab.FavIconURL,
+			SortOrder:   tab.SortOrder,
+			AddedAt:     tab.AddedAt.Format(time.RFC3339),
+			Tags:        tabTagsToResponses(tab.Tags),
 		}
 	}
 	return WorkspaceResponse{

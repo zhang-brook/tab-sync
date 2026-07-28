@@ -24,14 +24,14 @@ func NewRecycleBinService(db *database.DB, workspaceSvc *WorkspaceService) *Recy
 
 // RecycleBinTabResponse 回收站标签页响应
 type RecycleBinTabResponse struct {
-	ID                   uint      `json:"id"`
-	OriginalWorkspaceID   string   `json:"originalWorkspaceId"`
-	OriginalWorkspaceName string   `json:"originalWorkspaceName"`
-	URL                  string    `json:"url"`
-	Title                string    `json:"title"`
-	DisplayName          string    `json:"displayName"`
-	FavIconURL           string    `json:"favIconUrl"`
-	DeletedAt            time.Time `json:"deletedAt"`
+	ID                    uint      `json:"id"`
+	OriginalWorkspaceID   string    `json:"originalWorkspaceId"`
+	OriginalWorkspaceName string    `json:"originalWorkspaceName"`
+	URL                   string    `json:"url"`
+	Title                 string    `json:"title"`
+	DisplayName           string    `json:"displayName"`
+	FavIconURL            string    `json:"favIconUrl"`
+	DeletedAt             time.Time `json:"deletedAt"`
 }
 
 // List 列出回收站中的全部标签页（按删除时间倒序）
@@ -109,13 +109,13 @@ func (s *RecycleBinService) Empty() error {
 
 func toRecycleBinResponse(it model.RecycleBinTab) RecycleBinTabResponse {
 	return RecycleBinTabResponse{
-		ID:                   it.ID,
+		ID:                    it.ID,
 		OriginalWorkspaceID:   it.OriginalWorkspaceID,
 		OriginalWorkspaceName: it.OriginalWorkspaceName,
-		URL:                  it.URL,
-		Title:                it.Title,
-		DisplayName:          it.DisplayName,
-		FavIconURL:           it.FavIconURL,
-		DeletedAt:            it.DeletedAt,
+		URL:                   it.URL,
+		Title:                 it.Title,
+		DisplayName:           it.DisplayName,
+		FavIconURL:            it.FavIconURL,
+		DeletedAt:             it.DeletedAt,
 	}
 }
