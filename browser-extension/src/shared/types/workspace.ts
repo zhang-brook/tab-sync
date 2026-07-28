@@ -29,7 +29,7 @@ export interface Workspace {
 
 /** 标签页引用 - 保存 URL 快照，即使原标签页已关闭也能重新打开 */
 export interface TabReference {
-  /** 关联的 TabRecord.id */
+  /** 标签页在后端的唯一标识 */
   tabId: string
   /** URL 快照 */
   url: string

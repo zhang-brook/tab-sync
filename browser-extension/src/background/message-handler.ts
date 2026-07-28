@@ -121,9 +121,9 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
   const chromeTabs = await chrome.tabs.query({})
   const openCount = chromeTabs.length
 
-  // const frozenTabs = await chrome.tabs.query({ frozen: true })
-  const frozenTabs = await chrome.tabs.query({ status: 'unloaded' })
-  const frozenCount = frozenTabs.length
+  // 以 status 'unloaded' 统计已休眠/未加载的标签页（frozen 查询条件需要更新的 Chrome 类型定义支持）
+  const unloadedTabs = await chrome.tabs.query({ status: 'unloaded' })
+  const frozenCount = unloadedTabs.length
 
   return {
     success: true,
@@ -423,9 +423,7 @@ async function handleOpenWorkspace(
   // 收集所有要归入标签组的 Chrome tabId（用于 asTabGroup 模式）
   const allChromeTabIds: number[] = []
 
-  // 所有标签页都按"重新打开"处理：
-  // 工作组 tab 的公开标识是后端主键 ID，并不绑定本地 chromeTabId，
-  // 因此不再做"已打开检测"（依赖 chromeTabId→ID 映射的机制已移除），避免误导。
+  // 工作组 tab 以后端主键标识，不与本地 chromeTabId 绑定，因此统一按"重新打开"处理
   const toReopen: TabReference[] = tabsToOpen
 
   // 确定标签组目标窗口 ID

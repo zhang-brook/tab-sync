@@ -1,4 +1,4 @@
-/** 认证状态（v3: API Key 风格，无需账号密码） */
+/** 认证状态（API Key 风格，无需账号密码） */
 export interface AuthState {
   /** 是否已认证 */
   authenticated: boolean

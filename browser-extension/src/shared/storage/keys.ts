@@ -1,9 +1,9 @@
-/** chrome.storage.local 的存储 key 常量
- * v2: 仅保留认证/设备/设置，业务数据全部走后端 API
- * v3: 适配轻量后端 — 移除账号密码体系，Token 改为 API Key 风格
+/**
+ * chrome.storage.local 的存储 key 常量。
+ * 本地仅保存认证/设备/设置数据，业务数据全部走后端 API。
  */
 export const STORAGE_KEYS = {
-  /** API Key 风格的认证 Token（替代原来的 accessToken） */
+  /** API Key 风格的认证 Token */
   AUTH_TOKEN: 'auth_token',
   /** 连接模式: 'lightweight' | 'zhige' */
   CONNECTION_MODE: 'connection_mode',
