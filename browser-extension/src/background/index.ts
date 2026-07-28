@@ -1,5 +1,4 @@
 import { handleMessage } from './message-handler'
-import { initTabMonitor } from './tab-monitor'
 import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
@@ -7,9 +6,6 @@ import { storage, STORAGE_KEYS } from '../shared/storage'
 import { sendMessage } from '../shared/composables/useMessage'
 
 logger.info('Service Worker started')
-
-// 注册标签页事件监听（必须在顶层同步注册，SW 重启时也能正确绑定）
-initTabMonitor()
 
 // 点击工具栏图标时打开侧边栏（已移除 popup，故 onClicked 会触发）
 chrome.action.onClicked.addListener(async (tab) => {

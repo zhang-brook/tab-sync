@@ -9,7 +9,6 @@ import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleB
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
-import { registerPendingReopen } from './tab-monitor'
 
 /**
  * 统一消息处理分发器
@@ -549,10 +548,8 @@ async function handleOpenWorkspace(
   // 重新打开标签页
   if (toReopen.length > 0) {
     if (newWindow) {
-      // 新窗口模式: 逐个创建以确保每个标签页都能正确预注册
-      // 先创建窗口
+      // 新窗口模式：先用第一个标签页创建窗口，其余在该窗口中依次创建
       const firstTab = toReopen[0]
-      registerPendingReopen(firstTab.url, firstTab.tabId)
       const win = await chrome.windows.create({ url: firstTab.url })
       opened++
       if (win?.tabs?.[0]?.id != null) {
@@ -562,7 +559,6 @@ async function handleOpenWorkspace(
 
       // 剩余标签页在该窗口中创建
       for (let i = 1; i < toReopen.length; i++) {
-        registerPendingReopen(toReopen[i].url, toReopen[i].tabId)
         const tab = await chrome.tabs.create({ url: toReopen[i].url, windowId: win?.id })
         opened++
         if (tab?.id != null) {
@@ -573,7 +569,6 @@ async function handleOpenWorkspace(
       // 当前窗口模式：在激活标签之后依次打开，保持原有顺序
       for (let i = 0; i < toReopen.length; i++) {
         const tabRef = toReopen[i]
-        registerPendingReopen(tabRef.url, tabRef.tabId)
         const tab = await openTabAfterActive(tabRef.url, i)
         opened++
         if (tab?.id != null) {
