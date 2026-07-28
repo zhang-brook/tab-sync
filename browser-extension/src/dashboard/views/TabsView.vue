@@ -313,7 +313,7 @@ async function refresh(showLoading = true) {
     const result: TreeWindow[] = []
     for (const win of chromeWindows) {
       if (win.type !== 'normal') continue
-        const winTabs: chrome.tabs.Tab[] = win.tabs || []
+      const winTabs: chrome.tabs.Tab[] = win.tabs || []
       const groupsMap = new Map<number, TreeGroup>()
       const winItems: TreeItem[] = []
       let currentGroupId = 0
