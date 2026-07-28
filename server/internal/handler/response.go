@@ -48,11 +48,6 @@ func Created(c *gin.Context, data interface{}) {
 	})
 }
 
-// NoContent 无内容成功响应 (204)
-func NoContent(c *gin.Context) {
-	c.Status(http.StatusNoContent)
-}
-
 // Error 错误响应
 func Error(c *gin.Context, httpStatus int, message string) {
 	c.JSON(httpStatus, CommonReturn{

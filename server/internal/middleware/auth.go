@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/spidermemos/tab-sync-server/internal/service"
 )
@@ -62,26 +61,6 @@ func TokenAuth(authSvc *service.AuthService) gin.HandlerFunc {
 	}
 }
 
-// AdminAuth 管理员认证中间件（仅 Admin Token）
-func AdminAuth(authSvc *service.AuthService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-
-		if !authSvc.IsAdmin(tokenStr) {
-			c.JSON(http.StatusForbidden, gin.H{
-				"code":    403,
-				"success": false,
-				"message": "需要管理员权限",
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
-}
-
 // AdminOrJWTAuth 管理员认证中间件（支持 Admin Token 或 JWT 会话）
 // 管理后台 Web 界面使用 JWT，API 调用使用 Admin Token
 func AdminOrJWTAuth(authSvc *service.AuthService) gin.HandlerFunc {
@@ -123,6 +102,3 @@ func AdminOrJWTAuth(authSvc *service.AuthService) gin.HandlerFunc {
 		c.Abort()
 	}
 }
-
-// 确保 jwt 包被引用（用于 JWT 验证）
-var _ jwt.MapClaims
