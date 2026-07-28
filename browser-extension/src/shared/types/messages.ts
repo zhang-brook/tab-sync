@@ -1,4 +1,3 @@
-import type { TabRecord } from './tab'
 import type { Workspace, TagInfo } from './workspace'
 import type { Device } from './device'
 import type { AuthState } from './auth'
@@ -10,10 +9,6 @@ export type MessageAction =
   | 'GET_STATE'
   | 'LOGIN_WITH_TOKEN'
   | 'LOGOUT'
-  | 'GET_TABS'
-  | 'CLOSE_TAB'
-  | 'CLOSE_TABS_BATCH'
-  | 'REOPEN_TAB'
   | 'GET_WORKSPACES'
   | 'CREATE_WORKSPACE'
   | 'UPDATE_WORKSPACE'
@@ -64,31 +59,6 @@ export interface CheckVersionMessage {
 export interface SetConnectionModeMessage {
   action: 'SET_CONNECTION_MODE'
   payload: { mode: 'lightweight' | 'zhige'; apiBaseUrl?: string }
-}
-
-export interface GetTabsMessage {
-  action: 'GET_TABS'
-  payload?: {
-    status?: 'open' | 'closed' | 'archived'
-    search?: string
-    deviceId?: string
-    workspaceId?: string
-  }
-}
-
-export interface CloseTabMessage {
-  action: 'CLOSE_TAB'
-  payload: { tabId: string }
-}
-
-export interface CloseTabsBatchMessage {
-  action: 'CLOSE_TABS_BATCH'
-  payload: { tabIds: string[] }
-}
-
-export interface ReopenTabMessage {
-  action: 'REOPEN_TAB'
-  payload: { url: string }
 }
 
 export interface GetWorkspacesMessage {
@@ -289,10 +259,6 @@ export type ExtensionMessage =
   | LogoutMessage
   | CheckVersionMessage
   | SetConnectionModeMessage
-  | GetTabsMessage
-  | CloseTabMessage
-  | CloseTabsBatchMessage
-  | ReopenTabMessage
   | GetWorkspacesMessage
   | CreateWorkspaceMessage
   | UpdateWorkspaceMessage
@@ -338,11 +304,6 @@ export interface StateData {
     frozen: number
   }
   connectionMode?: string | null
-}
-
-/** GET_TABS 响应数据 */
-export interface TabsData {
-  tabs: TabRecord[]
 }
 
 /** GET_WORKSPACES 响应数据 */

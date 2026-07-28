@@ -1,4 +1,4 @@
-import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
@@ -35,18 +35,6 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'GET_WORKSPACE_TABS_SUMMARY':
       return handleGetWorkspaceTabsSummary()
-
-    case 'GET_TABS':
-      return handleGetTabs(message.payload)
-
-    case 'CLOSE_TAB':
-      return handleCloseTab(message.payload.tabId)
-
-    case 'CLOSE_TABS_BATCH':
-      return handleCloseTabsBatch(message.payload.tabIds)
-
-    case 'REOPEN_TAB':
-      return handleReopenTab(message.payload.url)
 
     case 'GET_WORKSPACES':
       return handleGetWorkspaces(message.payload)
@@ -271,95 +259,6 @@ function compareVersions(a: string, b: string): number {
     if (na !== nb) return na < nb ? -1 : 1
   }
   return 0
-}
-
-// ============ 标签页操作 ============
-
-/** 获取标签页列表（筛选，默认从浏览器直接查询当前打开的标签页） */
-async function handleGetTabs(
-  filters?: { status?: string; search?: string; deviceId?: string; workspaceId?: string },
-): Promise<MessageResponse<TabsData>> {
-  // 查询浏览器当前所有标签页
-  const chromeTabs = await chrome.tabs.query({})
-  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-
-  let tabs = chromeTabs.map(tab => ({
-    id: mappings[String(tab.id)] || '',
-    chromeTabId: tab.id ?? 0,
-    windowId: tab.windowId ?? 0,
-    url: tab.url || tab.pendingUrl || '',
-    title: tab.title || '',
-    favIconUrl: tab.favIconUrl || '',
-    status: 'open' as const,
-    openedAt: '',
-    lastAccessedAt: '',
-    deviceId: '',
-    workspaceIds: [] as string[],
-  }))
-
-  // 状态筛选
-  if (filters?.status && filters.status !== 'open') {
-    tabs = [] // 浏览器中只有 open 的标签页
-  }
-
-  // 搜索筛选
-  if (filters?.search) {
-    const keyword = filters.search.toLowerCase()
-    tabs = tabs.filter(t => t.title.toLowerCase().includes(keyword) || t.url.toLowerCase().includes(keyword))
-  }
-
-  return { success: true, data: { tabs } }
-}
-
-/** 关闭本地标签页（通过 session storage 查找 chromeTabId） */
-async function handleCloseTab(tabId: string): Promise<MessageResponse> {
-  // 从 session storage 查找对应的 chromeTabId（反向映射：UUID → chromeTabId）
-  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-  const chromeTabIdStr = Object.keys(mappings).find(key => mappings[key] === tabId)
-  if (!chromeTabIdStr) {
-    return { success: false, error: '标签页不在当前会话中' }
-  }
-
-  try {
-    await chrome.tabs.remove(Number(chromeTabIdStr))
-  } catch {
-    // 标签页可能已经被用户手动关闭
-  }
-
-  return { success: true }
-}
-
-/** 批量关闭标签页（通过 session storage 查找 chromeTabId） */
-async function handleCloseTabsBatch(tabIds: string[]): Promise<MessageResponse> {
-  const { tab_id_mappings } = await chrome.storage.session.get('tab_id_mappings')
-  const mappings: Record<string, string> = (tab_id_mappings as Record<string, string>) || {}
-  const uuidSet = new Set(tabIds)
-  const chromeTabIds: number[] = []
-
-  for (const [chromeTabIdStr, uuid] of Object.entries(mappings)) {
-    if (uuidSet.has(uuid)) {
-      chromeTabIds.push(Number(chromeTabIdStr))
-    }
-  }
-
-  if (chromeTabIds.length > 0) {
-    try {
-      await chrome.tabs.remove(chromeTabIds)
-    } catch {
-      // 部分标签页可能已经关闭
-    }
-  }
-
-  return { success: true }
-}
-
-/** 重新打开标签页 */
-async function handleReopenTab(url: string): Promise<MessageResponse> {
-  await openTabAfterActive(url)
-  logger.info('Reopened tab:', url)
-  return { success: true }
 }
 
 // ============ 工作组操作 ============
