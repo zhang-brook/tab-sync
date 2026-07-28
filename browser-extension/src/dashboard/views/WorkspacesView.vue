@@ -202,6 +202,11 @@
                       <el-icon><PriceTag /></el-icon>
                     </el-button>
                   </el-tooltip>
+                  <el-tooltip content="移动到其他工作组" placement="top">
+                    <el-button size="small" text @click="openMoveDialog(selectedWorkspace!.id, tab.tabId)">
+                      <el-icon><Rank /></el-icon>
+                    </el-button>
+                  </el-tooltip>
                   <el-tooltip content="在新标签页中打开" placement="top">
                     <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
                       <el-icon><View /></el-icon>
@@ -255,6 +260,11 @@
                     <el-icon><PriceTag /></el-icon>
                   </el-button>
                 </el-tooltip>
+                <el-tooltip content="移动到其他工作组" placement="top">
+                  <el-button size="small" text @click="openMoveDialog(item.workspaceId, item.tab.tabId)">
+                    <el-icon><Rank /></el-icon>
+                  </el-button>
+                </el-tooltip>
                 <el-tooltip content="在新标签页中打开" placement="top">
                   <el-button size="small" text type="primary" @click="openSingleTab(item.tab.url)">
                     <el-icon><View /></el-icon>
@@ -284,17 +294,14 @@
           <el-input v-model="formData.name" placeholder="例如: 项目A开发" />
         </el-form-item>
         <el-form-item label="父工作组">
-          <el-tree-select
-            v-model="formData.parentId"
-            :data="parentTreeData"
-            node-key="id"
-            :props="treeProps"
-            check-strictly
-            clearable
-            default-expand-all
-            placeholder="不选则为根级工作组"
-            style="width: 100%"
-          />
+          <div class="parent-picker">
+            <el-button @click="parentPickerVisible = true">
+              {{ parentWorkspaceName || '选择父工作组（不选则为根级）' }}
+            </el-button>
+            <el-button v-if="formData.parentId" text type="danger" @click="clearParent">
+              清除
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="标识色">
           <el-color-picker v-model="formData.color" :predefine="presetColors" />
@@ -358,13 +365,29 @@
       :selected-ids="tagEditorSelectedIds"
       @confirm="onTagEditorConfirm"
     />
+
+    <!-- 移动到其他工作组 -->
+    <WorkspacePickerDialog
+      v-model="movePickerVisible"
+      title="移动到工作组"
+      :disabled-ids="moveDisabledIds"
+      @select="handleMoveToWorkspace"
+    />
+
+    <!-- 选择父工作组 -->
+    <WorkspacePickerDialog
+      v-model="parentPickerVisible"
+      title="选择父工作组"
+      :disabled-ids="parentDisabledIds"
+      @select="onSelectParent"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -372,6 +395,7 @@ import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from
 import { openTabAfterActive } from '../../shared/utils/tab-utils'
 import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '../../shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
+import WorkspacePickerDialog from '../../shared/components/WorkspacePickerDialog.vue'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -416,16 +440,23 @@ const treeData = computed<WorkspaceTreeNode[]>(() => {
   return [...system, ...rest]
 })
 
-/** 父工作组下拉树（编辑时排除自身及后代，避免形成环） */
-const parentTreeData = computed<WorkspaceTreeNode[]>(() => {
-  if (!isEditing.value || !editingId.value) return treeData.value
-  const excluded = new Set([editingId.value, ...collectDescendantIds(workspaces.value, editingId.value)])
-  const prune = (nodes: WorkspaceTreeNode[]): WorkspaceTreeNode[] =>
-    nodes
-      .filter((n) => !excluded.has(n.id))
-      .map((n) => ({ ...n, children: prune(n.children) }))
-  return prune(treeData.value)
+/** 父工作组选择器：编辑时禁用自身及后代，避免形成环 */
+const parentPickerVisible = ref(false)
+const parentDisabledIds = computed<string[]>(() => {
+  if (!isEditing.value || !editingId.value) return []
+  return [editingId.value, ...collectDescendantIds(workspaces.value, editingId.value)]
 })
+const parentWorkspaceName = computed(() => {
+  if (!formData.value.parentId) return ''
+  return workspaces.value.find((w) => w.id === formData.value.parentId)?.name ?? ''
+})
+function onSelectParent(node: WorkspaceTreeNode) {
+  formData.value.parentId = node.id
+  parentPickerVisible.value = false
+}
+function clearParent() {
+  formData.value.parentId = ''
+}
 
 const selectedWorkspace = computed<Workspace | null>(
   () => workspaces.value.find((w) => w.id === selectedId.value) ?? null,
@@ -818,6 +849,38 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
     await loadWorkspaces()
   }
 }
+
+// ============ 移动到其他工作组 ============
+
+const movePickerVisible = ref(false)
+const moveSource = ref<{ workspaceId: string; tabId: string } | null>(null)
+
+/** 选择目标时仅禁用标签页当前所在工作组（未分组等仍可移动到） */
+const moveDisabledIds = computed<string[]>(() => {
+  return moveSource.value ? [moveSource.value.workspaceId] : []
+})
+
+function openMoveDialog(workspaceId: string, tabId: string) {
+  moveSource.value = { workspaceId, tabId }
+  movePickerVisible.value = true
+}
+
+async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
+  const src = moveSource.value
+  if (!src) return
+  const res = await sendMessage({
+    action: 'MOVE_WORKSPACE_TAB',
+    payload: { workspaceId: node.id, tabId: src.tabId, newIndex: 0 },
+  })
+  if (res.success) {
+    ElMessage.success(`已移动到「${node.name}」`)
+    await loadWorkspaces()
+  } else if (res.authError) {
+    ElMessage.warning('未连接后端，无法移动')
+  } else {
+    ElMessage.error(res.error || '移动失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -1058,6 +1121,12 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   font-size: 12px;
   color: #909399;
   padding-left: 90px;
+}
+
+.parent-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .drag-handle {

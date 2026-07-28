@@ -78,16 +78,14 @@
           <div class="form-tip">关闭后 <code>Shift+Alt+S</code> 将不再触发收藏</div>
         </el-form-item>
         <el-form-item label="默认工作组">
-          <el-tree-select
-            v-model="defaultWorkspaceId"
-            :data="workspaceTree"
-            node-key="value"
-            :props="{ label: 'label', children: 'children' }"
-            placeholder="选择默认收藏工作组"
-            clearable
-            @change="saveDefaultWorkspace"
-            style="width: 280px"
-          />
+          <div class="ws-picker-row">
+            <el-button @click="defaultPickerVisible = true">
+              {{ defaultWorkspaceName || '选择默认收藏工作组' }}
+            </el-button>
+            <el-button v-if="defaultWorkspaceId" text type="danger" @click="clearDefaultWorkspace">
+              清除
+            </el-button>
+          </div>
           <div class="form-tip">未设置时，快捷键会打开侧边栏引导选择</div>
         </el-form-item>
       </el-form>
@@ -171,6 +169,13 @@
         </el-form-item>
       </el-form>
     </el-card>
+
+    <!-- 选择默认工作组 -->
+    <WorkspacePickerDialog
+      v-model="defaultPickerVisible"
+      title="选择默认工作组"
+      @select="onSelectDefault"
+    />
   </div>
 </template>
 
@@ -180,6 +185,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '../../shared/storage'
 import type { StateData, WorkspacesData, Workspace } from '../../shared/types'
+import WorkspacePickerDialog from '../../shared/components/WorkspacePickerDialog.vue'
+import type { WorkspaceTreeNode as WsNode } from '../../shared/utils/workspace-tree'
 
 const apiBaseUrl = ref('')
 const deviceId = ref('')
@@ -196,29 +203,21 @@ const workspaceOptions = ref<Workspace[]>([])
 // 是否启用「加入并关闭」快捷键
 const shortcutEnabled = ref(true)
 
-// 将扁平的工作组列表按 parentId 组装成树，供默认工作组下拉树形展示
-interface WorkspaceTreeNode {
-  value: string
-  label: string
-  children: WorkspaceTreeNode[]
-}
-
-const workspaceTree = computed<WorkspaceTreeNode[]>(() => {
-  const list = workspaceOptions.value
-  const map = new Map<string, WorkspaceTreeNode>()
-  list.forEach((w) => map.set(w.id, { value: w.id, label: w.name, children: [] }))
-  const roots: WorkspaceTreeNode[] = []
-  list.forEach((w) => {
-    const node = map.get(w.id)!
-    const parent = w.parentId ? map.get(w.parentId) : undefined
-    if (parent) {
-      parent.children.push(node)
-    } else {
-      roots.push(node)
-    }
-  })
-  return roots
+// 默认收藏工作组（通过公共分组选择器选择，支持树状展示与禁用）
+const defaultPickerVisible = ref(false)
+const defaultWorkspaceName = computed(() => {
+  if (!defaultWorkspaceId.value) return ''
+  return workspaceOptions.value.find((w) => w.id === defaultWorkspaceId.value)?.name ?? ''
 })
+function onSelectDefault(node: WsNode) {
+  defaultWorkspaceId.value = node.id
+  saveDefaultWorkspace()
+  defaultPickerVisible.value = false
+}
+function clearDefaultWorkspace() {
+  defaultWorkspaceId.value = ''
+  saveDefaultWorkspace()
+}
 
 const extensionVersion = chrome.runtime.getManifest().version
 const extensionId = chrome.runtime.id
@@ -393,6 +392,12 @@ async function handleClearData() {
   color: #909399;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+.ws-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .mono-text {
