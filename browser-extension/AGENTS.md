@@ -10,7 +10,7 @@ Chrome 浏览器标签页管理扩展，支持标签页同步、工作组管理�
 
 - **技术栈**: Vue 3 (Composition API) + Element Plus + Vite 8 + CRXJS v2.4.0 + TypeScript 6 + Chrome Manifest V3
 - **设计规范**: `.qoder/specs/tab-sync-manager.md`
-- **架构**: Background Service Worker 为数据中心，所有 UI (SidePanel / Dashboard) 通过 `chrome.runtime.sendMessage` 通信
+- **架构**: Background Service Worker 为消息路由中心（无业务数据），后端为唯一数据源；所有 UI (SidePanel / Dashboard) 通过 `chrome.runtime.sendMessage` 与 Background 通信，再由 Background 调用后端 REST API
 - **后端**: 轻量后端 `server/`（Go + Gin + SQLite），扩展通过 REST API 与其交互
 
 ---
@@ -63,17 +63,17 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
 **防御性编程**: UI 端读取响应数据时必须使用可选链 `?.` 和空值合并 `??`，因为 Background 可能因任何原因返回 `undefined`。
 
-### 3.3 Tab 标识体系
+### 3.4 Tab 标识体系
 
 - 工作组内的标签页 (`TabReference`) 以后端主键 `tabId` 标识，保存 URL/标题/图标快照，即使原标签页已关闭也能重新打开
 - Chrome 的 `tabId` (数字) 仅在本地会话期间有意义，UI 展示本地标签页时直接查询 `chrome.tabs` API
 - 从工作组打开标签页统一按"重新打开"处理，不与本地 chromeTabId 绑定
 
-### 3.4 存储 Key 管理
+### 3.5 存储 Key 管理
 
 所有 `chrome.storage.local` 的 key 集中定义在 `src/shared/storage/keys.ts` 的 `STORAGE_KEYS` 常量中。新增存储项时必须在此注册。
 
-### 3.5 认证模式 (API Key 风格)
+### 3.6 认证模式 (API Key 风格)
 
 - `AUTH_TOKEN` 直接存储 API Key 风格的 Bearer Token，无账号密码体系
 - `CONNECTION_MODE` 标识连接模式（`'lightweight'` | `'zhige'`）
@@ -124,10 +124,11 @@ src/
 
 ### 5.2 Git 提交
 
-- **使用中文编写 commit message**
-- 格式示例: `feat: 实现工作组一键恢复打开与标签页去重关联`
-- 常用前缀: `feat:` (新功能), `fix:` (修复), `refactor:` (重构), `docs:` (文档), `chore:` (杂项)
-- **不要主动提交**，等用户明确要求时再执行 `git commit`
+- **使用英文编写 commit message**，格式为 `type(scope): subject`
+- 常用前缀: `feat` (新功能), `fix` (修复), `refactor` (重构), `docs` (文档), `style` (格式), `test` (测试), `chore` (杂项)
+- 示例: `fix(extension): compare version numbers numerically instead of lexically`
+- 每个提交应是**原子、可独立编译**的；混合改动按逻辑分多个提交
+- **不要主动提交**，等用户明确要求时再执行 `git commit`；只用 `git add` 暂存本次改动涉及的文件，不带入无关改动
 
 ### 5.3 代码风格
 
