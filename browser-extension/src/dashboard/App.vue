@@ -76,8 +76,8 @@
     <div class="auth-overlay-card">
       <el-icon :size="48" color="#f56c6c"><WarningFilled /></el-icon>
       <h2>登录已过期</h2>
-      <p>请通过扩展弹窗重新登录后再继续使用</p>
-      <el-button type="primary" @click="openPopup">重新登录</el-button>
+      <p>请通过扩展侧边栏重新登录后再继续使用</p>
+      <el-button type="primary" @click="openSidePanel">重新登录</el-button>
       <el-button text @click="retryCheckAuth">我已登录</el-button>
     </div>
   </div>
@@ -142,16 +142,18 @@ async function handleLogout() {
   }, 1000)
   ElMessage.success('已退出登录')
 
-  // 打开 popup 显示登录页，然后关闭当前后台管理页面
-  chrome.action.openPopup().catch(() => { })
+  // 关闭当前后台管理页面，用户可通过侧边栏重新登录
   window.close()
 }
 
-function openPopup() {
-  // 通过 chrome.action.openPopup() 打开弹窗（仅 MV3 支持）
-  chrome.action.openPopup().catch(() => {
-    // 降级：无法编程打开弹窗时，提示用户手动点击扩展图标
-  })
+/** 打开侧边栏以便重新登录（扩展未配置 popup，登录入口在侧边栏） */
+async function openSidePanel() {
+  try {
+    const win = await chrome.windows.getCurrent()
+    await chrome.sidePanel.open({ windowId: win.id! })
+  } catch {
+    ElMessage.info('请点击浏览器工具栏中的扩展图标打开侧边栏登录')
+  }
 }
 
 onMounted(() => {
