@@ -48,6 +48,7 @@ func AutoMigrate(db *DB) error {
 		&model.Tag{},
 		&model.TabTag{},
 		&model.WorkspaceTag{},
+		&model.RecycleBinTab{},
 	); err != nil {
 		return err
 	}

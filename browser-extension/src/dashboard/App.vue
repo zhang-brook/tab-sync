@@ -12,6 +12,7 @@
           <el-icon><Odometer /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
+        <el-divider style="margin: 0; opacity: 0.4;" />
         <el-menu-item index="/tabs">
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
@@ -28,6 +29,10 @@
         <el-menu-item index="/tags">
           <el-icon><PriceTag /></el-icon>
           <span>标签</span>
+        </el-menu-item>
+        <el-menu-item index="/recyclebin">
+          <el-icon><Delete /></el-icon>
+          <span>回收站</span>
         </el-menu-item>
         <el-divider style="margin: 0; opacity: 0.4;" />
         <el-menu-item index="/devices">
@@ -82,7 +87,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '../shared/composables/useMessage'
 import { STORAGE_KEYS } from '../shared/storage'
 import type { StateData } from '../shared/types'
@@ -97,6 +102,7 @@ const pageTitleMap: Record<string, string> = {
   '/workspaces': '工作组',
   '/tags': '标签',
   '/synced': '已同步标签页',
+  '/recyclebin': '回收站',
   '/devices': '设备管理',
   '/settings': '设置',
 }

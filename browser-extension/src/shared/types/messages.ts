@@ -37,6 +37,10 @@ export type MessageAction =
   | 'ADD_WORKSPACE_TAG'
   | 'REMOVE_WORKSPACE_TAG'
   | 'GET_TAG_TABS'
+  | 'GET_RECYCLE_BIN'
+  | 'RESTORE_RECYCLE_BIN_TAB'
+  | 'DELETE_RECYCLE_BIN_TAB'
+  | 'EMPTY_RECYCLE_BIN'
 
 // ============ 请求消息定义 ============
 
@@ -89,6 +93,8 @@ export interface ReopenTabMessage {
 
 export interface GetWorkspacesMessage {
   action: 'GET_WORKSPACES'
+  /** 传入 { includeSystem: true } 可包含系统工作组（如「未分组」） */
+  payload?: { includeSystem?: boolean }
 }
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
@@ -235,6 +241,47 @@ export interface GetTagTabsMessage {
   payload: { tagId: number }
 }
 
+// ============ 回收站相关消息 ============
+
+/** 回收站中的标签页（从工作组移除后暂存） */
+export interface RecycleBinTab {
+  /** 回收站条目自增主键 */
+  id: number
+  /** 被移除时所属工作组 ID */
+  originalWorkspaceId: string
+  /** 被移除时所属工作组名称（快照） */
+  originalWorkspaceName: string
+  url: string
+  title: string
+  /** 用户自定义显示名（可选，为空时使用 title） */
+  displayName?: string
+  favIconUrl: string
+  /** 移入回收站的时间 */
+  deletedAt: string
+}
+
+/** 获取回收站列表 */
+export interface GetRecycleBinMessage {
+  action: 'GET_RECYCLE_BIN'
+}
+
+/** 恢复一条回收站标签页（统一恢复到「未分组」） */
+export interface RestoreRecycleBinTabMessage {
+  action: 'RESTORE_RECYCLE_BIN_TAB'
+  payload: { id: number }
+}
+
+/** 彻底删除一条回收站标签页 */
+export interface DeleteRecycleBinTabMessage {
+  action: 'DELETE_RECYCLE_BIN_TAB'
+  payload: { id: number }
+}
+
+/** 清空回收站 */
+export interface EmptyRecycleBinMessage {
+  action: 'EMPTY_RECYCLE_BIN'
+}
+
 /** 所有请求消息的联合类型 */
 export type ExtensionMessage =
   | GetStateMessage
@@ -267,6 +314,10 @@ export type ExtensionMessage =
   | AddWorkspaceTagMessage
   | RemoveWorkspaceTagMessage
   | GetTagTabsMessage
+  | GetRecycleBinMessage
+  | RestoreRecycleBinTabMessage
+  | DeleteRecycleBinTabMessage
+  | EmptyRecycleBinMessage
 
 // ============ 响应定义 ============
 
@@ -332,4 +383,9 @@ export interface TagTabItem {
 /** GET_TAG_TABS 响应数据 */
 export interface TagTabsData {
   tabs: TagTabItem[]
+}
+
+/** GET_RECYCLE_BIN 响应数据 */
+export interface RecycleBinData {
+  recycleBin: RecycleBinTab[]
 }

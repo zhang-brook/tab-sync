@@ -138,6 +138,12 @@ func main() {
 			auth.DELETE("/workspaces/:id/tabs/:tabId/tags/:tagId", handlers.Tag.RemoveFromTab)
 			auth.POST("/workspaces/:id/tags", handlers.Tag.AddToWorkspace)
 			auth.DELETE("/workspaces/:id/tags/:tagId", handlers.Tag.RemoveFromWorkspace)
+
+			// 回收站（被移除的标签页暂存，可恢复/彻底删除）
+			auth.GET("/recyclebin", handlers.RecycleBin.List)
+			auth.POST("/recyclebin/:id/restore", handlers.RecycleBin.Restore)
+			auth.DELETE("/recyclebin/:id", handlers.RecycleBin.Delete)
+			auth.DELETE("/recyclebin", handlers.RecycleBin.Empty)
 		}
 
 		// 管理接口（支持 Admin Token 或 JWT 会话）

@@ -1,10 +1,11 @@
-import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, TabsData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
+import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
@@ -49,7 +50,7 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return handleReopenTab(message.payload.url)
 
     case 'GET_WORKSPACES':
-      return handleGetWorkspaces()
+      return handleGetWorkspaces(message.payload)
 
     case 'CREATE_WORKSPACE':
       return handleCreateWorkspace(message.payload)
@@ -74,6 +75,18 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'REMOVE_WORKSPACE_TAB':
       return handleRemoveWorkspaceTab(message.payload.workspaceId, message.payload.tabId)
+
+    case 'GET_RECYCLE_BIN':
+      return handleGetRecycleBin()
+
+    case 'RESTORE_RECYCLE_BIN_TAB':
+      return handleRestoreRecycleBinTab(message.payload)
+
+    case 'DELETE_RECYCLE_BIN_TAB':
+      return handleDeleteRecycleBinTab(message.payload)
+
+    case 'EMPTY_RECYCLE_BIN':
+      return handleEmptyRecycleBin()
 
     case 'GET_DEVICES':
       return handleGetDevices()
@@ -340,8 +353,8 @@ async function handleReopenTab(url: string): Promise<MessageResponse> {
 // ============ 工作组操作 ============
 
 /** 获取所有工作组（从后端 API 获取） */
-async function handleGetWorkspaces(): Promise<MessageResponse<WorkspacesData>> {
-  const res = await getWorkspaces()
+async function handleGetWorkspaces(payload?: { includeSystem?: boolean }): Promise<MessageResponse<WorkspacesData>> {
+  const res = await getWorkspaces(payload?.includeSystem ?? false)
   if (res.ok && res.data) {
     return { success: true, data: { workspaces: res.data.workspaces } }
   }
@@ -628,8 +641,8 @@ async function handleUpdateWorkspaceTab(
 /** 从工作组中移除指定标签页 */
 async function handleRemoveWorkspaceTab(workspaceId: string, tabId: string): Promise<MessageResponse> {
   try {
-    // 1. 获取所有工作组
-    const res = await getWorkspaces()
+    // 1. 获取所有工作组（含系统工作组「未分组」，否则其下的标签页无法定位）
+    const res = await getWorkspaces(true)
     if (!res.ok || !res.data) {
       return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
     }
@@ -818,5 +831,39 @@ async function handleGetTagTabs(tagId: number): Promise<MessageResponse<TagTabsD
     return { success: true, data: { tabs: res.data.tabs } }
   }
   return { success: false, error: res.error || '获取标签下的标签页失败', authError: res.status === 401 }
+}
+
+// ============ 回收站 ============
+
+async function handleGetRecycleBin(): Promise<MessageResponse<RecycleBinData>> {
+  const res = await getRecycleBin()
+  if (res.ok && res.data) {
+    return { success: true, data: { recycleBin: res.data } }
+  }
+  return { success: false, error: res.error || '获取回收站失败', authError: res.status === 401 }
+}
+
+async function handleRestoreRecycleBinTab(payload: { id: number }): Promise<MessageResponse> {
+  const res = await restoreRecycleBinTab(payload.id)
+  if (res.ok) {
+    return { success: true, data: res.data }
+  }
+  return { success: false, error: res.error || '恢复失败', authError: res.status === 401 }
+}
+
+async function handleDeleteRecycleBinTab(payload: { id: number }): Promise<MessageResponse> {
+  const res = await deleteRecycleBinTab(payload.id)
+  if (res.ok) {
+    return { success: true, data: res.data }
+  }
+  return { success: false, error: res.error || '删除失败', authError: res.status === 401 }
+}
+
+async function handleEmptyRecycleBin(): Promise<MessageResponse> {
+  const res = await emptyRecycleBin()
+  if (res.ok) {
+    return { success: true, data: res.data }
+  }
+  return { success: false, error: res.error || '清空回收站失败', authError: res.status === 401 }
 }
 

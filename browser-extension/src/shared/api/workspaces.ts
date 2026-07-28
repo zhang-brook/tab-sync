@@ -2,9 +2,11 @@ import { apiClient } from './client'
 import type { Workspace } from '../types'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
-/** 获取所有工作组 */
-export function getWorkspaces() {
-  return apiClient.get<{ workspaces: Workspace[] }>('/v1/tab-sync/workspaces')
+/** 获取所有工作组。includeSystem=true 时包含系统工作组（如「未分组」） */
+export function getWorkspaces(includeSystem = false) {
+  return apiClient.get<{ workspaces: Workspace[] }>(
+    `/v1/tab-sync/workspaces?includeSystem=${includeSystem}`,
+  )
 }
 
 /** 创建工作区（不含标签页，标签页由后续更新/加入操作添加） */

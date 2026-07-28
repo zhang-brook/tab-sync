@@ -17,8 +17,9 @@ func NewWorkspaceHandler(svc *service.WorkspaceService) *WorkspaceHandler {
 }
 
 // List 获取工作组列表
+// 查询参数 includeSystem=true 时包含系统工作组（如「未分组」），默认仅返回用户可管理的普通工作组
 func (h *WorkspaceHandler) List(c *gin.Context) {
-	workspaces, err := h.svc.List()
+	workspaces, err := h.svc.List(c.Query("includeSystem") == "true")
 	if err != nil {
 		InternalError(c, "获取工作组列表失败")
 		return

@@ -62,6 +62,7 @@ type Workspace struct {
 	Icon        string `gorm:"size:50"`
 	SortOrder   int    `gorm:"default:0"` // 排序序号
 	IsDeleted   bool   `gorm:"default:false"`
+	IsSystem    bool   `gorm:"default:false"` // 系统工作组（如「未分组」），不可在前端管理界面删除
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
@@ -127,4 +128,21 @@ type WorkspaceTag struct {
 	WorkspaceID string `gorm:"uniqueIndex:uniq_ws_tag;index;size:64"`
 	TagID       uint   `gorm:"uniqueIndex:uniq_ws_tag;index"`
 	Tag         Tag    `gorm:"foreignKey:TagID"`
+}
+
+// ===================== 回收站 =====================
+
+// RecycleBinTab 回收站中的标签页：从工作组移除后暂存于此，可恢复或彻底删除。
+// 恢复时统一归入「未分组」系统工作组（见 service.WorkspaceService.GetOrCreateUngroupedWorkspace）。
+type RecycleBinTab struct {
+	ID                   uint      `gorm:"primaryKey;autoIncrement"`
+	OriginalWorkspaceID   string   `gorm:"index;size:64;not null"` // 被移除时所属工作组 UUID
+	OriginalWorkspaceName string   `gorm:"size:200"`               // 被移除时所属工作组名称（快照，便于展示）
+	URL                  string   `gorm:"size:2048;not null"`
+	Title                string   `gorm:"size:500"`
+	DisplayName          string   `gorm:"size:500"` // 用户自定义显示名
+	FavIconURL           string   `gorm:"size:2048"`
+	SortOrder            int      `gorm:"default:0"`
+	DeletedAt            time.Time // 移入回收站的时间
+	CreatedAt            time.Time
 }

@@ -38,7 +38,7 @@
           class="ws-chip"
           :style="{ borderColor: item.color, color: item.color }"
         >{{ item.name }}</el-tag>
-        <el-button class="row-action" text :icon="Close" title="从该工作组移除" @click="remove(item)" />
+        <el-button class="row-action" text :icon="Close" title="移动到回收站" @click="remove(item)" />
       </div>
     </div>
   </div>
@@ -46,8 +46,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Search, Refresh, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
@@ -59,7 +60,10 @@ interface SyncedItem {
   name: string
   color: string
   tab: TabReference
+  removing?: boolean
 }
+
+const router = useRouter()
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -69,7 +73,7 @@ const filtered = ref<SyncedItem[]>([])
 async function load() {
   loading.value = true
   try {
-    const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+    const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
     if (res.success && res.data) {
       const list: SyncedItem[] = []
       for (const ws of res.data.workspaces) {
@@ -108,12 +112,28 @@ async function openTab(url?: string) {
 
 async function remove(item: SyncedItem) {
   try {
+    await ElMessageBox.confirm(
+      `确定要将「${item.tab.title || item.tab.url}」移动到回收站吗？`,
+      '移除标签页',
+      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return // 用户取消
+  }
+  item.removing = true
+  try {
     const res = await sendMessage({ action: 'REMOVE_WORKSPACE_TAB', payload: {
       workspaceId: item.workspaceId,
       tabId: item.tab.tabId,
     } })
     if (res.success) {
-      ElMessage.success('已移除')
+      ElNotification({
+        title: '已移至回收站',
+        message: `「${item.tab.title || item.tab.url}」已移动到回收站，可前往回收站恢复或彻底删除`,
+        type: 'success',
+        duration: 3500,
+        onClick: () => router.push('/recyclebin'),
+      })
       await load()
     } else if (res.authError) {
       ElMessage.warning('未连接到后端')
@@ -122,6 +142,8 @@ async function remove(item: SyncedItem) {
     }
   } catch (e) {
     ElMessage.error('移除失败：' + (e as Error).message)
+  } finally {
+    item.removing = false
   }
 }
 

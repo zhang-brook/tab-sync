@@ -70,6 +70,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/recyclebin',
+      name: 'RecycleBin',
+      component: () => import('./views/RecycleBinView.vue'),
+      meta: {
+        dataSource: { label: '云端', desc: '被移除的标签页暂存于此，可恢复', type: 'success' },
+      },
+    },
+    {
       path: '/devices',
       name: 'Devices',
       component: () => import('./views/DevicesView.vue'),

@@ -14,8 +14,9 @@ import (
 
 // WorkspaceService 工作组管理服务
 type WorkspaceService struct {
-	db      *database.DB
-	syncSvc *SyncService
+	db         *database.DB
+	syncSvc    *SyncService
+	RecycleBin *RecycleBinService
 }
 
 // NewWorkspaceService 创建工作区服务
@@ -59,6 +60,7 @@ type WorkspaceResponse struct {
 	Name      string         `json:"name"`
 	Color     string         `json:"color"`
 	Icon      string         `json:"icon"`
+	IsSystem  bool           `json:"isSystem"`
 	Tabs      []TabReference `json:"tabs"`
 	Tags      []TagResponse  `json:"tags"`
 	CreatedAt string         `json:"createdAt"`
@@ -92,9 +94,15 @@ type CreateResult struct {
 }
 
 // List 获取所有工作组
-func (s *WorkspaceService) List() ([]WorkspaceResponse, error) {
+// includeSystem=true 时包含系统工作组（如「未分组」），否则仅返回用户可管理的普通工作组。
+func (s *WorkspaceService) List(includeSystem bool) ([]WorkspaceResponse, error) {
+	query := s.db.Where("is_deleted = ?", false)
+	if !includeSystem {
+		query = query.Where("is_system = ?", false)
+	}
+
 	var workspaces []model.Workspace
-	err := s.db.Where("is_deleted = ?", false).
+	err := query.
 		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
 			return db.Preload("Tags.Tag").Order("sort_order ASC")
 		}).
@@ -204,14 +212,20 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 					}
 				}
 			}
-			// 删除未出现在新列表中的标签页
-			for uid := range existingByID {
-				if !seen[uid] {
-					if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
-						return derr
+		// 软删除：将未出现在新列表中的标签页移入回收站（而非直接物理删除）
+		for uid := range existingByID {
+			if !seen[uid] {
+				removed := existingByID[uid]
+				if s.RecycleBin != nil {
+					if aerr := s.RecycleBin.Add(tx, workspace.WorkspaceID, workspace.Name, removed); aerr != nil {
+						return aerr
 					}
 				}
+				if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
+					return derr
+				}
 			}
+		}
 			return nil
 		})
 		if err != nil {
@@ -247,6 +261,9 @@ func (s *WorkspaceService) Delete(id string) error {
 		}
 		childrenMap := make(map[string][]string)
 		for _, w := range all {
+			if w.WorkspaceID == id && w.IsSystem {
+				return errors.New("系统工作组不可删除")
+			}
 			childrenMap[w.ParentID] = append(childrenMap[w.ParentID], w.WorkspaceID)
 		}
 
@@ -449,6 +466,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 		Name:      ws.Name,
 		Color:     ws.Color,
 		Icon:      ws.Icon,
+		IsSystem:  ws.IsSystem,
 		Tabs:      tabs,
 		Tags:      workspaceTagsToResponses(ws.Tags),
 		CreatedAt: ws.CreatedAt.Format(time.RFC3339),
@@ -504,4 +522,39 @@ type WorkspaceTabSummary struct {
 type TabURLPair struct {
 	TabID string `json:"tabId"`
 	URL   string `json:"url"`
+}
+
+// ===================== 回收站 / 未分组 =====================
+
+// UngroupedWorkspaceID 是「未分组」系统工作组的固定标识。
+// 回收站中的标签页恢复后统一归入该工作组，避免回到原工作组造成分组混乱。
+const UngroupedWorkspaceID = "ungrouped"
+
+// UngroupedWorkspaceName 是「未分组」系统工作组的显示名
+const UngroupedWorkspaceName = "未分组"
+
+// GetOrCreateUngroupedWorkspace 获取或创建「未分组」系统工作组。
+// 该工作组为系统内置（is_system=true），不参与普通工作组管理/删除。
+func (s *WorkspaceService) GetOrCreateUngroupedWorkspace() (*model.Workspace, error) {
+	var ws model.Workspace
+	err := s.db.Where("workspace_id = ?", UngroupedWorkspaceID).First(&ws).Error
+	if err == nil {
+		return &ws, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	ws = model.Workspace{
+		WorkspaceID: UngroupedWorkspaceID,
+		ParentID:    "",
+		Name:        UngroupedWorkspaceName,
+		Color:       "#909399",
+		Icon:        "folder-open",
+		IsSystem:    true,
+	}
+	if err := s.db.Create(&ws).Error; err != nil {
+		return nil, err
+	}
+	return &ws, nil
 }

@@ -23,6 +23,8 @@ export interface Workspace {
   tags?: TagInfo[]
   createdAt: string
   updatedAt: string
+  /** 是否为系统工作组（如「未分组」），系统工作组不可在管理界面删除 */
+  isSystem?: boolean
 }
 
 /** 标签页引用 - 保存 URL 快照，即使原标签页已关闭也能重新打开 */
