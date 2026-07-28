@@ -114,8 +114,8 @@ func TestAPI_GetVersion(t *testing.T) {
 	if !ok {
 		t.Fatal("响应 Data 格式不正确")
 	}
-	if data["api_version"] != "v1" {
-		t.Errorf("api_version 不匹配: got %v", data["api_version"])
+	if data["apiVersion"] != "v1" {
+		t.Errorf("apiVersion 不匹配: got %v", data["apiVersion"])
 	}
 }
 

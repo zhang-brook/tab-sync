@@ -31,12 +31,12 @@ type VersionRange struct {
 // GetVersionInfo 获取版本信息（含版本兼容性映射表）
 func (s *SystemService) GetVersionInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"server_version":  s.cfg.Version,
-		"min_ext_version": s.cfg.MinExtVersion,
-		"max_ext_version": s.cfg.MaxExtVersion,
-		"api_version":     "v1",
+		"serverVersion": s.cfg.Version,
+		"minExtVersion": s.cfg.MinExtVersion,
+		"maxExtVersion": s.cfg.MaxExtVersion,
+		"apiVersion":    "v1",
 		// 扩展 → 后端版本兼容性映射表
-		"version_map": []VersionRange{
+		"versionMap": []VersionRange{
 			{
 				MinExtVersion: "1.0.0",
 				MaxExtVersion: "1.x.x",

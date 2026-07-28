@@ -927,7 +927,7 @@
       try {
         const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
         if (v.code === 0) {
-          $('dashServerInfo').textContent = 'Server v' + v.data.server_version + ' · API ' + v.data.api_version;
+          $('dashServerInfo').textContent = 'Server v' + v.data.serverVersion + ' · API ' + v.data.apiVersion;
         }
       } catch (e) {}
 
@@ -1136,7 +1136,7 @@
       // 拉取版本号填充品牌页脚
       try {
         const v = await fetch(API + '/v1/tab-sync/version').then(r => r.json());
-        if (v.code === 0) $('brandVersion').textContent = v.data.server_version;
+        if (v.code === 0) $('brandVersion').textContent = v.data.serverVersion;
       } catch (e) {}
     })();
   </script>
