@@ -92,7 +92,7 @@ const disabledSet = computed(() => new Set(props.disabledIds || []))
 async function onOpen() {
   keyword.value = ''
   loading.value = true
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
     treeData.value = buildWorkspaceTree(res.data.workspaces)
   } else {
