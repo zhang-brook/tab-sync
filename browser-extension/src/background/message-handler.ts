@@ -212,8 +212,9 @@ async function handleCheckVersion(): Promise<MessageResponse> {
   const { serverVersion, minExtVersion, maxExtVersion } = res.data
   const extVersion = chrome.runtime.getManifest().version
 
-  // 简单字符串版本比较
-  const compatible = extVersion >= minExtVersion && extVersion <= maxExtVersion
+  const compatible =
+    compareVersions(extVersion, minExtVersion) >= 0 &&
+    compareVersions(extVersion, maxExtVersion) <= 0
 
   return {
     success: true,
@@ -259,6 +260,18 @@ async function handleOpenDashboard(): Promise<MessageResponse> {
   }
 
   return { success: true }
+}
+
+/** 比较两个 x.y.z 格式的版本号，返回 -1（a<b）/ 0（相等）/ 1（a>b） */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] ?? 0
+    const nb = pb[i] ?? 0
+    if (na !== nb) return na < nb ? -1 : 1
+  }
+  return 0
 }
 
 // ============ 标签页操作 ============
