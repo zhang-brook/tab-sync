@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from './keys'
 
-/** chrome.storage.local 数据结构映射 (v3: API Key 风格认证) */
+/** chrome.storage.local 数据结构映射 */
 interface StorageSchema {
   [STORAGE_KEYS.AUTH_TOKEN]: string | null
   [STORAGE_KEYS.CONNECTION_MODE]: string | null
@@ -60,14 +60,5 @@ export const storage = {
   /** 清除所有数据 */
   async clear(): Promise<void> {
     await chrome.storage.local.clear()
-  },
-
-  /** 监听存储变化 */
-  onChange(callback: (changes: { [key: string]: chrome.storage.StorageChange }) => void): void {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local') {
-        callback(changes)
-      }
-    })
   },
 }

@@ -75,16 +75,3 @@ export function collectDescendantIds(workspaces: Workspace[], rootId: string): s
   }
   return result
 }
-
-/**
- * 判断 candidateId 是否是 nodeId 的后代（或自身）。
- * 用于移动/设置父级时避免形成环。
- */
-export function isSelfOrDescendant(
-  workspaces: Workspace[],
-  nodeId: string,
-  candidateId: string,
-): boolean {
-  if (nodeId === candidateId) return true
-  return collectDescendantIds(workspaces, nodeId).includes(candidateId)
-}
