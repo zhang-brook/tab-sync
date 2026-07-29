@@ -125,7 +125,7 @@ async function loadTags() {
   try {
     const res = await sendMessage<TagsData>({ action: 'GET_TAGS' })
     if (res.success && res.data) {
-      tags.value = res.data.tags
+      tags.value = res.data.tags ?? []
     } else if (res.authError) {
       tags.value = []
     } else {
@@ -147,7 +147,7 @@ async function loadTagTabs(tagId: number) {
   try {
     const res = await sendMessage<TagTabsData>({ action: 'GET_TAG_TABS', payload: { tagId } })
     if (res.success && res.data) {
-      tabs.value = res.data.tabs
+      tabs.value = res.data.tabs ?? []
     } else if (!res.authError) {
       ElMessage.error(res.error || '获取标签页失败')
     }
