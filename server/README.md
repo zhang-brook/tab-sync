@@ -189,9 +189,9 @@ docker compose start
 | `DELETE` | `/v1/tab-sync/workspaces/:id` | 删除工作组 |
 | `GET` | `/v1/tab-sync/workspaces/tabs-summary` | 标签页摘要 |
 | `POST` | `/v1/tab-sync/workspaces/:id/tabs/move` | 移动标签页 |
-| `POST` | `/v1/tab-sync/sync/push` | 推送同步事件 |
-| `GET` | `/v1/tab-sync/sync/pull` | 拉取同步事件（增量） |
-| `GET` | `/v1/tab-sync/sse/events` | SSE 实时事件流（扩展长连接） |
+| `POST` | `/v1/tab-sync/sync/push` | 推送同步事件（预留） |
+| `GET` | `/v1/tab-sync/sync/pull` | 拉取同步事件（增量，预留） |
+| `GET` | `/v1/tab-sync/sse/events` | SSE 实时事件流（扩展长连接，预留） |
 | `POST` | `/v1/tab-sync/tool-calling` | AI 远程工具调用（预留） |
 
 标签管理（标签页标签 `tab` + 工作组标签 `workspace`，全局共享、多设备可见）：

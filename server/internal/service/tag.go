@@ -119,7 +119,7 @@ type TagTabItem struct {
 
 // GetTabsByTag 返回带有指定标签的云端标签页列表（基于 TabTag 关联）
 func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
-	var items []TagTabItem
+	items := make([]TagTabItem, 0)
 	err := s.db.
 		Table("tab_tags").
 		Select("workspace_tabs.id AS tab_id, workspace_tabs.url, workspace_tabs.title, workspace_tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").

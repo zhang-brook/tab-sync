@@ -9,6 +9,7 @@ import (
 	"github.com/spidermemos/tab-sync-server/internal/config"
 	"github.com/spidermemos/tab-sync-server/internal/database"
 	"github.com/spidermemos/tab-sync-server/internal/model"
+	"gorm.io/gorm"
 )
 
 // SyncService 同步服务
@@ -34,23 +35,27 @@ func (s *SyncService) RecordEvent(eventType, entityType, entityID string, payloa
 		return fmt.Errorf("序列化 SyncEvent payload 失败: %w", err)
 	}
 
-	// 生成当前最大版本号 +1
-	var maxVersion int64
-	s.db.Model(&model.SyncEvent{}).
-		Select("COALESCE(MAX(version), 0)").
-		Scan(&maxVersion)
+	// 在事务内生成当前最大版本号 +1 并插入，避免并发写入产生重复版本号
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var maxVersion int64
+		if err := tx.Model(&model.SyncEvent{}).
+			Select("COALESCE(MAX(version), 0)").
+			Scan(&maxVersion).Error; err != nil {
+			return err
+		}
 
-	event := model.SyncEvent{
-		EventID:    uuid.New().String(),
-		EventType:  eventType,
-		EntityType: entityType,
-		EntityID:   entityID,
-		Payload:    string(payloadBytes),
-		Version:    maxVersion + 1,
-		CreatedAt:  time.Now(),
-	}
+		event := model.SyncEvent{
+			EventID:    uuid.New().String(),
+			EventType:  eventType,
+			EntityType: entityType,
+			EntityID:   entityID,
+			Payload:    string(payloadBytes),
+			Version:    maxVersion + 1,
+			CreatedAt:  time.Now(),
+		}
 
-	return s.db.Create(&event).Error
+		return tx.Create(&event).Error
+	})
 }
 
 // GetUnsyncedEvents 获取未同步到上游的事件列表

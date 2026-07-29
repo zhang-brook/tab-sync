@@ -133,7 +133,7 @@ export interface RemoveWorkspaceTabMessage {
   }
 }
 
-/** 移动标签页到目标工作组指定位置（精简版，支持同组排序和跨组移动） */
+/** 移动标签页到目标工作组指定位置（支持同组排序和跨组移动） */
 export interface MoveWorkspaceTabMessage {
   action: 'MOVE_WORKSPACE_TAB'
   payload: {

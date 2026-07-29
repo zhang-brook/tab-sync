@@ -504,7 +504,7 @@ async function handleOpenWorkspace(
   }
 }
 
-/** 移动标签页到目标工作组指定位置（精简版 — 只需传 tabId + workspaceId + newIndex） */
+/** 移动标签页到目标工作组指定位置（支持同组排序和跨组移动） */
 async function handleMoveWorkspaceTab(
   payload: { workspaceId: string; tabId: string; newIndex: number },
 ): Promise<MessageResponse> {
