@@ -868,9 +868,11 @@ function openMoveDialog(workspaceId: string, tabId: string) {
 async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   const src = moveSource.value
   if (!src) return
+  // 追加到目标分组的最后一项（源分组已在选择器中 disabled，不会选到同组）
+  const newIndex = node.workspace.tabs?.length ?? 0
   const res = await sendMessage({
     action: 'MOVE_WORKSPACE_TAB',
-    payload: { workspaceId: node.id, tabId: src.tabId, newIndex: 0 },
+    payload: { workspaceId: node.id, tabId: src.tabId, newIndex },
   })
   if (res.success) {
     ElMessage.success(`已移动到「${node.name}」`)
