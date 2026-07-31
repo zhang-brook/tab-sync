@@ -164,12 +164,16 @@
 
           <!-- 标签页列表 -->
           <div class="detail-body">
-            <el-empty v-if="rightTabs.length === 0" :image-size="60" description="工作组内暂无标签页" />
+            <el-empty
+              v-if="rightTabs.length === 0"
+              :image-size="60"
+              :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'"
+            />
 
             <!-- 仅本层级：支持拖拽排序 -->
             <draggable
               v-else-if="tabScope === 'current'"
-              :list="selectedWorkspace.tabs"
+              :list="displayTabs"
               item-key="tabId"
               handle=".drag-handle"
               ghost-class="tab-ghost"
@@ -506,7 +510,7 @@ interface RightTabItem {
   workspaceColor: string
 }
 
-/** 右侧标签页列表：根据层级范围聚合 */
+/** 右侧标签页列表：根据层级范围聚合，两种范围均支持按标签筛选 */
 const rightTabs = computed<RightTabItem[]>(() => {
   const ws = selectedWorkspace.value
   if (!ws) return []
@@ -519,18 +523,29 @@ const rightTabs = computed<RightTabItem[]>(() => {
       workspaceColor: w.color,
     }))
 
-  if (tabScope.value === 'current') return collect(ws)
-
-  const ids = [ws.id, ...collectDescendantIds(workspaces.value, ws.id)]
-  const result: RightTabItem[] = []
-  for (const id of ids) {
-    const w = workspaces.value.find((x) => x.id === id)
-    if (w) result.push(...collect(w))
+  let result: RightTabItem[]
+  if (tabScope.value === 'current') {
+    result = collect(ws)
+  } else {
+    const ids = [ws.id, ...collectDescendantIds(workspaces.value, ws.id)]
+    result = []
+    for (const id of ids) {
+      const w = workspaces.value.find((x) => x.id === id)
+      if (w) result.push(...collect(w))
+    }
   }
   if (tagFilter.value != null) {
     return result.filter((item) => item.tab.tags?.some((t) => t.id === tagFilter.value))
   }
   return result
+})
+
+/** 「仅本层级」拖拽列表的数据源：未筛选时直接引用原数组保持拖拽体验，筛选时返回过滤后的新数组 */
+const displayTabs = computed<TabReference[]>(() => {
+  const ws = selectedWorkspace.value
+  if (!ws) return []
+  if (tagFilter.value == null) return ws.tabs
+  return ws.tabs.filter((tab) => tab.tags?.some((t) => t.id === tagFilter.value))
 })
 
 watch(searchKeyword, (val) => {
@@ -864,11 +879,11 @@ async function handleSaveRename() {
   }
 }
 
-/** 同组内拖拽排序 */
+/** 同组内拖拽排序（以当前展示列表为准，映射回原数组索引） */
 function onDragUpdate(evt: { newIndex: number }) {
   const ws = selectedWorkspace.value
   if (!ws) return
-  const tab = ws.tabs[evt.newIndex]
+  const tab = displayTabs.value[evt.newIndex]
   if (tab) {
     const actualIndex = ws.tabs.findIndex((t) => t.tabId === tab.tabId)
     handleMoveTab(ws.id, tab.tabId, actualIndex >= 0 ? actualIndex : evt.newIndex)
