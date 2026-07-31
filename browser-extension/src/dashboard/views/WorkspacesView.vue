@@ -51,11 +51,12 @@
           @node-click="onSelectNode"
         >
           <template #default="{ data }">
-            <span class="tree-node">
+            <span class="tree-node" @contextmenu.prevent.stop="onNodeContextMenu(data)">
               <span class="tree-dot" :style="{ backgroundColor: data.color }" />
               <span class="tree-name" :title="data.name">{{ data.name }}</span>
               <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
               <el-dropdown
+                :ref="(el: any) => setNodeMenuRef(data.id, el)"
                 trigger="click"
                 @command="(cmd: string) => onNodeMenuCommand(cmd, data)"
                 @click.stop
@@ -630,6 +631,25 @@ async function onTagEditorConfirm(ids: number[]) {
 
 function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
+}
+
+/** 树节点右键菜单：节点 id -> el-dropdown 实例（同一时间仅打开一个） */
+const nodeMenuRefs = new Map<string, { handleOpen: () => void; handleClose: () => void }>()
+
+function setNodeMenuRef(id: string, el: { handleOpen: () => void; handleClose: () => void } | null) {
+  if (el) nodeMenuRefs.set(id, el)
+  else nodeMenuRefs.delete(id)
+}
+
+/** 右键节点：选中该节点并打开其操作菜单，替代浏览器默认右键菜单 */
+function onNodeContextMenu(data: WorkspaceTreeNode) {
+  selectedId.value = data.id
+  treeRef.value?.setCurrentKey(data.id)
+  // 先关闭其他节点可能已打开的菜单，再打开当前节点的菜单
+  for (const [id, menu] of nodeMenuRefs) {
+    if (id !== data.id) menu.handleClose()
+  }
+  nodeMenuRefs.get(data.id)?.handleOpen()
 }
 
 function showCreateDialog(parentId: string) {
