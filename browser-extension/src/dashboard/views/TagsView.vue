@@ -32,6 +32,14 @@
           <span class="tag-dot" :style="{ backgroundColor: tag.color || '#909399' }" />
           <span class="tag-name">{{ tag.name }}</span>
           <el-button
+            class="tag-action"
+            text
+            size="small"
+            :icon="Edit"
+            title="重命名"
+            @click.stop="openEdit(tag)"
+          />
+          <el-button
             class="tag-del"
             text
             size="small"
@@ -96,6 +104,22 @@
         <el-button type="primary" :disabled="!newName.trim()" @click="createTag">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑标签对话框 -->
+    <el-dialog v-model="editVisible" title="编辑标签" width="360px">
+      <el-form label-width="64px">
+        <el-form-item label="名称">
+          <el-input v-model="editName" placeholder="标签名称" maxlength="20" show-word-limit />
+        </el-form-item>
+        <el-form-item label="颜色">
+          <el-color-picker v-model="editColor" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!editName.trim()" @click="saveTag">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -103,7 +127,7 @@
 import { ref, onMounted } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Close, Loading, Refresh } from '@element-plus/icons-vue'
+import { Plus, Close, Loading, Refresh, Edit } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TagInfo } from '@/shared/types/workspace'
@@ -119,6 +143,12 @@ const tabsLoading = ref(false)
 const createVisible = ref(false)
 const newName = ref('')
 const newColor = ref('#409EFF')
+
+// 编辑标签
+const editVisible = ref(false)
+const editingTag = ref<TagInfo | null>(null)
+const editName = ref('')
+const editColor = ref('#409EFF')
 
 async function loadTags() {
   tagsLoading.value = true
@@ -208,6 +238,43 @@ async function deleteTag(tag: TagInfo) {
     }
   } catch (e) {
     ElMessage.error('删除标签失败：' + (e as Error).message)
+  }
+}
+
+function openEdit(tag: TagInfo) {
+  editingTag.value = tag
+  editName.value = tag.name
+  editColor.value = tag.color || '#409EFF'
+  editVisible.value = true
+}
+
+async function saveTag() {
+  const name = editName.value.trim()
+  if (!name || !editingTag.value) return
+  try {
+    const res = await sendMessage({
+      action: 'UPDATE_TAG',
+      payload: { tagId: editingTag.value.id, name, color: editColor.value },
+    })
+    if (res.success) {
+      ElMessage.success('已更新标签')
+      editVisible.value = false
+      // 更新本地列表中的标签信息
+      const idx = tags.value.findIndex(t => t.id === editingTag.value!.id)
+      if (idx !== -1) {
+        tags.value[idx] = { ...tags.value[idx], name, color: editColor.value }
+      }
+      // 更新右侧选中的标签信息
+      if (selectedTag.value?.id === editingTag.value!.id) {
+        selectedTag.value = { ...selectedTag.value, name, color: editColor.value }
+      }
+    } else if (res.authError) {
+      ElMessage.warning('未连接到后端')
+    } else {
+      ElMessage.error(res.error || '更新标签失败')
+    }
+  } catch (e) {
+    ElMessage.error('更新标签失败：' + (e as Error).message)
   }
 }
 
@@ -318,7 +385,11 @@ onMounted(loadTags)
 .tag-del {
   opacity: 0;
 }
-.tag-item:hover .tag-del {
+.tag-action {
+  opacity: 0;
+}
+.tag-item:hover .tag-del,
+.tag-item:hover .tag-action {
   opacity: 1;
 }
 .tags-right {

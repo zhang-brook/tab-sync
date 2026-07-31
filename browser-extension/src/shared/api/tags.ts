@@ -13,6 +13,11 @@ export function createTag(payload: { name: string; color?: string; scope: 'tab' 
   return apiClient.post<TagInfo>('/v1/tab-sync/tags', payload)
 }
 
+/** 更新标签（名称/颜色） */
+export function updateTag(tagId: number, payload: { name?: string; color?: string }) {
+  return apiClient.put<TagInfo>(`/v1/tab-sync/tags/${tagId}`, payload)
+}
+
 /** 删除标签 */
 export function deleteTag(tagId: number) {
   return apiClient.delete(`/v1/tab-sync/tags/${tagId}`)

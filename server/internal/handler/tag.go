@@ -54,6 +54,33 @@ func (h *TagHandler) Create(c *gin.Context) {
 	Created(c, tag)
 }
 
+// Update 更新标签（名称/颜色）
+func (h *TagHandler) Update(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		BadRequest(c, "无效的标签 ID")
+		return
+	}
+	var body struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		BadRequest(c, "参数错误")
+		return
+	}
+	if body.Name == "" && body.Color == "" {
+		BadRequest(c, "至少需要提供 name 或 color")
+		return
+	}
+	tag, err := h.svc.Update(uint(id), body.Name, body.Color)
+	if err != nil {
+		InternalError(c, "更新标签失败")
+		return
+	}
+	Success(c, tag)
+}
+
 // Delete 删除标签
 func (h *TagHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

@@ -1,4 +1,4 @@
-import type { Workspace, TagInfo } from './workspace'
+﻿import type { Workspace, TagInfo } from './workspace'
 import type { Device } from './device'
 import type { AuthState } from './auth'
 
@@ -26,6 +26,7 @@ export type MessageAction =
   | 'SET_CONNECTION_MODE'
   | 'GET_TAGS'
   | 'CREATE_TAG'
+  | 'UPDATE_TAG'
   | 'DELETE_TAG'
   | 'ADD_TAB_TAG'
   | 'REMOVE_TAB_TAG'
@@ -179,6 +180,12 @@ export interface CreateTagMessage {
 export interface DeleteTagMessage {
   action: 'DELETE_TAG'
   payload: { tagId: number }
+
+/** 更新标签（名称/颜色） */
+export interface UpdateTagMessage {
+  action: 'UPDATE_TAG'
+  payload: { tagId: number; name?: string; color?: string }
+}
 }
 
 /** 给工作组内标签页打标签 */
@@ -274,6 +281,7 @@ export type ExtensionMessage =
   | GetWorkspaceTabsSummaryMessage
   | GetTagsMessage
   | CreateTagMessage
+  | UpdateTagMessage
   | DeleteTagMessage
   | AddTabTagMessage
   | RemoveTabTagMessage

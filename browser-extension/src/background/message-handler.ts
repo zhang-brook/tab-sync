@@ -1,10 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+﻿import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab } from '../shared/api/workspaces'
-import { getTags, createTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
+import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { openTabAfterActive } from '../shared/utils/tab-utils'
@@ -86,6 +86,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'CREATE_TAG':
       return handleCreateTag(message.payload)
+
+    case 'UPDATE_TAG':
+      return handleUpdateTag(message.payload)
 
     case 'DELETE_TAG':
       return handleDeleteTag(message.payload.tagId)
@@ -674,6 +677,17 @@ async function handleCreateTag(
     return { success: true, data: res.data }
   }
   return { success: false, error: res.error || '创建标签失败', authError: res.status === 401 }
+}
+
+/** 更新标签（名称/颜色） */
+async function handleUpdateTag(
+  payload: { tagId: number; name?: string; color?: string },
+): Promise<MessageResponse<TagInfo>> {
+  const res = await updateTag(payload.tagId, { name: payload.name, color: payload.color })
+  if (res.ok && res.data) {
+    return { success: true, data: res.data }
+  }
+  return { success: false, error: res.error || '更新标签失败', authError: res.status === 401 }
 }
 
 /** 删除标签 */

@@ -44,6 +44,24 @@ func (s *TagService) Create(name, color, scope string) (*TagResponse, error) {
 	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope}, nil
 }
 
+// Update 更新标签（名称/颜色）
+func (s *TagService) Update(id uint, name, color string) (*TagResponse, error) {
+	tag := model.Tag{}
+	if err := s.db.First(&tag, id).Error; err != nil {
+		return nil, err
+	}
+	if name != "" {
+		tag.Name = name
+	}
+	if color != "" {
+		tag.Color = color
+	}
+	if err := s.db.Save(&tag).Error; err != nil {
+		return nil, err
+	}
+	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope}, nil
+}
+
 // Delete 删除标签（事务内清理关联记录）
 func (s *TagService) Delete(id uint) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {

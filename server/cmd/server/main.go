@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"embed"
@@ -132,6 +132,7 @@ func main() {
 			// 标签管理（标签页标签 + 工作组标签）
 			auth.GET("/tags", handlers.Tag.List)
 			auth.POST("/tags", handlers.Tag.Create)
+			auth.PUT("/tags/:id", handlers.Tag.Update)
 			auth.DELETE("/tags/:id", handlers.Tag.Delete)
 			auth.GET("/tags/:id/tabs", handlers.Tag.GetTabsByTag)
 			auth.POST("/workspaces/:id/tabs/:tabId/tags", handlers.Tag.AddToTab)
