@@ -42,6 +42,14 @@ export function moveWorkspaceTab(targetWorkspaceId: string, tabId: string, newIn
   return apiClient.post<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(targetWorkspaceId)}/tabs/move`, { tabId, newIndex })
 }
 
+/** 通过 URL 向工作组添加标签页 */
+export function addWorkspaceTabByUrl(workspaceId: string, url: string, title?: string) {
+  return apiClient.post<{ tab: { tabId: string; url: string; title: string; favIconUrl: string; sortOrder: number; addedAt: string } }>(
+    `/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/tabs`,
+    { url, title: title || '' },
+  )
+}
+
 /** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName） */
 export function updateWorkspaceTab(
   workspaceId: string,

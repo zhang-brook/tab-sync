@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"embed"
@@ -117,6 +117,7 @@ func main() {
 			auth.DELETE("/workspaces/:id", handlers.Workspace.Delete)
 			auth.GET("/workspaces/tabs-summary", handlers.Workspace.TabsSummary)
 			auth.POST("/workspaces/:id/tabs/move", handlers.Workspace.MoveTab)
+			auth.POST("/workspaces/:id/tabs", handlers.Workspace.AddTabByURL)
 			auth.PATCH("/workspaces/:id/tabs/:tabId", handlers.Workspace.UpdateTab)
 
 			// 同步相关（预留）

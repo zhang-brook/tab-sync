@@ -1,9 +1,9 @@
-﻿import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -53,6 +53,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'ADD_TABS_TO_WORKSPACE':
       return handleAddTabsToWorkspace(message.payload)
+
+    case 'ADD_WORKSPACE_TAB_BY_URL':
+      return handleAddWorkspaceTabByUrl(message.payload)
 
     case 'MOVE_WORKSPACE_TAB':
       return handleMoveWorkspaceTab(message.payload)
@@ -359,6 +362,19 @@ async function handleAddTabsToWorkspace(
   }
   logger.warn('addTabsToWorkspace: updateWorkspace failed:', updateRes.error)
   return { success: false, error: updateRes.error || '更新工作组失败', authError: updateRes.status === 401 }
+}
+
+/** 通过 URL 向工作组添加标签页 */
+async function handleAddWorkspaceTabByUrl(
+  payload: { workspaceId: string; url: string; title?: string },
+): Promise<MessageResponse> {
+  const res = await addWorkspaceTabByUrl(payload.workspaceId, payload.url, payload.title)
+  if (res.ok && res.data) {
+    logger.info(`Tab added by URL to workspace "${payload.workspaceId}": ${payload.url}`)
+    return { success: true, data: res.data }
+  }
+  logger.warn('addWorkspaceTabByUrl API failed:', res.error)
+  return { success: false, error: res.error || '添加标签页失败', authError: res.status === 401 }
 }
 
 /** 将 hex 颜色映射为 Chrome 标签组颜色名称 */

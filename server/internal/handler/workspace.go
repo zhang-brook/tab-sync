@@ -110,6 +110,25 @@ func (h *WorkspaceHandler) MoveTab(c *gin.Context) {
 	Success(c, gin.H{"success": true})
 }
 
+// AddTabByURL 通过 URL 向工作组添加标签页
+func (h *WorkspaceHandler) AddTabByURL(c *gin.Context) {
+	workspaceID := c.Param("id")
+
+	var payload service.AddTabByURLPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		BadRequest(c, "请提供有效的 URL")
+		return
+	}
+
+	tab, err := h.svc.AddTabByURL(workspaceID, payload)
+	if err != nil {
+		BadRequest(c, "添加标签页失败: "+err.Error())
+		return
+	}
+
+	Created(c, gin.H{"tab": tab})
+}
+
 // UpdateTab 更新工作组内单个标签页属性（当前支持手动设置添加时间 addedAt）
 func (h *WorkspaceHandler) UpdateTab(c *gin.Context) {
 	workspaceID := c.Param("id")

@@ -390,6 +390,68 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 	})
 }
 
+// AddTabByURLPayload 通过 URL 添加标签页的请求体
+type AddTabByURLPayload struct {
+	URL   string `json:"url" binding:"required"`
+	Title string `json:"title"` // 可选，为空时使用 URL 作为标题
+}
+
+// AddTabByURL 通过 URL 向工作组添加标签页
+func (s *WorkspaceService) AddTabByURL(workspaceID string, payload AddTabByURLPayload) (*TabReference, error) {
+	if workspaceID == "" {
+		return nil, errors.New("workspaceID 不能为空")
+	}
+	if payload.URL == "" {
+		return nil, errors.New("URL 不能为空")
+	}
+
+	// 验证工作组存在
+	var workspace model.Workspace
+	if err := s.db.Where("workspace_id = ? AND is_deleted = ?", workspaceID, false).First(&workspace).Error; err != nil {
+		return nil, err
+	}
+
+	title := payload.Title
+	if title == "" {
+		title = payload.URL
+	}
+
+	tab := model.WorkspaceTab{
+		WorkspaceID: workspaceID,
+		URL:         sanitizeString(payload.URL, 2048),
+		Title:       sanitizeString(title, 500),
+		FavIconURL:  "",
+		SortOrder:   0,
+		AddedAt:     time.Now(),
+	}
+
+	// 计算新标签页的 sortOrder（放在末尾）
+	var maxOrder int
+	s.db.Model(&model.WorkspaceTab{}).
+		Where("workspace_id = ?", workspaceID).
+		Select("COALESCE(MAX(sort_order), -1)").
+		Scan(&maxOrder)
+	tab.SortOrder = maxOrder + 1
+
+	if err := s.db.Create(&tab).Error; err != nil {
+		return nil, err
+	}
+
+	// 记录同步事件
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("added", "tab", workspaceID, tab)
+	}
+
+	return &TabReference{
+		TabID:      strconv.FormatUint(uint64(tab.ID), 10),
+		URL:        tab.URL,
+		Title:      tab.Title,
+		FavIconURL: tab.FavIconURL,
+		SortOrder:  tab.SortOrder,
+		AddedAt:    tab.AddedAt.Format(time.RFC3339),
+	}, nil
+}
+
 // UpdateTabPayload 更新工作组内单个标签页属性的请求体（字段均可选，仅更新提供的字段）
 type UpdateTabPayload struct {
 	// AddedAt 手动设置的添加时间（RFC3339 格式）

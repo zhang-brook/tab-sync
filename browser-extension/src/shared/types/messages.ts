@@ -15,6 +15,7 @@ export type MessageAction =
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
   | 'ADD_TABS_TO_WORKSPACE'
+  | 'ADD_WORKSPACE_TAB_BY_URL'
   | 'MOVE_WORKSPACE_TAB'
   | 'UPDATE_WORKSPACE_TAB'
   | 'REMOVE_WORKSPACE_TAB'
@@ -123,6 +124,12 @@ export interface AddTabsToWorkspaceMessage {
   payload: { workspaceId: string; tabs: WorkspaceTabPayload[] }
 }
 
+/** 通过 URL 向工作组添加标签页 */
+export interface AddWorkspaceTabByUrlMessage {
+  action: 'ADD_WORKSPACE_TAB_BY_URL'
+  payload: { workspaceId: string; url: string; title?: string }
+}
+
 /** 从工作组中移除指定标签页 */
 export interface RemoveWorkspaceTabMessage {
   action: 'REMOVE_WORKSPACE_TAB'
@@ -180,12 +187,12 @@ export interface CreateTagMessage {
 export interface DeleteTagMessage {
   action: 'DELETE_TAG'
   payload: { tagId: number }
+}
 
 /** 更新标签（名称/颜色） */
 export interface UpdateTagMessage {
   action: 'UPDATE_TAG'
   payload: { tagId: number; name?: string; color?: string }
-}
 }
 
 /** 给工作组内标签页打标签 */
@@ -272,6 +279,7 @@ export type ExtensionMessage =
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
   | AddTabsToWorkspaceMessage
+  | AddWorkspaceTabByUrlMessage
   | MoveWorkspaceTabMessage
   | UpdateWorkspaceTabMessage
   | RemoveWorkspaceTabMessage

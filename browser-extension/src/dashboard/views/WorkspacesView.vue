@@ -143,6 +143,11 @@
                   <el-icon><Delete /></el-icon>
                 </el-button>
               </el-tooltip>
+              <el-tooltip content="通过 URL 添加标签页" placement="top">
+                <el-button size="small" text type="primary" @click="addUrlDialogVisible = true">
+                  <el-icon><Plus /></el-icon>
+                </el-button>
+              </el-tooltip>
             </div>
           </div>
 
@@ -381,13 +386,40 @@
       :disabled-ids="parentDisabledIds"
       @select="onSelectParent"
     />
+
+    <!-- 通过 URL 添加标签页 -->
+    <el-dialog v-model="addUrlDialogVisible" title="通过 URL 添加标签页" width="500px" destroy-on-close>
+      <el-form label-width="70px" label-position="left">
+        <el-form-item label="URL" required>
+          <el-input
+            v-model="newTabUrl"
+            placeholder="https://example.com"
+            clearable
+            @keyup.enter="handleAddTabByUrl"
+          >
+            <template #prepend>
+              <el-icon><Link /></el-icon>
+            </template>
+          </el-input>
+        </el-form-item>
+      </el-form>
+      <div class="add-url-dialog-hint">
+        标签页将添加到当前选中的工作组「{{ selectedWorkspace?.name }}」
+      </div>
+      <template #footer>
+        <el-button @click="addUrlDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="addingByUrl" :disabled="!newTabUrl.trim()" @click="handleAddTabByUrl">
+          添加
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -402,6 +434,11 @@ const loading = ref(true)
 const searchKeyword = ref('')
 const selectedId = ref('')
 const tabScope = ref<'current' | 'all'>('current')
+
+// URL 输入添加标签页
+const addUrlDialogVisible = ref(false)
+const newTabUrl = ref('')
+const addingByUrl = ref(false)
 
 // 标签相关状态
 const tagFilter = ref<number | null>(null)
@@ -850,6 +887,30 @@ async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number
   }
 }
 
+/** 通过 URL 向当前选中工作组添加标签页 */
+async function handleAddTabByUrl() {
+  const url = newTabUrl.value.trim()
+  if (!url || !selectedWorkspace.value) return
+
+  addingByUrl.value = true
+  const res = await sendMessage({
+    action: 'ADD_WORKSPACE_TAB_BY_URL',
+    payload: { workspaceId: selectedWorkspace.value.id, url },
+  })
+  addingByUrl.value = false
+
+  if (res.success) {
+    ElMessage.success('标签页已添加')
+    newTabUrl.value = ''
+    addUrlDialogVisible.value = false
+    await loadWorkspaces()
+  } else if (res.authError) {
+    ElMessage.warning('未连接后端，无法添加')
+  } else {
+    ElMessage.error(res.error || '添加失败')
+  }
+}
+
 // ============ 移动到其他工作组 ============
 
 const movePickerVisible = ref(false)
@@ -1033,6 +1094,12 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
 .detail-actions {
   display: flex;
   gap: 4px;
+}
+
+.add-url-dialog-hint {
+  font-size: 12px;
+  color: #909399;
+  padding-left: 70px;
 }
 
 .scope-bar {
