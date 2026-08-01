@@ -182,7 +182,7 @@
               @update="onDragUpdate"
             >
               <template #item="{ element: tab }">
-                <div class="ws-tab-item">
+                <div class="ws-tab-item" @contextmenu.prevent.stop="onTabContextMenu(tab.tabId, $event)">
                   <span class="drag-handle" title="拖拽排序">⋮⋮</span>
                   <LazyFavicon
                     :favIconUrl="tab.favIconUrl"
@@ -197,43 +197,35 @@
                     </div>
                   </div>
                   <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(tab.addedAt)">{{ formatAddedAt(tab.addedAt) }}</span>
-                  <el-tooltip content="修改添加时间" placement="top">
-                    <el-button size="small" text @click="openEditTimeDialog(selectedWorkspace!.id, tab)">
-                      <el-icon><Clock /></el-icon>
+                  <el-dropdown
+                    :ref="(el: any) => setTabMenuRef(tab.tabId, el)"
+                    trigger="click"
+                    @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)"
+                    @click.stop
+                  >
+                    <el-button size="small" text class="tab-more-btn" @click.stop>
+                      <el-icon class="dots-vertical"><MoreFilled /></el-icon>
                     </el-button>
-                  </el-tooltip>
-                  <el-tooltip content="重命名" placement="top">
-                    <el-button size="small" text @click="openRenameDialog(selectedWorkspace!.id, tab)">
-                      <el-icon><Edit /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip content="标签" placement="top">
-                    <el-button size="small" text @click="openTabTagEditor(selectedWorkspace!.id, tab)">
-                      <el-icon><PriceTag /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip content="移动到其他工作组" placement="top">
-                    <el-button size="small" text @click="openMoveDialog(selectedWorkspace!.id, tab.tabId)">
-                      <el-icon><Rank /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip content="在新标签页中打开" placement="top">
-                    <el-button size="small" text type="primary" @click="openSingleTab(tab.url)">
-                      <el-icon><View /></el-icon>
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip content="从工作组中移除" placement="top">
-                    <el-button size="small" text type="danger" @click="handleRemoveTab(selectedWorkspace!.id, tab.tabId)">
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </el-tooltip>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="open" :icon="View">在新标签页中打开</el-dropdown-item>
+                        <el-dropdown-item command="copyTitle" :icon="DocumentCopy" divided>复制标题</el-dropdown-item>
+                        <el-dropdown-item command="copyLink" :icon="Link">复制链接</el-dropdown-item>
+                        <el-dropdown-item command="editTime" :icon="Clock" divided>修改添加时间</el-dropdown-item>
+                        <el-dropdown-item command="rename" :icon="Edit">重命名</el-dropdown-item>
+                        <el-dropdown-item command="tag" :icon="PriceTag">标签</el-dropdown-item>
+                        <el-dropdown-item command="move" :icon="Rank">移动到其他工作组</el-dropdown-item>
+                        <el-dropdown-item command="remove" :icon="Delete" divided class="danger-dropdown-item">从工作组中移除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </template>
             </draggable>
 
             <!-- 包含子工作组：只读列表，带来源标记 -->
             <div v-else class="flat-tabs">
-              <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item">
+              <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item" @contextmenu.prevent.stop="onTabContextMenu(item.tab.tabId, $event)">
                 <LazyFavicon
                   :favIconUrl="item.tab.favIconUrl"
                   :size="16"
@@ -255,36 +247,28 @@
                   {{ item.workspaceName }}
                 </el-tag>
                 <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(item.tab.addedAt)">{{ formatAddedAt(item.tab.addedAt) }}</span>
-                <el-tooltip content="修改添加时间" placement="top">
-                  <el-button size="small" text @click="openEditTimeDialog(item.workspaceId, item.tab)">
-                    <el-icon><Clock /></el-icon>
+                <el-dropdown
+                  :ref="(el: any) => setTabMenuRef(item.tab.tabId, el)"
+                  trigger="click"
+                  @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
+                  @click.stop
+                >
+                  <el-button size="small" text class="tab-more-btn" @click.stop>
+                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
                   </el-button>
-                </el-tooltip>
-                <el-tooltip content="重命名" placement="top">
-                  <el-button size="small" text @click="openRenameDialog(item.workspaceId, item.tab)">
-                    <el-icon><Edit /></el-icon>
-                  </el-button>
-                </el-tooltip>
-                <el-tooltip content="标签" placement="top">
-                  <el-button size="small" text @click="openTabTagEditor(item.workspaceId, item.tab)">
-                    <el-icon><PriceTag /></el-icon>
-                  </el-button>
-                </el-tooltip>
-                <el-tooltip content="移动到其他工作组" placement="top">
-                  <el-button size="small" text @click="openMoveDialog(item.workspaceId, item.tab.tabId)">
-                    <el-icon><Rank /></el-icon>
-                  </el-button>
-                </el-tooltip>
-                <el-tooltip content="在新标签页中打开" placement="top">
-                  <el-button size="small" text type="primary" @click="openSingleTab(item.tab.url)">
-                    <el-icon><View /></el-icon>
-                  </el-button>
-                </el-tooltip>
-                <el-tooltip content="从工作组中移除" placement="top">
-                  <el-button size="small" text type="danger" @click="handleRemoveTab(item.workspaceId, item.tab.tabId)">
-                    <el-icon><Delete /></el-icon>
-                  </el-button>
-                </el-tooltip>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="open" :icon="View">在新标签页中打开</el-dropdown-item>
+                      <el-dropdown-item command="copyTitle" :icon="DocumentCopy" divided>复制标题</el-dropdown-item>
+                      <el-dropdown-item command="copyLink" :icon="Link">复制链接</el-dropdown-item>
+                      <el-dropdown-item command="editTime" :icon="Clock" divided>修改添加时间</el-dropdown-item>
+                      <el-dropdown-item command="rename" :icon="Edit">重命名</el-dropdown-item>
+                      <el-dropdown-item command="tag" :icon="PriceTag">标签</el-dropdown-item>
+                      <el-dropdown-item command="move" :icon="Rank">移动到其他工作组</el-dropdown-item>
+                      <el-dropdown-item command="remove" :icon="Delete" divided class="danger-dropdown-item">从工作组中移除</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </div>
           </div>
@@ -424,7 +408,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank, Link } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank, Link, DocumentCopy } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -650,6 +634,63 @@ function onNodeContextMenu(data: WorkspaceTreeNode) {
     if (id !== data.id) menu.handleClose()
   }
   nodeMenuRefs.get(data.id)?.handleOpen()
+}
+
+/** 标签页菜单：tabId -> el-dropdown 实例（同一时间仅打开一个） */
+const tabMenuRefs = new Map<string, { handleOpen: () => void; handleClose: () => void }>()
+
+function setTabMenuRef(tabId: string, el: { handleOpen: () => void; handleClose: () => void } | null) {
+  if (el) tabMenuRefs.set(tabId, el)
+  else tabMenuRefs.delete(tabId)
+}
+
+/** 右键标签页项：打开操作菜单，替代浏览器默认右键菜单 */
+function onTabContextMenu(tabId: string, _event: MouseEvent) {
+  // 关闭其他标签页可能已打开的菜单
+  for (const [id, menu] of tabMenuRefs) {
+    if (id !== tabId) menu.handleClose()
+  }
+  tabMenuRefs.get(tabId)?.handleOpen()
+}
+
+/** 标签页操作菜单命令分发 */
+function onTabMenuCommand(command: string, workspaceId: string, tab: TabReference) {
+  switch (command) {
+    case 'open':
+      openSingleTab(tab.url)
+      break
+    case 'copyTitle':
+      copyToClipboard(displayTitle(tab), '标题已复制')
+      break
+    case 'copyLink':
+      copyToClipboard(tab.url, '链接已复制')
+      break
+    case 'editTime':
+      openEditTimeDialog(workspaceId, tab)
+      break
+    case 'rename':
+      openRenameDialog(workspaceId, tab)
+      break
+    case 'tag':
+      openTabTagEditor(workspaceId, tab)
+      break
+    case 'move':
+      openMoveDialog(workspaceId, tab.tabId)
+      break
+    case 'remove':
+      handleRemoveTab(workspaceId, tab.tabId)
+      break
+  }
+}
+
+/** 复制文本到剪贴板 */
+async function copyToClipboard(text: string, successMsg: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(successMsg)
+  } catch {
+    ElMessage.error('复制失败')
+  }
 }
 
 function showCreateDialog(parentId: string) {
@@ -1256,6 +1297,18 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   opacity: 0.4;
   background: #e6f7ff;
   border: 1px dashed #409eff;
+}
+
+/* 标签页项的竖三点按钮 */
+.tab-more-btn {
+  margin-left: auto;
+  padding: 2px 4px;
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.tab-more-btn:hover {
+  color: #606266;
 }
 </style>
 
