@@ -51,46 +51,28 @@
           @node-click="onSelectNode"
         >
           <template #default="{ data }">
-            <span class="tree-node" @contextmenu.prevent.stop="onNodeContextMenu(data)">
-              <span class="tree-dot" :style="{ backgroundColor: data.color }" />
-              <span class="tree-name" :title="data.name">{{ data.name }}</span>
-              <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
-              <el-dropdown
-                :ref="(el: any) => setNodeMenuRef(data.id, el)"
-                trigger="click"
-                @command="(cmd: string) => onNodeMenuCommand(cmd, data)"
-                @click.stop
-              >
-                <el-button size="small" text class="node-dots-btn" @click.stop>
-                  <el-icon class="dots-vertical"><MoreFilled /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item :command="'open'" :icon="FolderOpened" :disabled="data.tabCount === 0">
-                      打开所有标签页
-                      <el-text type="info" style="margin-left: 6.18px;" v-if="data.tabCount > 0">
-                        ({{ data.tabCount }}个标签页)
-                      </el-text>
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="'openNewWindow'" :icon="CopyDocument" :disabled="data.tabCount === 0">
-                      打开所有标签页（新窗口）
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="'openAsGroup'" :icon="Collection" :disabled="data.tabCount === 0">
-                      打开所有标签页（打开为标签组）
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="'createChild'" :icon="FolderAdd" divided>
-                      新建子工作组
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem">
-                      编辑
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem">
-                      删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </span>
+            <ContextMenu @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @open="() => onNodeContextMenu(data)">
+              <span class="tree-node">
+                <span class="tree-dot" :style="{ backgroundColor: data.color }" />
+                <span class="tree-name" :title="data.name">{{ data.name }}</span>
+                <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
+                <el-dropdown
+                  trigger="click"
+                  @command="(cmd: string) => onNodeMenuCommand(cmd, data)"
+                  @click.stop
+                >
+                  <el-button size="small" text class="node-dots-btn" @click.stop>
+                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <NodeDropdownMenu :data="data" />
+                  </template>
+                </el-dropdown>
+              </span>
+              <template #menu>
+                <NodeDropdownMenu :data="data" />
+              </template>
+            </ContextMenu>
           </template>
         </el-tree>
       </div>
@@ -182,94 +164,88 @@
               @update="onDragUpdate"
             >
               <template #item="{ element: tab }">
-                <div class="ws-tab-item" @contextmenu.prevent.stop="onTabContextMenu(tab.tabId, $event)">
-                  <span class="drag-handle" title="拖拽排序">⋮⋮</span>
+                <ContextMenu @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)">
+                  <div class="ws-tab-item">
+                    <span class="drag-handle" title="拖拽排序">⋮⋮</span>
+                    <LazyFavicon
+                      :favIconUrl="tab.favIconUrl"
+                      :size="16"
+                      class="tab-favicon"
+                    />
+                    <div class="tab-text">
+                      <div class="tab-title" :title="tab.displayName ? tab.displayName + '（原：' + tab.title + '）' : tab.title" @click="openSingleTab(tab.url)">{{ displayTitle(tab) }}</div>
+                      <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
+                      <div class="tab-tags" v-if="tab.tags && tab.tags.length">
+                        <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                      </div>
+                    </div>
+                    <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(tab.addedAt)">{{ formatAddedAt(tab.addedAt) }}</span>
+                    <el-dropdown
+                      trigger="click"
+                      @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)"
+                      @click.stop
+                    >
+                      <el-button size="small" text class="tab-more-btn" @click.stop>
+                        <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                      </el-button>
+                      <template #dropdown>
+                        <TabDropdownMenu />
+                      </template>
+                    </el-dropdown>
+                  </div>
+                  <template #menu>
+                    <TabDropdownMenu />
+                  </template>
+                </ContextMenu>
+              </template>
+            </draggable>
+
+            <!-- 包含子工作组：只读列表，带来源标记 -->
+            <div v-else class="flat-tabs">
+              <ContextMenu
+                v-for="item in rightTabs"
+                :key="item.workspaceId + '-' + item.tab.tabId"
+                @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
+              >
+                <div class="ws-tab-item">
                   <LazyFavicon
-                    :favIconUrl="tab.favIconUrl"
+                    :favIconUrl="item.tab.favIconUrl"
                     :size="16"
                     class="tab-favicon"
                   />
                   <div class="tab-text">
-                    <div class="tab-title" :title="tab.displayName ? tab.displayName + '（原：' + tab.title + '）' : tab.title" @click="openSingleTab(tab.url)">{{ displayTitle(tab) }}</div>
-                    <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
-                    <div class="tab-tags" v-if="tab.tags && tab.tags.length">
-                      <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                    <div class="tab-title" :title="item.tab.displayName ? item.tab.displayName + '（原：' + item.tab.title + '）' : item.tab.title" @click="openSingleTab(item.tab.url)">{{ displayTitle(item.tab) }}</div>
+                    <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
+                    <div class="tab-tags" v-if="item.tab.tags && item.tab.tags.length">
+                      <el-tag v-for="tg in item.tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
                     </div>
                   </div>
-                  <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(tab.addedAt)">{{ formatAddedAt(tab.addedAt) }}</span>
+                  <el-tag
+                    v-if="item.workspaceId !== selectedWorkspace.id"
+                    size="small"
+                    effect="plain"
+                    :style="{ borderColor: item.workspaceColor, color: item.workspaceColor }"
+                  >
+                    {{ item.workspaceName }}
+                  </el-tag>
+                  <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(item.tab.addedAt)">{{ formatAddedAt(item.tab.addedAt) }}</span>
                   <el-dropdown
-                    :ref="(el: any) => setTabMenuRef(tab.tabId, el)"
                     trigger="click"
-                    @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)"
+                    @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
                     @click.stop
                   >
                     <el-button size="small" text class="tab-more-btn" @click.stop>
                       <el-icon class="dots-vertical"><MoreFilled /></el-icon>
                     </el-button>
                     <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item command="open" :icon="View">在新标签页中打开</el-dropdown-item>
-                        <el-dropdown-item command="copyTitle" :icon="DocumentCopy" divided>复制标题</el-dropdown-item>
-                        <el-dropdown-item command="copyLink" :icon="Link">复制链接</el-dropdown-item>
-                        <el-dropdown-item command="editTime" :icon="Clock" divided>修改添加时间</el-dropdown-item>
-                        <el-dropdown-item command="rename" :icon="Edit">重命名</el-dropdown-item>
-                        <el-dropdown-item command="tag" :icon="PriceTag">标签</el-dropdown-item>
-                        <el-dropdown-item command="move" :icon="Rank">移动到其他工作组</el-dropdown-item>
-                        <el-dropdown-item command="remove" :icon="Delete" divided class="danger-dropdown-item">从工作组中移除</el-dropdown-item>
-                      </el-dropdown-menu>
+                      <TabDropdownMenu />
                     </template>
                   </el-dropdown>
                 </div>
-              </template>
-            </draggable>
-
-            <!-- 包含子工作组：只读列表，带来源标记 -->
-            <div v-else class="flat-tabs">
-              <div v-for="item in rightTabs" :key="item.workspaceId + '-' + item.tab.tabId" class="ws-tab-item" @contextmenu.prevent.stop="onTabContextMenu(item.tab.tabId, $event)">
-                <LazyFavicon
-                  :favIconUrl="item.tab.favIconUrl"
-                  :size="16"
-                  class="tab-favicon"
-                />
-                <div class="tab-text">
-                  <div class="tab-title" :title="item.tab.displayName ? item.tab.displayName + '（原：' + item.tab.title + '）' : item.tab.title" @click="openSingleTab(item.tab.url)">{{ displayTitle(item.tab) }}</div>
-                  <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
-                  <div class="tab-tags" v-if="item.tab.tags && item.tab.tags.length">
-                    <el-tag v-for="tg in item.tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
-                  </div>
-                </div>
-                <el-tag
-                  v-if="item.workspaceId !== selectedWorkspace.id"
-                  size="small"
-                  effect="plain"
-                  :style="{ borderColor: item.workspaceColor, color: item.workspaceColor }"
-                >
-                  {{ item.workspaceName }}
-                </el-tag>
-                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(item.tab.addedAt)">{{ formatAddedAt(item.tab.addedAt) }}</span>
-                <el-dropdown
-                  :ref="(el: any) => setTabMenuRef(item.tab.tabId, el)"
-                  trigger="click"
-                  @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
-                  @click.stop
-                >
-                  <el-button size="small" text class="tab-more-btn" @click.stop>
-                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="open" :icon="View">在新标签页中打开</el-dropdown-item>
-                      <el-dropdown-item command="copyTitle" :icon="DocumentCopy" divided>复制标题</el-dropdown-item>
-                      <el-dropdown-item command="copyLink" :icon="Link">复制链接</el-dropdown-item>
-                      <el-dropdown-item command="editTime" :icon="Clock" divided>修改添加时间</el-dropdown-item>
-                      <el-dropdown-item command="rename" :icon="Edit">重命名</el-dropdown-item>
-                      <el-dropdown-item command="tag" :icon="PriceTag">标签</el-dropdown-item>
-                      <el-dropdown-item command="move" :icon="Rank">移动到其他工作组</el-dropdown-item>
-                      <el-dropdown-item command="remove" :icon="Delete" divided class="danger-dropdown-item">从工作组中移除</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
+                <template #menu>
+                  <TabDropdownMenu />
+                </template>
+              </ContextMenu>
             </div>
           </div>
         </template>
@@ -408,7 +384,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, View, FolderAdd, MoreFilled, PriceTag, Clock, Rank, Link, DocumentCopy } from '@element-plus/icons-vue'
+import ContextMenu from '@/shared/components/ContextMenu.vue'
+import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
+import TabDropdownMenu from '../components/TabDropdownMenu.vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
@@ -617,40 +596,10 @@ function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
 }
 
-/** 树节点右键菜单：节点 id -> el-dropdown 实例（同一时间仅打开一个） */
-const nodeMenuRefs = new Map<string, { handleOpen: () => void; handleClose: () => void }>()
-
-function setNodeMenuRef(id: string, el: { handleOpen: () => void; handleClose: () => void } | null) {
-  if (el) nodeMenuRefs.set(id, el)
-  else nodeMenuRefs.delete(id)
-}
-
-/** 右键节点：选中该节点并打开其操作菜单，替代浏览器默认右键菜单 */
+/** 右键节点：选中该节点，由 ContextMenu 负责打开操作菜单 */
 function onNodeContextMenu(data: WorkspaceTreeNode) {
   selectedId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
-  // 先关闭其他节点可能已打开的菜单，再打开当前节点的菜单
-  for (const [id, menu] of nodeMenuRefs) {
-    if (id !== data.id) menu.handleClose()
-  }
-  nodeMenuRefs.get(data.id)?.handleOpen()
-}
-
-/** 标签页菜单：tabId -> el-dropdown 实例（同一时间仅打开一个） */
-const tabMenuRefs = new Map<string, { handleOpen: () => void; handleClose: () => void }>()
-
-function setTabMenuRef(tabId: string, el: { handleOpen: () => void; handleClose: () => void } | null) {
-  if (el) tabMenuRefs.set(tabId, el)
-  else tabMenuRefs.delete(tabId)
-}
-
-/** 右键标签页项：打开操作菜单，替代浏览器默认右键菜单 */
-function onTabContextMenu(tabId: string, _event: MouseEvent) {
-  // 关闭其他标签页可能已打开的菜单
-  for (const [id, menu] of tabMenuRefs) {
-    if (id !== tabId) menu.handleClose()
-  }
-  tabMenuRefs.get(tabId)?.handleOpen()
 }
 
 /** 标签页操作菜单命令分发 */
