@@ -7,7 +7,7 @@ import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWo
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
-import { openTabAfterActive } from '../shared/utils/tab-utils'
+import { openTabsAfterActive } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
 
 /**
@@ -482,10 +482,10 @@ async function handleOpenWorkspace(
         }
       }
     } else {
-      // 当前窗口模式：在激活标签之后依次打开，保持原有顺序
-      for (let i = 0; i < toReopen.length; i++) {
-        const tabRef = toReopen[i]
-        const tab = await openTabAfterActive(tabRef.url, i)
+      // 当前窗口模式：批量在激活标签之后打开，内部只查询一次索引避免漂移
+      const urls = toReopen.map((t) => t.url)
+      const tabs = await openTabsAfterActive(urls)
+      for (const tab of tabs) {
         opened++
         if (tab?.id != null) {
           allChromeTabIds.push(tab.id)
