@@ -81,93 +81,74 @@
               <span class="node-count">{{ win.tabCount }}</span>
             </div>
 
-            <!-- 窗口内容 -->
+            <!-- 窗口内容：分组块与连续未分组序列分别渲染，未分组标签页仅在同一序列内互相拖拽排序 -->
             <div v-show="!collapsedWindows.has(win.id)" class="window-body">
-              <template v-for="item in win.items" :key="item.key">
+              <template
+                v-for="seg in segmentsOf(win)"
+                :key="seg.kind === 'group' ? seg.group.key : `tabs-${seg.tabs[0]?.chromeTabId ?? 'none'}`"
+              >
                 <!-- 标签页分组 -->
-                <div v-if="item.type === 'group'" class="group-node">
+                <div v-if="seg.kind === 'group'" class="group-node">
                   <div class="group-header">
                     <el-checkbox
-                      :model-value="groupCheckState(item).checked"
-                      :indeterminate="groupCheckState(item).indeterminate"
-                      @change="(v) => toggleGroup(item, Boolean(v))"
+                      :model-value="groupCheckState(seg.group).checked"
+                      :indeterminate="groupCheckState(seg.group).indeterminate"
+                      @change="(v) => toggleGroup(seg.group, Boolean(v))"
                       @click.stop
                     />
                     <el-icon
                       class="expand-icon"
-                      :class="{ 'is-expanded': !collapsedGroups.has(item.groupId) }"
-                      @click="toggleGroupCollapse(item.groupId)"
+                      :class="{ 'is-expanded': !collapsedGroups.has(seg.group.groupId) }"
+                      @click="toggleGroupCollapse(seg.group.groupId)"
                     >
                       <CaretRight />
                     </el-icon>
-                    <span class="group-dot" :style="{ backgroundColor: groupColorHex(item.color) }" />
-                    <span class="group-title">{{ item.title || '未命名分组' }}</span>
-                    <span class="node-count">{{ item.tabs.length }}</span>
+                    <span class="group-dot" :style="{ backgroundColor: groupColorHex(seg.group.color) }" />
+                    <span class="group-title">{{ seg.group.title || '未命名分组' }}</span>
+                    <span class="node-count">{{ seg.group.tabs.length }}</span>
                   </div>
-                  <div v-show="!collapsedGroups.has(item.groupId)" class="group-body">
-                    <div
-                      v-for="tab in item.tabs"
-                      :key="tab.chromeTabId"
-                      class="tab-item is-grouped"
-                      :class="{ 'is-active': tab.chromeTabId === selectedTabId }"
-                      :ref="(el: any) => setTabRef(tab.chromeTabId, el)"
-                      @click="activateTab(tab)"
+                  <div v-show="!collapsedGroups.has(seg.group.groupId)" class="group-body">
+                    <TabList
+                      :items="toTabListItems(seg.group.tabs)"
+                      selectable
+                      sortable
+                      :selected="selectedIdsArray"
+                      :active-id="selectedTabId"
+                      @update:selected="onSelectedChange"
+                      @click="onTabClick"
+                      @sort="(items, evt) => onTabSort(seg.group.tabs, items, evt)"
                     >
-                      <el-checkbox
-                        :model-value="selectedTabIds.has(tab.chromeTabId)"
-                        @change="(v) => toggleTab(tab.chromeTabId, Boolean(v))"
-                        @click.stop
-                      />
-                      <LazyFavicon
-                        :favIconUrl="tab.favIconUrl"
-                        :size="16"
-                        class="tab-favicon"
-                      />
-                      <div class="tab-info">
-                        <div class="tab-title" :title="tab.title">{{ tab.title || '(无标题)' }}</div>
-                        <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
-                      </div>
-                      <div class="tab-actions" @click.stop>
+                      <template #actions="{ item }">
                         <el-tooltip content="关闭" placement="top">
-                          <el-button size="small" text circle @click="closeTab(tab.chromeTabId)">
+                          <el-button size="small" text circle @click="closeTab((item as any).chromeTabId)">
                             <el-icon><Close /></el-icon>
                           </el-button>
                         </el-tooltip>
-                      </div>
-                    </div>
+                      </template>
+                    </TabList>
                   </div>
                 </div>
 
                 <!-- 未分组标签页 -->
-                <div
+                <TabList
                   v-else
-                  class="tab-item"
-                  :class="{ 'is-active': item.chromeTabId === selectedTabId }"
-                  :ref="(el: any) => setTabRef(item.chromeTabId, el)"
-                  @click="activateTab(item)"
+                  :items="toTabListItems(seg.tabs)"
+                  selectable
+                  sortable
+                  :selected="selectedIdsArray"
+                  :active-id="selectedTabId"
+                  @update:selected="onSelectedChange"
+                  @click="onTabClick"
+                  @sort="(items, evt) => onTabSort(seg.tabs, items, evt)"
                 >
-                  <el-checkbox
-                    :model-value="selectedTabIds.has(item.chromeTabId)"
-                    @change="(v) => toggleTab(item.chromeTabId, Boolean(v))"
-                    @click.stop
-                  />
-                  <LazyFavicon
-                    :favIconUrl="item.favIconUrl"
-                    :size="16"
-                    class="tab-favicon"
-                  />
-                  <div class="tab-info">
-                    <div class="tab-title" :title="item.title">{{ item.title || '(无标题)' }}</div>
-                    <div class="tab-url" :title="item.url">{{ item.url }}</div>
-                  </div>
-                  <div class="tab-actions" @click.stop>
+                  <template #actions="{ item }">
                     <el-tooltip content="关闭" placement="top">
-                      <el-button size="small" text circle @click="closeTab(item.chromeTabId)">
+                      <el-button size="small" text circle @click="closeTab((item as any).chromeTabId)">
                         <el-icon><Close /></el-icon>
                       </el-button>
                     </el-tooltip>
-                  </div>
-                </div>
+                  </template>
+                </TabList>
               </template>
             </div>
           </div>
@@ -186,7 +167,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import LazyFavicon from '@/shared/components/LazyFavicon.vue'
+import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import { Search, Close, Loading, CaretRight, Monitor, Aim } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '../shared/composables/useMessage'
@@ -223,6 +204,36 @@ interface WindowNode {
   order: number
   tabCount: number
   items: Array<GroupNode | TabNode>
+}
+
+type SideTabListItem = TabListItem & TabNode
+
+/** 将窗口内的混合节点拆分为「分组块 / 连续未分组序列」，未分组标签页仅在序列内互相拖拽排序 */
+type WinSegment =
+  | { kind: 'group'; group: GroupNode }
+  | { kind: 'tabs'; tabs: TabNode[] }
+
+function segmentsOf(win: WindowNode): WinSegment[] {
+  const segs: WinSegment[] = []
+  let pending: TabNode[] = []
+  for (const item of win.items) {
+    if (item.type === 'group') {
+      if (pending.length) {
+        segs.push({ kind: 'tabs', tabs: pending })
+        pending = []
+      }
+      segs.push({ kind: 'group', group: item })
+    } else {
+      pending.push(item)
+    }
+  }
+  if (pending.length) segs.push({ kind: 'tabs', tabs: pending })
+  return segs
+}
+
+/** 分组/未分组标签页 → 公共列表组件数据（保留 TabNode 原始字段供排序与操作） */
+function toTabListItems(tabs: TabNode[]): SideTabListItem[] {
+  return tabs.map((t) => ({ ...t, id: t.chromeTabId }))
 }
 
 // ============ 登录态（从 popup 迁移） ============
@@ -271,17 +282,39 @@ const selectedTabIds = ref<Set<number>>(new Set())
 
 // 当前浏览器激活的标签页（高亮 + 定位用），随浏览器选中页变化而同步
 const selectedTabId = ref<number | null>(null)
-const tabRefs = {} as Record<number, HTMLElement>
 
-function setTabRef(id: number, el: Element | null) {
-  if (el) tabRefs[id] = el as HTMLElement
-  else delete tabRefs[id]
+/** TabList 选中态：以数组传入、同步回 Set */
+const selectedIdsArray = computed<Array<string | number>>(() => Array.from(selectedTabIds.value))
+
+function onSelectedChange(ids: Array<string | number>) {
+  selectedTabIds.value = new Set(ids as number[])
+}
+
+function onTabClick(item: TabListItem) {
+  activateTab(item as SideTabListItem)
+}
+
+/** 拖拽排序：以序列在窗口内的基准索引 + 新相对位置映射为 Chrome 绝对索引（分组内/未分组序列内均适用） */
+async function onTabSort(list: TabNode[], items: TabListItem[], evt: TabListSortEvent) {
+  const moved = evt.moved?.element as SideTabListItem | undefined
+  if (!moved) return
+  const base = Math.min(...list.map((t) => t.index))
+  const newRel = items.findIndex((i) => i.id === moved.chromeTabId)
+  if (newRel < 0) return
+  try {
+    await chrome.tabs.move(moved.chromeTabId, { index: base + newRel })
+  } catch {
+    // 可能已关闭
+  }
 }
 
 function scrollToSelected() {
   if (selectedTabId.value == null) return
   nextTick(() => {
-    tabRefs[selectedTabId.value as number]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // TabList 行带 data-tab-id 属性，按 id 定位到目标行
+    document
+      .querySelector(`[data-tab-id="${selectedTabId.value}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   })
 }
 
@@ -327,7 +360,7 @@ async function focusActiveTab() {
     }
 
     await nextTick()
-    tabRefs[t.id]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    document.querySelector(`[data-tab-id="${t.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   } catch {
     /* 忽略：无活动标签页等异常情况 */
   }
@@ -471,13 +504,6 @@ function toggleGroup(group: GroupNode, checked: boolean) {
     if (checked) next.add(t.chromeTabId)
     else next.delete(t.chromeTabId)
   }
-  selectedTabIds.value = next
-}
-
-function toggleTab(chromeTabId: number, checked: boolean) {
-  const next = new Set(selectedTabIds.value)
-  if (checked) next.add(chromeTabId)
-  else next.delete(chromeTabId)
   selectedTabIds.value = next
 }
 
@@ -822,70 +848,5 @@ onUnmounted(() => {
 
 .group-body {
   padding-left: 18px;
-}
-
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.tab-item:hover {
-  background-color: #f5f7fa;
-}
-
-.tab-item.is-active {
-  background-color: #ecf5ff;
-}
-
-.tab-favicon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  border-radius: 2px;
-}
-
-.tab-favicon-placeholder {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  background-color: #dcdfe6;
-  border-radius: 2px;
-}
-
-.tab-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.tab-title {
-  font-size: 13px;
-  color: #303133;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-url {
-  font-size: 11px;
-  color: #909399;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
-}
-
-.tab-actions {
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.tab-item:hover .tab-actions {
-  opacity: 1;
 }
 </style>
