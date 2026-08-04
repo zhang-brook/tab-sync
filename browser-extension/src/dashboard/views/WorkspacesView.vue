@@ -156,7 +156,7 @@
             <TabList
               v-else
               :items="tabListItems"
-              :sortable="tabScope === 'current'"
+              :sortable="tabScope === 'current' && tagFilter == null"
               @sort="onTabSort"
               @click="(item: any) => openSingleTab(item.tab.url)"
               @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
@@ -850,12 +850,14 @@ function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
   const moved = evt.moved?.element as WsTabListItem | undefined
   if (!ws || !moved) return
   const newRelIndex = items.findIndex((i) => i.id === moved.id)
-  const actualIndex = ws.tabs.findIndex((t) => t.tabId === moved.tab.tabId)
+  if (newRelIndex < 0) return
   // 未筛选时本地同步展示顺序，避免依赖父数据重渲染导致拖拽后顺序回退
   if (tagFilter.value == null) {
     ws.tabs = items.map((i) => (i as WsTabListItem).tab)
   }
-  handleMoveTab(ws.id, moved.tab.tabId, actualIndex >= 0 ? actualIndex : newRelIndex)
+  // newRelIndex 为被拖拽项在新列表中的位置；服务端 MoveTab 会先移除该项再插入到
+  // 剩余列表的 newIndex 处，二者语义一致，故直接以新位置作为目标索引。
+  handleMoveTab(ws.id, moved.tab.tabId, newRelIndex)
 }
 
 async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {

@@ -99,6 +99,7 @@ function titleAttr(item: TabListItem): string {
     <template #item="{ element }">
       <ContextMenu
         v-if="hasContextMenu"
+        block
         @command="(cmd: string) => emit('command', cmd, element)"
       >
         <div

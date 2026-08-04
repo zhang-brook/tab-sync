@@ -1,5 +1,9 @@
 <template>
-  <div class="context-menu-wrapper" @contextmenu.prevent="handleContextMenu">
+  <div
+    class="context-menu-wrapper"
+    :class="{ 'is-block': block }"
+    @contextmenu.prevent="handleContextMenu"
+  >
     <slot />
     <el-dropdown
       ref="dropdownRef"
@@ -20,6 +24,12 @@
 .context-menu-wrapper {
   display: contents;
 }
+
+/* 可拖拽列表中的项需要包裹元素为真实块级盒子，否则 display:contents 会让
+   Sortable 选中的拖拽元素没有盒子，导致拖拽时项不跟随鼠标。 */
+.context-menu-wrapper.is-block {
+  display: block;
+}
 </style>
 
 <script lang="ts">
@@ -29,6 +39,8 @@ const menuInstances = new Set<{ handleOpen: () => void; handleClose: () => void 
 
 <script setup lang="ts">
 import { ref, nextTick, onBeforeUnmount } from 'vue'
+
+defineProps<{ block?: boolean }>()
 
 const emit = defineEmits<{
   (e: 'command', command: string): void
