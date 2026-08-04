@@ -41,7 +41,7 @@
           class="search-input"
         />
         <el-tooltip content="定位到当前激活的标签页" placement="top">
-          <el-button size="small" :icon="Aim" @click="focusActiveTab" />
+          <el-button size="small" :icon="Aim" @click="focusActiveTab">定位</el-button>
         </el-tooltip>
       </div>
 

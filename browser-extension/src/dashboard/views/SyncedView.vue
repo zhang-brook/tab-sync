@@ -38,7 +38,7 @@
             title="移动到回收站"
             :loading="(item as any).source.removing"
             @click="remove((item as any).source)"
-          />
+          >回收站</el-button>
         </template>
       </TabList>
     </div>

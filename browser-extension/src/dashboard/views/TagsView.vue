@@ -48,7 +48,7 @@
                 class="tag-del"
                 text
                 size="small"
-                :icon="Close"
+                :icon="Delete"
                 title="删除"
                 @click.stop="deleteTag(tag)"
               />
@@ -85,10 +85,10 @@
             <template #actions="{ item }">
               <el-button
                 text
-                :icon="Close"
+                :icon="Delete"
                 title="移除该标签"
                 @click="removeTagFromTab((item as any).source)"
-              />
+              >移除</el-button>
             </template>
           </TabList>
         </div>
@@ -133,7 +133,7 @@
 import { ref, computed, onMounted } from 'vue'
 import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Close, Loading, Refresh, Edit } from '@element-plus/icons-vue'
+import { Plus, Close, Loading, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TagInfo } from '@/shared/types/workspace'

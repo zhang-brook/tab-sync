@@ -40,9 +40,9 @@
               class="tag-item-del"
               text
               size="small"
-              :icon="Close"
+              :icon="Delete"
               @click.stop="deleteTag(t)"
-            />
+            >删除</el-button>
           </div>
         </el-checkbox-group>
         <el-empty v-if="filteredTags.length === 0" description="没有匹配的标签" :image-size="40" />
@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Close } from '@element-plus/icons-vue'
+import { Search, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '../../shared/composables/useMessage'
 import type { TagInfo, TagsData } from '../../shared/types'
 
