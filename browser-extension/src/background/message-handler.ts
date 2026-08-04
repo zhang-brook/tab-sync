@@ -541,14 +541,25 @@ async function handleMoveWorkspaceTab(
   }
 }
 
-/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName） */
+/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName、编辑链接 url/title/favIconUrl） */
 async function handleUpdateWorkspaceTab(
-  payload: { workspaceId: string; tabId: string; addedAt?: string; displayName?: string },
+  payload: {
+    workspaceId: string
+    tabId: string
+    addedAt?: string
+    displayName?: string
+    url?: string
+    title?: string
+    favIconUrl?: string
+  },
 ): Promise<MessageResponse> {
   try {
     const res = await updateWorkspaceTab(payload.workspaceId, payload.tabId, {
       addedAt: payload.addedAt,
       displayName: payload.displayName,
+      url: payload.url,
+      title: payload.title,
+      favIconUrl: payload.favIconUrl,
     })
     if (res.ok) {
       logger.info(`Tab updated: ${payload.tabId} in workspace=${payload.workspaceId}`)
