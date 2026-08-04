@@ -145,7 +145,7 @@
             </el-select>
           </div>
 
-          <!-- 标签页列表 -->
+          <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标） -->
           <div class="detail-body">
             <el-empty
               v-if="rightTabs.length === 0"
@@ -153,100 +153,38 @@
               :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'"
             />
 
-            <!-- 仅本层级：支持拖拽排序 -->
-            <draggable
-              v-else-if="tabScope === 'current'"
-              :list="displayTabs"
-              item-key="tabId"
-              handle=".drag-handle"
-              ghost-class="tab-ghost"
-              :animation="200"
-              @update="onDragUpdate"
+            <TabList
+              v-else
+              :items="tabListItems"
+              :sortable="tabScope === 'current'"
+              @sort="onTabSort"
+              @click="(item: any) => openSingleTab(item.tab.url)"
+              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
             >
-              <template #item="{ element: tab }">
-                <ContextMenu @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)">
-                  <div class="ws-tab-item">
-                    <span class="drag-handle" title="拖拽排序">⋮⋮</span>
-                    <LazyFavicon
-                      :favIconUrl="tab.favIconUrl"
-                      :size="16"
-                      class="tab-favicon"
-                    />
-                    <div class="tab-text">
-                      <div class="tab-title" :title="tab.displayName ? tab.displayName + '（原：' + tab.title + '）' : tab.title" @click="openSingleTab(tab.url)">{{ displayTitle(tab) }}</div>
-                      <div class="tab-url" :title="tab.url">{{ tab.url }}</div>
-                      <div class="tab-tags" v-if="tab.tags && tab.tags.length">
-                        <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
-                      </div>
-                    </div>
-                    <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(tab.addedAt)">{{ formatAddedAt(tab.addedAt) }}</span>
-                    <el-dropdown
-                      trigger="click"
-                      @command="(cmd: string) => onTabMenuCommand(cmd, selectedWorkspace!.id, tab)"
-                      @click.stop
-                    >
-                      <el-button size="small" text class="tab-more-btn" @click.stop>
-                        <el-icon class="dots-vertical"><MoreFilled /></el-icon>
-                      </el-button>
-                      <template #dropdown>
-                        <TabDropdownMenu />
-                      </template>
-                    </el-dropdown>
-                  </div>
-                  <template #menu>
+              <template #extra="{ item }">
+                <div v-if="(item as any).tab.tags && (item as any).tab.tags.length" class="tab-tags">
+                  <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                </div>
+                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull((item as any).tab.addedAt)">{{ formatAddedAt((item as any).tab.addedAt) }}</span>
+              </template>
+              <template #context-menu>
+                <TabDropdownMenu />
+              </template>
+              <template #actions="{ item }">
+                <el-dropdown
+                  trigger="click"
+                  @command="(cmd: string) => onTabMenuCommand(cmd, (item as any).workspaceId, (item as any).tab)"
+                  @click.stop
+                >
+                  <el-button size="small" text class="tab-more-btn" @click.stop>
+                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                  </el-button>
+                  <template #dropdown>
                     <TabDropdownMenu />
                   </template>
-                </ContextMenu>
+                </el-dropdown>
               </template>
-            </draggable>
-
-            <!-- 包含子工作组：只读列表，带来源标记 -->
-            <div v-else class="flat-tabs">
-              <ContextMenu
-                v-for="item in rightTabs"
-                :key="item.workspaceId + '-' + item.tab.tabId"
-                @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
-              >
-                <div class="ws-tab-item">
-                  <LazyFavicon
-                    :favIconUrl="item.tab.favIconUrl"
-                    :size="16"
-                    class="tab-favicon"
-                  />
-                  <div class="tab-text">
-                    <div class="tab-title" :title="item.tab.displayName ? item.tab.displayName + '（原：' + item.tab.title + '）' : item.tab.title" @click="openSingleTab(item.tab.url)">{{ displayTitle(item.tab) }}</div>
-                    <div class="tab-url" :title="item.tab.url">{{ item.tab.url }}</div>
-                    <div class="tab-tags" v-if="item.tab.tags && item.tab.tags.length">
-                      <el-tag v-for="tg in item.tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
-                    </div>
-                  </div>
-                  <el-tag
-                    v-if="item.workspaceId !== selectedWorkspace.id"
-                    size="small"
-                    effect="plain"
-                    :style="{ borderColor: item.workspaceColor, color: item.workspaceColor }"
-                  >
-                    {{ item.workspaceName }}
-                  </el-tag>
-                  <span class="tab-added" :title="'添加于 ' + formatAddedAtFull(item.tab.addedAt)">{{ formatAddedAt(item.tab.addedAt) }}</span>
-                  <el-dropdown
-                    trigger="click"
-                    @command="(cmd: string) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
-                    @click.stop
-                  >
-                    <el-button size="small" text class="tab-more-btn" @click.stop>
-                      <el-icon class="dots-vertical"><MoreFilled /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <TabDropdownMenu />
-                    </template>
-                  </el-dropdown>
-                </div>
-                <template #menu>
-                  <TabDropdownMenu />
-                </template>
-              </ContextMenu>
-            </div>
+            </TabList>
           </div>
         </template>
       </div>
@@ -383,13 +321,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import LazyFavicon from '@/shared/components/LazyFavicon.vue'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
+import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import draggable from 'vuedraggable'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
 import { openTabAfterActive } from '../../shared/utils/tab-utils'
@@ -504,13 +441,31 @@ const rightTabs = computed<RightTabItem[]>(() => {
   return result
 })
 
-/** 「仅本层级」拖拽列表的数据源：未筛选时直接引用原数组保持拖拽体验，筛选时返回过滤后的新数组 */
-const displayTabs = computed<TabReference[]>(() => {
-  const ws = selectedWorkspace.value
-  if (!ws) return []
-  if (tagFilter.value == null) return ws.tabs
-  return ws.tabs.filter((tab) => tab.tags?.some((t) => t.id === tagFilter.value))
-})
+interface WsTabListItem extends TabListItem {
+  tab: TabReference
+  workspaceId: string
+}
+
+/** 右侧标签页列表 → 公共列表组件数据（「包含子工作组」模式下非本组标签页带来源徽标） */
+const tabListItems = computed<WsTabListItem[]>(() =>
+  rightTabs.value.map((it) => ({
+    id: `${it.workspaceId}-${it.tab.tabId}`,
+    title: displayTitle(it.tab),
+    originalTitle: it.tab.displayName ? it.tab.title : undefined,
+    url: it.tab.url,
+    favIconUrl: it.tab.favIconUrl,
+    badgeText:
+      tabScope.value === 'all' && it.workspaceId !== selectedWorkspace.value?.id
+        ? it.workspaceName
+        : undefined,
+    badgeColor:
+      tabScope.value === 'all' && it.workspaceId !== selectedWorkspace.value?.id
+        ? it.workspaceColor
+        : undefined,
+    tab: it.tab,
+    workspaceId: it.workspaceId,
+  })),
+)
 
 watch(searchKeyword, (val) => {
   treeRef.value?.filter(val)
@@ -890,14 +845,17 @@ async function handleSaveRename() {
 }
 
 /** 同组内拖拽排序（以当前展示列表为准，映射回原数组索引） */
-function onDragUpdate(evt: { newIndex: number }) {
+function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
   const ws = selectedWorkspace.value
-  if (!ws) return
-  const tab = displayTabs.value[evt.newIndex]
-  if (tab) {
-    const actualIndex = ws.tabs.findIndex((t) => t.tabId === tab.tabId)
-    handleMoveTab(ws.id, tab.tabId, actualIndex >= 0 ? actualIndex : evt.newIndex)
+  const moved = evt.moved?.element as WsTabListItem | undefined
+  if (!ws || !moved) return
+  const newRelIndex = items.findIndex((i) => i.id === moved.id)
+  const actualIndex = ws.tabs.findIndex((t) => t.tabId === moved.tab.tabId)
+  // 未筛选时本地同步展示顺序，避免依赖父数据重渲染导致拖拽后顺序回退
+  if (tagFilter.value == null) {
+    ws.tabs = items.map((i) => (i as WsTabListItem).tab)
   }
+  handleMoveTab(ws.id, moved.tab.tabId, actualIndex >= 0 ? actualIndex : newRelIndex)
 }
 
 async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {
@@ -1135,68 +1093,6 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   flex: 1;
 }
 
-.flat-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ws-tab-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  transition: background-color 0.15s;
-}
-
-.ws-tab-item:hover {
-  background-color: #f5f7fa;
-}
-
-.tab-favicon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  border-radius: 2px;
-}
-
-.tab-favicon-placeholder {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  background-color: #dcdfe6;
-  border-radius: 2px;
-}
-
-.tab-text {
-  min-width: 0;
-  flex: 1;
-}
-
-.tab-title {
-  font-size: 13px;
-  color: #303133;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-
-.tab-title:hover {
-  color: #409eff;
-  text-decoration: underline;
-}
-
-.tab-url {
-  font-size: 11px;
-  color: #909399;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
-}
-
 .tab-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1221,31 +1117,6 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.drag-handle {
-  cursor: grab;
-  color: #c0c4cc;
-  font-size: 14px;
-  line-height: 1;
-  user-select: none;
-  flex-shrink: 0;
-  padding: 0 2px;
-  transition: color 0.15s;
-}
-
-.drag-handle:hover {
-  color: #909399;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.tab-ghost {
-  opacity: 0.4;
-  background: #e6f7ff;
-  border: 1px dashed #409eff;
 }
 
 /* 标签页项的竖三点按钮 */

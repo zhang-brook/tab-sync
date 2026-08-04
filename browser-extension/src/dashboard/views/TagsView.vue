@@ -31,6 +31,9 @@
         >
           <span class="tag-dot" :style="{ backgroundColor: tag.color || '#909399' }" />
           <span class="tag-name">{{ tag.name }}</span>
+          <span v-if="tag.scope === 'tab'" class="tag-count" title="包含的标签页数">
+            {{ tag.tabCount ?? 0 }}
+          </span>
           <el-button
             class="tag-action"
             text
@@ -70,21 +73,19 @@
         </div>
         <el-empty v-else-if="tabs.length === 0" description="该标签下暂无标签页" :image-size="60" />
         <div v-else class="tab-list">
-          <div v-for="tab in tabs" :key="tab.workspaceId + '-' + tab.tabId" class="tab-item">
-            <LazyFavicon :favIconUrl="tab.favIconUrl" :size="16" class="favicon" />
-            <div class="tab-main" @click="openTab(tab)">
-              <div class="tab-title">{{ tab.title || tab.url }}</div>
-              <div class="tab-url">{{ tab.url }}</div>
-            </div>
-            <el-tag size="small" effect="plain" class="ws-chip">{{ tab.workspaceName }}</el-tag>
-            <el-button
-              class="tab-del"
-              text
-              :icon="Close"
-              title="移除该标签"
-              @click="removeTagFromTab(tab)"
-            />
-          </div>
+          <TabList
+            :items="listItems"
+            @click="(item: any) => openTab(item.source)"
+          >
+            <template #actions="{ item }">
+              <el-button
+                text
+                :icon="Close"
+                title="移除该标签"
+                @click="removeTagFromTab((item as any).source)"
+              />
+            </template>
+          </TabList>
         </div>
       </template>
     </div>
@@ -124,8 +125,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import LazyFavicon from '@/shared/components/LazyFavicon.vue'
+import { ref, computed, onMounted } from 'vue'
+import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Close, Loading, Refresh, Edit } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
@@ -138,6 +139,22 @@ const tagsLoading = ref(false)
 const selectedTag = ref<TagInfo | null>(null)
 const tabs = ref<TagTabItem[]>([])
 const tabsLoading = ref(false)
+
+interface TagListItem extends TabListItem {
+  source: TagTabItem
+}
+
+/** 标签下标签页 → 公共列表组件数据 */
+const listItems = computed<TagListItem[]>(() =>
+  tabs.value.map((t) => ({
+    id: `${t.workspaceId}-${t.tabId}`,
+    title: t.title || t.url,
+    url: t.url,
+    favIconUrl: t.favIconUrl,
+    badgeText: t.workspaceName,
+    source: t,
+  })),
+)
 
 // 新建标签
 const createVisible = ref(false)
@@ -382,6 +399,17 @@ onMounted(loadTags)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tag-count {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
 .tag-del {
   opacity: 0;
 }
@@ -426,42 +454,5 @@ onMounted(loadTags)
 .tab-list {
   flex: 1;
   overflow-y: auto;
-}
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.tab-item:hover {
-  background: var(--el-fill-color-light);
-}
-.tab-main {
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-.tab-title {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tab-url {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.favicon {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.ws-chip {
-  flex-shrink: 0;
 }
 </style>

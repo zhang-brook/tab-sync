@@ -26,28 +26,29 @@
     </div>
 
     <div v-else class="tab-scroll">
-      <div v-for="item in filtered" :key="item.workspaceId + '-' + item.tab.tabId" class="synced-item">
-        <LazyFavicon :favIconUrl="item.tab.favIconUrl" :size="16" class="favicon" />
-        <div class="main" @click="openTab(item.tab.url)">
-          <div class="title">{{ item.tab.title || item.tab.url }}</div>
-          <div class="url">{{ item.tab.url }}</div>
-        </div>
-        <el-tag
-          size="small"
-          effect="plain"
-          class="ws-chip"
-          :style="{ borderColor: item.color, color: item.color }"
-        >{{ item.name }}</el-tag>
-        <el-button class="row-action" text :icon="Close" title="移动到回收站" @click="remove(item)" />
-      </div>
+      <TabList
+        :items="listItems"
+        @click="(item: any) => openTab(item.source.tab.url)"
+      >
+        <template #actions="{ item }">
+          <el-button
+            class="row-action"
+            text
+            :icon="Close"
+            title="移动到回收站"
+            :loading="(item as any).source.removing"
+            @click="remove((item as any).source)"
+          />
+        </template>
+      </TabList>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import LazyFavicon from '@/shared/components/LazyFavicon.vue'
+import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Search, Refresh, Close, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
@@ -69,6 +70,23 @@ const loading = ref(false)
 const searchKeyword = ref('')
 const items = ref<SyncedItem[]>([])
 const filtered = ref<SyncedItem[]>([])
+
+interface SyncedListItem extends TabListItem {
+  source: SyncedItem
+}
+
+/** 已同步标签页 → 公共列表组件数据 */
+const listItems = computed<SyncedListItem[]>(() =>
+  filtered.value.map((i) => ({
+    id: `${i.workspaceId}-${i.tab.tabId}`,
+    title: i.tab.title || i.tab.url,
+    url: i.tab.url,
+    favIconUrl: i.tab.favIconUrl,
+    badgeText: i.name,
+    badgeColor: i.color,
+    source: i,
+  })),
+)
 
 async function load() {
   loading.value = true
@@ -186,42 +204,5 @@ onMounted(load)
 .tab-scroll {
   flex: 1;
   overflow-y: auto;
-}
-.synced-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-}
-.synced-item:hover {
-  background: var(--el-fill-color-light);
-}
-.main {
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-.title {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.url {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.favicon {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.ws-chip {
-  flex-shrink: 0;
 }
 </style>
