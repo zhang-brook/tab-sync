@@ -29,6 +29,7 @@
             <el-tooltip content="新建工作组" placement="top">
               <el-button size="small" text type="primary" @click="showCreateDialog('')">
                 <el-icon><Plus /></el-icon>
+                <span>新建</span>
               </el-button>
             </el-tooltip>
           </div>
@@ -94,41 +95,49 @@
               <el-tooltip content="工作组标签" placement="top">
                 <el-button size="small" text @click="openWorkspaceTagEditor(selectedWorkspace)">
                   <el-icon><PriceTag /></el-icon>
+                  <span>标签</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开所有标签页" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, false)">
                   <el-icon><FolderOpened /></el-icon>
+                  <span>打开</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="在新窗口中打开" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, true)">
                   <el-icon><CopyDocument /></el-icon>
+                  <span>打开(新窗口)</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开为标签组" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenAsTabGroup(selectedWorkspace.id)">
                   <el-icon><Collection /></el-icon>
+                  <span>打开(标签组)</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="新建子工作组" placement="top">
                 <el-button size="small" text @click="showCreateDialog(selectedWorkspace.id)">
                   <el-icon><FolderAdd /></el-icon>
+                  <span>建子组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="编辑" placement="top">
                 <el-button size="small" text :disabled="selectedWorkspace?.isSystem" @click="showEditDialog(selectedWorkspace)">
                   <el-icon><Edit /></el-icon>
+                  <span>编辑组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
                 <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem" @click="handleDelete(selectedWorkspace)">
                   <el-icon><Delete /></el-icon>
+                  <span>删除组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="通过 URL 添加标签页" placement="top">
                 <el-button size="small" text type="primary" @click="addUrlDialogVisible = true">
                   <el-icon><Plus /></el-icon>
+                  <span>加网址</span>
                 </el-button>
               </el-tooltip>
             </div>
