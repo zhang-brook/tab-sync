@@ -28,9 +28,25 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 	if err := q.Find(&tags).Error; err != nil {
 		return nil, err
 	}
+	// 统计每个标签关联的标签页数量（仅 tab 类标签有实际关联）
+	type tabCountRow struct {
+		TagID uint
+		Count int64
+	}
+	rows := make([]tabCountRow, 0)
+	if err := s.db.Model(&model.TabTag{}).
+		Select("tag_id, COUNT(*) AS count").
+		Group("tag_id").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	counts := make(map[uint]int64, len(rows))
+	for _, r := range rows {
+		counts[r.TagID] = r.Count
+	}
 	out := make([]TagResponse, 0, len(tags))
 	for _, t := range tags {
-		out = append(out, TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope})
+		out = append(out, TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope, TabCount: counts[t.ID]})
 	}
 	return out, nil
 }

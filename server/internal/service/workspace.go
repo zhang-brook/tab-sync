@@ -82,10 +82,11 @@ type TabReference struct {
 
 // TagResponse 标签响应（给前端）
 type TagResponse struct {
-	ID    uint   `json:"id"`
-	Name  string `json:"name"`
-	Color string `json:"color"`
-	Scope string `json:"scope"`
+	ID       uint   `json:"id"`
+	Name     string `json:"name"`
+	Color    string `json:"color"`
+	Scope    string `json:"scope"`
+	TabCount int64  `json:"tabCount"`
 }
 
 // CreateResult 创建工作区结果

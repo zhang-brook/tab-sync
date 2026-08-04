@@ -22,8 +22,6 @@ feat: 侧边栏支持按住拖动调整 tab 标签页排序
 
 feat: 工作组右上角的标题按钮，每个icon后面配2-3个字以方便用户明确按钮含义
 
-feat: 【标签】页 extension://fcpnhjfagbmgloojkjmlniicbaanjnfb/src/dashboard/index.html#/tags 左侧标签支持展示其包含的页面数
-
 ---
 
 **中等难度改动**

@@ -31,24 +31,29 @@
         >
           <span class="tag-dot" :style="{ backgroundColor: tag.color || '#909399' }" />
           <span class="tag-name">{{ tag.name }}</span>
-          <span v-if="tag.scope === 'tab'" class="tag-count" title="包含的标签页数">
-            {{ tag.tabCount ?? 0 }}
-          </span>
-          <el-button
-            class="tag-action"
-            text
-            size="small"
-            :icon="Edit"
-            title="重命名"
-            @click.stop="openEdit(tag)"
-          />
-          <el-button
-            class="tag-del"
-            text
-            size="small"
-            :icon="Close"
-            @click.stop="deleteTag(tag)"
-          />
+          <div class="tag-meta">
+            <span v-if="tag.scope === 'tab'" class="tag-count" title="包含的标签页数">
+              {{ tag.tabCount ?? 0 }}
+            </span>
+            <div class="tag-actions">
+              <el-button
+                class="tag-action"
+                text
+                size="small"
+                :icon="Edit"
+                title="重命名"
+                @click.stop="openEdit(tag)"
+              />
+              <el-button
+                class="tag-del"
+                text
+                size="small"
+                :icon="Close"
+                title="删除"
+                @click.stop="deleteTag(tag)"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -399,25 +404,53 @@ onMounted(loadTags)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tag-count {
+.tag-meta {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.tag-count {
+  display: inline-block;
   min-width: 20px;
   padding: 0 6px;
   border-radius: 10px;
   background: var(--el-fill-color);
   color: var(--el-text-color-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   text-align: center;
+  overflow: hidden;
+  transition: opacity 0.15s, max-width 0.15s, padding 0.15s;
 }
-.tag-del {
+.tag-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.15s, opacity 0.15s;
+}
+.tag-actions .el-button {
+  margin-left: 0;
+  padding: 4px;
+  color: var(--el-text-color-regular);
+}
+.tag-actions .el-button:hover {
+  color: var(--el-color-primary);
+}
+.tag-actions .tag-del:hover {
+  color: var(--el-color-danger);
+}
+.tag-item:hover .tag-count {
+  min-width: 0;
+  max-width: 0;
+  padding: 0;
   opacity: 0;
 }
-.tag-action {
-  opacity: 0;
-}
-.tag-item:hover .tag-del,
-.tag-item:hover .tag-action {
+.tag-item:hover .tag-actions {
+  max-width: 60px;
   opacity: 1;
 }
 .tags-right {
