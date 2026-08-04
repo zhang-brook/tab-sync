@@ -459,9 +459,15 @@ type UpdateTabPayload struct {
 	AddedAt *string `json:"addedAt,omitempty"`
 	// DisplayName 用户重命名后的显示名（空字符串表示清除重命名，恢复使用 Title）
 	DisplayName *string `json:"displayName,omitempty"`
+	// URL 标签页链接，编辑后同步更新显示名/图标（仅当未自定义 DisplayName 时回退标题）
+	URL *string `json:"url,omitempty"`
+	// Title 标签页标题，编辑 URL 时可选一并更新
+	Title *string `json:"title,omitempty"`
+	// FavIconURL 标签页图标，编辑 URL 时可选一并更新
+	FavIconURL *string `json:"favIconUrl,omitempty"`
 }
 
-// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间、重命名）
+// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间、重命名、编辑链接）
 // tabID 为后端自增主键（字符串）
 func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTabPayload) error {
 	if workspaceID == "" || tabID == "" {
@@ -487,6 +493,15 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 	}
 	if payload.DisplayName != nil {
 		updates["display_name"] = sanitizeString(*payload.DisplayName, 500)
+	}
+	if payload.URL != nil {
+		updates["url"] = sanitizeString(*payload.URL, 2048)
+	}
+	if payload.Title != nil {
+		updates["title"] = sanitizeString(*payload.Title, 500)
+	}
+	if payload.FavIconURL != nil {
+		updates["fav_icon_url"] = sanitizeFavIconURL(*payload.FavIconURL)
 	}
 	if len(updates) == 0 {
 		return nil

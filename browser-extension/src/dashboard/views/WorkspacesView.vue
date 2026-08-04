@@ -275,6 +275,40 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑链接对话框 -->
+    <el-dialog v-model="editUrlDialogVisible" title="编辑链接" width="520px" destroy-on-close>
+      <el-form label-width="70px" label-position="left">
+        <el-form-item label="链接" required>
+          <el-input
+            v-model="editUrlValue"
+            placeholder="https://example.com"
+            clearable
+            @keyup.enter="handleSaveEditUrl"
+          >
+            <template #prepend>
+              <el-icon><Link /></el-icon>
+            </template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="标题">
+          <el-input
+            v-model="editUrlTitleValue"
+            placeholder="留空则使用链接作为标题"
+            maxlength="500"
+            show-word-limit
+            clearable
+            @keyup.enter="handleSaveEditUrl"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editUrlDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editUrlSaving" :disabled="!editUrlValue.trim()" @click="handleSaveEditUrl">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 标签编辑对话框 -->
     <TagEditorDialog
       v-model="tagEditorVisible"
@@ -334,7 +368,7 @@ import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, EditPen } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
@@ -584,6 +618,9 @@ function onTabMenuCommand(command: string, workspaceId: string, tab: TabReferenc
     case 'rename':
       openRenameDialog(workspaceId, tab)
       break
+    case 'editUrl':
+      openEditUrlDialog(workspaceId, tab)
+      break
     case 'tag':
       openTabTagEditor(workspaceId, tab)
       break
@@ -771,6 +808,13 @@ const renameSaving = ref(false)
 const renameValue = ref('')
 const renameTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
 
+// 编辑链接
+const editUrlDialogVisible = ref(false)
+const editUrlSaving = ref(false)
+const editUrlValue = ref('')
+const editUrlTitleValue = ref('')
+const editUrlTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
+
 /** 列表中优先展示重命名后的显示名，否则回退到原始标题 */
 function displayTitle(tab: TabReference): string {
   return tab.displayName || tab.title || '(无标题)'
@@ -848,6 +892,49 @@ async function handleSaveRename() {
     ElMessage.success(name ? '已重命名' : '已恢复原始标题')
     renameDialogVisible.value = false
     await loadWorkspaces()
+  } else {
+    ElMessage.error(res.error || '更新失败')
+  }
+}
+
+function openEditUrlDialog(workspaceId: string, tab: TabReference) {
+  editUrlTarget.value = { workspaceId, tabId: tab.tabId }
+  editUrlValue.value = tab.url
+  editUrlTitleValue.value = tab.displayName || tab.title || ''
+  editUrlDialogVisible.value = true
+}
+
+async function handleSaveEditUrl() {
+  const target = editUrlTarget.value
+  const url = editUrlValue.value.trim()
+  if (!target || !url) {
+    ElMessage.warning('请输入链接地址')
+    return
+  }
+  editUrlSaving.value = true
+  // 仅当用户修改了标题框（与当前显示名/标题不同）时才回写标题，
+  // 否则保持服务端既有标题，避免误覆盖。
+  const cur = workspaces.value
+    .find((w) => w.id === target.workspaceId)
+    ?.tabs.find((t) => t.tabId === target.tabId)
+  const originalTitle = cur?.displayName || cur?.title || ''
+  const title = editUrlTitleValue.value.trim()
+  const res = await sendMessage({
+    action: 'UPDATE_WORKSPACE_TAB',
+    payload: {
+      workspaceId: target.workspaceId,
+      tabId: target.tabId,
+      url,
+      title: title !== originalTitle ? title : undefined,
+    },
+  })
+  editUrlSaving.value = false
+  if (res.success) {
+    ElMessage.success('链接已更新')
+    editUrlDialogVisible.value = false
+    await loadWorkspaces()
+  } else if (res.authError) {
+    ElMessage.warning('未连接后端，无法更新')
   } else {
     ElMessage.error(res.error || '更新失败')
   }
