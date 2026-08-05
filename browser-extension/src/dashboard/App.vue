@@ -208,6 +208,8 @@ html, body, #app {
 
 .dashboard-aside .el-menu-item {
   color: rgba(255, 255, 255, 0.65);
+  padding-left: 0px;
+  padding-right: 0px;
 }
 
 .dashboard-aside .el-menu-item:hover,

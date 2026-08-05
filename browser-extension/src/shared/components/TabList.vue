@@ -181,7 +181,8 @@ function titleAttr(item: TabListItem): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  /* padding: 6px 8px; */
+  padding: 6px 4px;
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.15s;
