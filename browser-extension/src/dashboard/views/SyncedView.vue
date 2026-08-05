@@ -34,11 +34,12 @@
           <el-button
             class="row-action"
             text
-            :icon="Close"
+            type="danger"
+            :icon="Delete"
             title="移动到回收站"
             :loading="(item as any).source.removing"
             @click="remove((item as any).source)"
-          >回收站</el-button>
+          >删除</el-button>
         </template>
       </TabList>
     </div>
@@ -50,7 +51,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { Search, Refresh, Close, Loading } from '@element-plus/icons-vue'
+import { Search, Refresh, Delete, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TabReference } from '@/shared/types/workspace'
