@@ -19,6 +19,8 @@ export interface Workspace {
   color: string
   /** 工作组图标 (可选) */
   icon?: string
+  /** 工作组描述 (可选) */
+  description?: string
   /** 工作组内的标签页引用 */
   tabs: TabReference[]
   /** 工作组标签 */

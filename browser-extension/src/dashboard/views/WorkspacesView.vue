@@ -143,6 +143,12 @@
             </div>
           </div>
 
+          <!-- 工作组描述（仅在填写后展示） -->
+          <div v-if="selectedWorkspace.description" class="ws-description">
+            <el-icon class="ws-description-icon"><Memo /></el-icon>
+            <p class="ws-description-text">{{ selectedWorkspace.description }}</p>
+          </div>
+
           <!-- 层级范围切换 -->
           <div class="scope-bar">
             <el-radio-group v-model="tabScope" size="small">
@@ -222,6 +228,16 @@
         </el-form-item>
         <el-form-item label="标识色">
           <el-color-picker v-model="formData.color" :predefine="presetColors" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input
+            v-model="formData.description"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="为该工作组填写一段描述（选填）"
+          />
         </el-form-item>
       </el-form>
       <div v-if="!isEditing" class="dialog-hint">
@@ -368,7 +384,7 @@ import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '../../shared/composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
@@ -408,6 +424,7 @@ const editingId = ref('')
 const formData = ref({
   name: '',
   color: '#409EFF',
+  description: '',
   parentId: '' as string,
 })
 
@@ -646,7 +663,7 @@ async function copyToClipboard(text: string, successMsg: string) {
 function showCreateDialog(parentId: string) {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: '#409EFF', parentId }
+  formData.value = { name: '', color: '#409EFF', description: '', parentId }
   dialogVisible.value = true
 }
 
@@ -656,6 +673,7 @@ function showEditDialog(ws: Workspace) {
   formData.value = {
     name: ws.name,
     color: ws.color,
+    description: ws.description || '',
     parentId: ws.parentId || '',
   }
   dialogVisible.value = true
@@ -706,6 +724,7 @@ async function handleSave() {
         id: editingId.value,
         name: formData.value.name.trim(),
         color: formData.value.color,
+        description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
       },
     })
@@ -718,6 +737,7 @@ async function handleSave() {
       payload: {
         name: formData.value.name.trim(),
         color: formData.value.color,
+        description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
       },
     })
@@ -1151,6 +1171,33 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.ws-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  background: #f7f8fa;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+}
+
+.ws-description-icon {
+  color: #909399;
+  margin-top: 3px;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.ws-description-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #303133;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .detail-title-row {

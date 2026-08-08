@@ -35,6 +35,11 @@ func (h *WorkspaceHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if len(payload.Description) > 500 {
+		BadRequest(c, "工作区描述不能超过 500 个字符")
+		return
+	}
+
 	result, err := h.svc.Create(payload)
 	if err != nil {
 		InternalError(c, "创建工作区失败")
@@ -55,6 +60,11 @@ func (h *WorkspaceHandler) Update(c *gin.Context) {
 	var payload service.UpdateWorkspacePayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		BadRequest(c, "请求数据格式错误")
+		return
+	}
+
+	if payload.Description != nil && len(*payload.Description) > 500 {
+		BadRequest(c, "工作区描述不能超过 500 个字符")
 		return
 	}
 

@@ -41,6 +41,7 @@ type CreateWorkspacePayload struct {
 	Name     string `json:"name"`
 	Color    string `json:"color"`
 	Icon     string `json:"icon"`
+	Description string `json:"description"`
 	ParentID string `json:"parentId"` // 父工作组 UUID（空表示根级）
 }
 
@@ -49,6 +50,7 @@ type UpdateWorkspacePayload struct {
 	Name     *string            `json:"name,omitempty"`
 	Color    *string            `json:"color,omitempty"`
 	Icon     *string            `json:"icon,omitempty"`
+	Description *string `json:"description,omitempty"`
 	ParentID *string            `json:"parentId,omitempty"` // 移动到新父工作组（空字符串表示移到根级）
 	Tabs     []WorkspaceTabData `json:"tabs,omitempty"`
 }
@@ -60,6 +62,7 @@ type WorkspaceResponse struct {
 	Name      string         `json:"name"`
 	Color     string         `json:"color"`
 	Icon      string         `json:"icon"`
+	Description string       `json:"description"`
 	IsSystem  bool           `json:"isSystem"`
 	Tabs      []TabReference `json:"tabs"`
 	Tags      []TagResponse  `json:"tags"`
@@ -131,6 +134,7 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		Name:        payload.Name,
 		Color:       payload.Color,
 		Icon:        payload.Icon,
+		Description: payload.Description,
 	}
 
 	if err := s.db.Create(&workspace).Error; err != nil {
@@ -167,6 +171,9 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	}
 	if payload.Icon != nil {
 		updates["icon"] = *payload.Icon
+	}
+	if payload.Description != nil {
+		updates["description"] = *payload.Description
 	}
 	if payload.ParentID != nil {
 		updates["parent_id"] = *payload.ParentID
@@ -544,6 +551,7 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 		Name:      ws.Name,
 		Color:     ws.Color,
 		Icon:      ws.Icon,
+		Description: ws.Description,
 		IsSystem:  ws.IsSystem,
 		Tabs:      tabs,
 		Tags:      workspaceTagsToResponses(ws.Tags),

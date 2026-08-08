@@ -60,7 +60,8 @@ type Workspace struct {
 	Name        string `gorm:"size:200;not null"`
 	Color       string `gorm:"size:7;default:'#409EFF'"`
 	Icon        string `gorm:"size:50"`
-	SortOrder   int    `gorm:"default:0"` // 排序序号
+	Description string `gorm:"size:500" json:"description"` // 工作组描述
+	SortOrder   int    `gorm:"default:0"`                   // 排序序号
 	IsDeleted   bool   `gorm:"default:false"`
 	IsSystem    bool   `gorm:"default:false"` // 系统工作组（如「未分组」），不可在前端管理界面删除
 	CreatedAt   time.Time

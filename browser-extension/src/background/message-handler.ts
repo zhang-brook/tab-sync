@@ -281,7 +281,7 @@ async function handleGetWorkspaces(payload?: { includeSystem?: boolean }): Promi
 
 /** 创建工作组（通过后端 API，不含标签页） */
 async function handleCreateWorkspace(
-  payload: { name: string; color: string; icon?: string; parentId?: string },
+  payload: { name: string; color: string; icon?: string; description?: string; parentId?: string },
 ): Promise<MessageResponse> {
   const res = await createWorkspace(payload)
   if (res.ok && res.data) {
@@ -294,7 +294,7 @@ async function handleCreateWorkspace(
 
 /** 更新工作组（通过后端 API） */
 async function handleUpdateWorkspace(
-  payload: { id: string; name?: string; color?: string; icon?: string; parentId?: string; tabs?: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
+  payload: { id: string; name?: string; color?: string; icon?: string; description?: string; parentId?: string; tabs?: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
   const { id, ...updatePayload } = payload
   const res = await updateWorkspace(id, updatePayload)
