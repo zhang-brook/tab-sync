@@ -808,10 +808,6 @@ onUnmounted(() => {
   padding: 0 6px;
 }
 
-.window-body {
-  padding-left: 8px;
-}
-
 .group-node {
   margin: 2px 0;
 }
