@@ -9,12 +9,12 @@ export function getTags(scope?: 'tab' | 'workspace') {
 }
 
 /** 创建标签 */
-export function createTag(payload: { name: string; color?: string; scope: 'tab' | 'workspace' }) {
+export function createTag(payload: { name: string; color?: string; scope: 'tab' | 'workspace'; description?: string }) {
   return apiClient.post<TagInfo>('/v1/tab-sync/tags', payload)
 }
 
-/** 更新标签（名称/颜色） */
-export function updateTag(tagId: number, payload: { name?: string; color?: string }) {
+/** 更新标签（名称/颜色/描述） */
+export function updateTag(tagId: number, payload: { name?: string; color?: string; description?: string }) {
   return apiClient.put<TagInfo>(`/v1/tab-sync/tags/${tagId}`, payload)
 }
 

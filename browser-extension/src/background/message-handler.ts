@@ -697,7 +697,7 @@ async function handleGetTags(payload?: { scope?: 'tab' | 'workspace' }): Promise
 
 /** 创建标签 */
 async function handleCreateTag(
-  payload: { name: string; color?: string; scope: 'tab' | 'workspace' },
+  payload: { name: string; color?: string; scope: 'tab' | 'workspace'; description?: string },
 ): Promise<MessageResponse<TagInfo>> {
   const res = await createTag(payload)
   if (res.ok && res.data) {
@@ -706,11 +706,15 @@ async function handleCreateTag(
   return { success: false, error: res.error || '创建标签失败', authError: res.status === 401 }
 }
 
-/** 更新标签（名称/颜色） */
+/** 更新标签（名称/颜色/描述） */
 async function handleUpdateTag(
-  payload: { tagId: number; name?: string; color?: string },
+  payload: { tagId: number; name?: string; color?: string; description?: string },
 ): Promise<MessageResponse<TagInfo>> {
-  const res = await updateTag(payload.tagId, { name: payload.name, color: payload.color })
+  const res = await updateTag(payload.tagId, {
+    name: payload.name,
+    color: payload.color,
+    description: payload.description,
+  })
   if (res.ok && res.data) {
     return { success: true, data: res.data }
   }

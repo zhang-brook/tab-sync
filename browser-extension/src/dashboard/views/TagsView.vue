@@ -31,6 +31,7 @@
         >
           <span class="tag-dot" :style="{ backgroundColor: tag.color || '#909399' }" />
           <span class="tag-name">{{ tag.name }}</span>
+          <span v-if="tag.description" class="tag-desc" :title="tag.description">{{ tag.description }}</span>
           <div class="tag-meta">
             <span v-if="tag.scope === 'tab'" class="tag-count" title="包含的标签页数">
               {{ tag.tabCount ?? 0 }}
@@ -95,42 +96,37 @@
       </template>
     </div>
 
-    <!-- 新建标签对话框 -->
-    <el-dialog v-model="createVisible" title="新建标签" width="360px">
+    <!-- 新建/编辑标签对话框 -->
+    <el-dialog v-model="dialogVisible" :title="dialogMode === 'create' ? '新建标签' : '编辑标签'" width="380px">
       <el-form label-width="64px">
         <el-form-item label="名称">
-          <el-input v-model="newName" placeholder="标签名称" maxlength="20" show-word-limit />
+          <el-input v-model="tagForm.name" placeholder="标签名称" maxlength="32" show-word-limit />
         </el-form-item>
         <el-form-item label="颜色">
-          <el-color-picker v-model="newColor" />
+          <el-color-picker v-model="tagForm.color" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input
+            v-model="tagForm.description"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="可选，仅当你填写时才会保存"
+            clearable
+          />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!newName.trim()" @click="createTag">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 编辑标签对话框 -->
-    <el-dialog v-model="editVisible" title="编辑标签" width="360px">
-      <el-form label-width="64px">
-        <el-form-item label="名称">
-          <el-input v-model="editName" placeholder="标签名称" maxlength="20" show-word-limit />
-        </el-form-item>
-        <el-form-item label="颜色">
-          <el-color-picker v-model="editColor" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!editName.trim()" @click="saveTag">确定</el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!tagForm.name.trim()" @click="submitTag">确定</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Loading, Refresh, Edit, Delete } from '@element-plus/icons-vue'
@@ -161,16 +157,11 @@ const listItems = computed<TagListItem[]>(() =>
   })),
 )
 
-// 新建标签
-const createVisible = ref(false)
-const newName = ref('')
-const newColor = ref('#409EFF')
-
-// 编辑标签
-const editVisible = ref(false)
+// 新建/编辑标签对话框
+const dialogVisible = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
 const editingTag = ref<TagInfo | null>(null)
-const editName = ref('')
-const editColor = ref('#409EFF')
+const tagForm = reactive({ name: '', color: '#409EFF', description: '' })
 
 async function loadTags() {
   tagsLoading.value = true
@@ -209,19 +200,25 @@ async function loadTagTabs(tagId: number) {
 }
 
 function openCreate() {
-  newName.value = ''
-  newColor.value = '#409EFF'
-  createVisible.value = true
+  dialogMode.value = 'create'
+  editingTag.value = null
+  tagForm.name = ''
+  tagForm.color = '#409EFF'
+  tagForm.description = ''
+  dialogVisible.value = true
 }
 
 async function createTag() {
-  const name = newName.value.trim()
+  const name = tagForm.name.trim()
   if (!name) return
   try {
-    const res = await sendMessage({ action: 'CREATE_TAG', payload: { name, color: newColor.value, scope: 'tab' } })
+    const res = await sendMessage({
+      action: 'CREATE_TAG',
+      payload: { name, color: tagForm.color, scope: 'tab', description: tagForm.description },
+    })
     if (res.success) {
       ElMessage.success('已创建标签')
-      createVisible.value = false
+      dialogVisible.value = false
       await loadTags()
     } else if (res.authError) {
       ElMessage.warning('未连接到后端')
@@ -264,31 +261,33 @@ async function deleteTag(tag: TagInfo) {
 }
 
 function openEdit(tag: TagInfo) {
+  dialogMode.value = 'edit'
   editingTag.value = tag
-  editName.value = tag.name
-  editColor.value = tag.color || '#409EFF'
-  editVisible.value = true
+  tagForm.name = tag.name
+  tagForm.color = tag.color || '#409EFF'
+  tagForm.description = tag.description || ''
+  dialogVisible.value = true
 }
 
 async function saveTag() {
-  const name = editName.value.trim()
+  const name = tagForm.name.trim()
   if (!name || !editingTag.value) return
   try {
     const res = await sendMessage({
       action: 'UPDATE_TAG',
-      payload: { tagId: editingTag.value.id, name, color: editColor.value },
+      payload: { tagId: editingTag.value.id, name, color: tagForm.color, description: tagForm.description },
     })
     if (res.success) {
       ElMessage.success('已更新标签')
-      editVisible.value = false
+      dialogVisible.value = false
       // 更新本地列表中的标签信息
       const idx = tags.value.findIndex(t => t.id === editingTag.value!.id)
       if (idx !== -1) {
-        tags.value[idx] = { ...tags.value[idx], name, color: editColor.value }
+        tags.value[idx] = { ...tags.value[idx], name, color: tagForm.color, description: tagForm.description }
       }
       // 更新右侧选中的标签信息
       if (selectedTag.value?.id === editingTag.value!.id) {
-        selectedTag.value = { ...selectedTag.value, name, color: editColor.value }
+        selectedTag.value = { ...selectedTag.value, name, color: tagForm.color, description: tagForm.description }
       }
     } else if (res.authError) {
       ElMessage.warning('未连接到后端')
@@ -297,6 +296,14 @@ async function saveTag() {
     }
   } catch (e) {
     ElMessage.error('更新标签失败：' + (e as Error).message)
+  }
+}
+
+async function submitTag() {
+  if (dialogMode.value === 'create') {
+    await createTag()
+  } else {
+    await saveTag()
   }
 }
 

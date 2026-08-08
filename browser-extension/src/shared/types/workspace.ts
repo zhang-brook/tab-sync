@@ -5,6 +5,8 @@ export interface TagInfo {
   /** 十六进制颜色，可能为空 */
   color: string
   scope: 'tab' | 'workspace'
+  /** 标签描述（可选，仅用户主动设置时存在） */
+  description?: string
   /** 该标签关联的标签页数量（由后端统计，workspace 类标签为 0） */
   tabCount?: number
 }

@@ -186,7 +186,7 @@ export interface GetTagsMessage {
 /** 创建标签 */
 export interface CreateTagMessage {
   action: 'CREATE_TAG'
-  payload: { name: string; color?: string; scope: 'tab' | 'workspace' }
+  payload: { name: string; color?: string; scope: 'tab' | 'workspace'; description?: string }
 }
 
 /** 删除标签 */
@@ -195,10 +195,10 @@ export interface DeleteTagMessage {
   payload: { tagId: number }
 }
 
-/** 更新标签（名称/颜色） */
+/** 更新标签（名称/颜色/描述） */
 export interface UpdateTagMessage {
   action: 'UPDATE_TAG'
-  payload: { tagId: number; name?: string; color?: string }
+  payload: { tagId: number; name?: string; color?: string; description?: string }
 }
 
 /** 给工作组内标签页打标签 */

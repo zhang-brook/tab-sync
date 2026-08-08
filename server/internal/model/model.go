@@ -111,6 +111,7 @@ type Tag struct {
 	Name      string `gorm:"size:32;not null;index"`
 	Color     string `gorm:"size:7"`
 	Scope     string `gorm:"size:8;index"`
+	Description string `gorm:"size:500"` // 标签描述（仅用户主动设置时保存）
 	CreatedAt time.Time
 }
 

@@ -31,9 +31,10 @@ func (h *TagHandler) List(c *gin.Context) {
 // Create 创建标签
 func (h *TagHandler) Create(c *gin.Context) {
 	var body struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
-		Scope string `json:"scope"`
+		Name        string `json:"name"`
+		Color       string `json:"color"`
+		Scope       string `json:"scope"`
+		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		BadRequest(c, "参数错误")
@@ -46,7 +47,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 	if body.Scope == "" {
 		body.Scope = "tab"
 	}
-	tag, err := h.svc.Create(body.Name, body.Color, body.Scope)
+	tag, err := h.svc.Create(body.Name, body.Color, body.Scope, body.Description)
 	if err != nil {
 		InternalError(c, "创建标签失败")
 		return
@@ -54,7 +55,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 	Created(c, tag)
 }
 
-// Update 更新标签（名称/颜色）
+// Update 更新标签（名称/颜色/描述）
 func (h *TagHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -62,18 +63,23 @@ func (h *TagHandler) Update(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
+		Name        string `json:"name"`
+		Color       string `json:"color"`
+		Description *string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		BadRequest(c, "参数错误")
 		return
 	}
-	if body.Name == "" && body.Color == "" {
-		BadRequest(c, "至少需要提供 name 或 color")
+	if body.Name == "" && body.Color == "" && body.Description == nil {
+		BadRequest(c, "至少需要提供 name、color 或 description")
 		return
 	}
-	tag, err := h.svc.Update(uint(id), body.Name, body.Color)
+	desc := ""
+	if body.Description != nil {
+		desc = *body.Description
+	}
+	tag, err := h.svc.Update(uint(id), body.Name, body.Color, desc)
 	if err != nil {
 		InternalError(c, "更新标签失败")
 		return

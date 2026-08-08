@@ -46,22 +46,22 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 	}
 	out := make([]TagResponse, 0, len(tags))
 	for _, t := range tags {
-		out = append(out, TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope, TabCount: counts[t.ID]})
+		out = append(out, TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope, Description: t.Description, TabCount: counts[t.ID]})
 	}
 	return out, nil
 }
 
 // Create 创建标签
-func (s *TagService) Create(name, color, scope string) (*TagResponse, error) {
-	tag := model.Tag{Name: name, Color: color, Scope: scope}
+func (s *TagService) Create(name, color, scope, description string) (*TagResponse, error) {
+	tag := model.Tag{Name: name, Color: color, Scope: scope, Description: description}
 	if err := s.db.Create(&tag).Error; err != nil {
 		return nil, err
 	}
-	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope}, nil
+	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope, Description: tag.Description}, nil
 }
 
-// Update 更新标签（名称/颜色）
-func (s *TagService) Update(id uint, name, color string) (*TagResponse, error) {
+// Update 更新标签（名称/颜色/描述）
+func (s *TagService) Update(id uint, name, color, description string) (*TagResponse, error) {
 	tag := model.Tag{}
 	if err := s.db.First(&tag, id).Error; err != nil {
 		return nil, err
@@ -72,10 +72,12 @@ func (s *TagService) Update(id uint, name, color string) (*TagResponse, error) {
 	if color != "" {
 		tag.Color = color
 	}
+	// 仅当用户主动设置描述时才更新（传空字符串表示清除描述）
+	tag.Description = description
 	if err := s.db.Save(&tag).Error; err != nil {
 		return nil, err
 	}
-	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope}, nil
+	return &TagResponse{ID: tag.ID, Name: tag.Name, Color: tag.Color, Scope: tag.Scope, Description: tag.Description}, nil
 }
 
 // Delete 删除标签（事务内清理关联记录）
