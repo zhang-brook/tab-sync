@@ -51,11 +51,11 @@ export function addWorkspaceTabByUrl(workspaceId: string, url: string, title?: s
   )
 }
 
-/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName、编辑链接 url/title/favIconUrl） */
+/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName、编辑链接 url/title/favIconUrl、描述 description） */
 export function updateWorkspaceTab(
   workspaceId: string,
   tabId: string,
-  payload: { addedAt?: string; displayName?: string; url?: string; title?: string; favIconUrl?: string },
+  payload: { addedAt?: string; displayName?: string; url?: string; title?: string; favIconUrl?: string; description?: string },
 ) {
   return apiClient.patch<{ success: boolean }>(
     `/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/tabs/${encodeURIComponent(tabId)}`,

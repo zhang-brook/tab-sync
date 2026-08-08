@@ -45,6 +45,8 @@ export interface TabReference {
   displayName?: string
   /** 图标快照 */
   favIconUrl: string
+  /** 标签页描述（可选，仅用户主动设置时存在） */
+  description?: string
   /** 排序序号 */
   sortOrder: number
   /** 加入工作组的时间 */

@@ -83,6 +83,7 @@ type WorkspaceTab struct {
 	FavIconURL  string `gorm:"size:2048"`
 	SortOrder   int    `gorm:"default:0"` // 排序序号
 	AddedAt     time.Time
+	Description string `gorm:\"size:500\"` // 标签页描述（仅用户主动设置时保存）
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Tags        []TabTag `gorm:"foreignKey:WorkspaceTabID"`

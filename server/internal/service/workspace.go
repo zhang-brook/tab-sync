@@ -38,36 +38,36 @@ type WorkspaceTabData struct {
 // CreateWorkspacePayload 创建工作区请求体
 // 创建时不携带标签页；标签页通过后续 Update 或加入操作添加
 type CreateWorkspacePayload struct {
-	Name     string `json:"name"`
-	Color    string `json:"color"`
-	Icon     string `json:"icon"`
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Icon        string `json:"icon"`
 	Description string `json:"description"`
-	ParentID string `json:"parentId"` // 父工作组 UUID（空表示根级）
+	ParentID    string `json:"parentId"` // 父工作组 UUID（空表示根级）
 }
 
 // UpdateWorkspacePayload 更新工作区请求体
 type UpdateWorkspacePayload struct {
-	Name     *string            `json:"name,omitempty"`
-	Color    *string            `json:"color,omitempty"`
-	Icon     *string            `json:"icon,omitempty"`
-	Description *string `json:"description,omitempty"`
-	ParentID *string            `json:"parentId,omitempty"` // 移动到新父工作组（空字符串表示移到根级）
-	Tabs     []WorkspaceTabData `json:"tabs,omitempty"`
+	Name        *string            `json:"name,omitempty"`
+	Color       *string            `json:"color,omitempty"`
+	Icon        *string            `json:"icon,omitempty"`
+	Description *string            `json:"description,omitempty"`
+	ParentID    *string            `json:"parentId,omitempty"` // 移动到新父工作组（空字符串表示移到根级）
+	Tabs        []WorkspaceTabData `json:"tabs,omitempty"`
 }
 
 // WorkspaceResponse 工作组响应（给前端）
 type WorkspaceResponse struct {
-	ID        string         `json:"id"`
-	ParentID  string         `json:"parentId"`
-	Name      string         `json:"name"`
-	Color     string         `json:"color"`
-	Icon      string         `json:"icon"`
-	Description string       `json:"description"`
-	IsSystem  bool           `json:"isSystem"`
-	Tabs      []TabReference `json:"tabs"`
-	Tags      []TagResponse  `json:"tags"`
-	CreatedAt string         `json:"createdAt"`
-	UpdatedAt string         `json:"updatedAt"`
+	ID          string         `json:"id"`
+	ParentID    string         `json:"parentId"`
+	Name        string         `json:"name"`
+	Color       string         `json:"color"`
+	Icon        string         `json:"icon"`
+	Description string         `json:"description"`
+	IsSystem    bool           `json:"isSystem"`
+	Tabs        []TabReference `json:"tabs"`
+	Tags        []TagResponse  `json:"tags"`
+	CreatedAt   string         `json:"createdAt"`
+	UpdatedAt   string         `json:"updatedAt"`
 }
 
 // TabReference 标签页引用
@@ -78,6 +78,8 @@ type TabReference struct {
 	// DisplayName 用户重命名后的显示名（可选，为空时前端应使用 Title）
 	DisplayName string        `json:"displayName,omitempty"`
 	FavIconURL  string        `json:"favIconUrl"`
+	// Description 标签页描述（可选，仅用户主动设置时存在）
+	Description string        `json:"description,omitempty"`
 	SortOrder   int           `json:"sortOrder"`
 	AddedAt     string        `json:"addedAt"`
 	Tags        []TagResponse `json:"tags"`
@@ -85,11 +87,12 @@ type TabReference struct {
 
 // TagResponse 标签响应（给前端）
 type TagResponse struct {
-	ID       uint   `json:"id"`
-	Name     string `json:"name"`
-	Color    string `json:"color"`
-	Scope    string `json:"scope"`
-	TabCount int64  `json:"tabCount"`
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Scope       string `json:"scope"`
+	Description string `json:"description"`
+	TabCount    int64  `json:"tabCount"`
 }
 
 // CreateResult 创建工作区结果
@@ -472,9 +475,11 @@ type UpdateTabPayload struct {
 	Title *string `json:"title,omitempty"`
 	// FavIconURL 标签页图标，编辑 URL 时可选一并更新
 	FavIconURL *string `json:"favIconUrl,omitempty"`
+	// Description 标签页描述（仅当用户主动设置时保存，空字符串表示清除描述）
+	Description *string `json:"description,omitempty"`
 }
 
-// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间、重命名、编辑链接）
+// UpdateTab 更新工作组内单个标签页的属性（当前支持手动设置添加时间、重命名、编辑链接、描述）
 // tabID 为后端自增主键（字符串）
 func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTabPayload) error {
 	if workspaceID == "" || tabID == "" {
@@ -510,6 +515,9 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 	if payload.FavIconURL != nil {
 		updates["fav_icon_url"] = sanitizeFavIconURL(*payload.FavIconURL)
 	}
+	if payload.Description != nil {
+		updates["description"] = sanitizeString(*payload.Description, 500)
+	}
 	if len(updates) == 0 {
 		return nil
 	}
@@ -540,23 +548,24 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 			Title:       tab.Title,
 			DisplayName: tab.DisplayName,
 			FavIconURL:  tab.FavIconURL,
+			Description: tab.Description,
 			SortOrder:   tab.SortOrder,
 			AddedAt:     tab.AddedAt.Format(time.RFC3339),
 			Tags:        tabTagsToResponses(tab.Tags),
 		}
 	}
 	return WorkspaceResponse{
-		ID:        ws.WorkspaceID,
-		ParentID:  ws.ParentID,
-		Name:      ws.Name,
-		Color:     ws.Color,
-		Icon:      ws.Icon,
+		ID:          ws.WorkspaceID,
+		ParentID:    ws.ParentID,
+		Name:        ws.Name,
+		Color:       ws.Color,
+		Icon:        ws.Icon,
 		Description: ws.Description,
-		IsSystem:  ws.IsSystem,
-		Tabs:      tabs,
-		Tags:      workspaceTagsToResponses(ws.Tags),
-		CreatedAt: ws.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: ws.UpdatedAt.Format(time.RFC3339),
+		IsSystem:    ws.IsSystem,
+		Tabs:        tabs,
+		Tags:        workspaceTagsToResponses(ws.Tags),
+		CreatedAt:   ws.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   ws.UpdatedAt.Format(time.RFC3339),
 	}
 }
 

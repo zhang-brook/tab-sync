@@ -541,7 +541,7 @@ async function handleMoveWorkspaceTab(
   }
 }
 
-/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName、编辑链接 url/title/favIconUrl） */
+/** 更新工作组内单个标签页属性（支持手动设置添加时间 addedAt、重命名 displayName、编辑链接 url/title/favIconUrl、描述 description） */
 async function handleUpdateWorkspaceTab(
   payload: {
     workspaceId: string
@@ -551,6 +551,7 @@ async function handleUpdateWorkspaceTab(
     url?: string
     title?: string
     favIconUrl?: string
+    description?: string
   },
 ): Promise<MessageResponse> {
   try {

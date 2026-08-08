@@ -172,6 +172,8 @@ export interface UpdateWorkspaceTabMessage {
     title?: string
     /** 标签页图标，编辑链接时可选一并更新 */
     favIconUrl?: string
+    /** 标签页描述（仅用户主动设置时保存，空字符串表示清除描述） */
+    description?: string
   }
 }
 

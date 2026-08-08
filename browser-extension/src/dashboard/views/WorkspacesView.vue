@@ -325,6 +325,28 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑描述对话框 -->
+    <el-dialog v-model="editDescDialogVisible" title="编辑描述" width="520px" destroy-on-close>
+      <el-form label-width="70px" label-position="left">
+        <el-form-item label="描述">
+          <el-input
+            v-model="editDescValue"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="可选，仅当你填写时才会保存；清空则移除描述"
+            clearable
+            @keyup.ctrl.enter="handleSaveEditDesc"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDescDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editDescSaving" @click="handleSaveEditDesc">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 标签编辑对话框 -->
     <TagEditorDialog
       v-model="tagEditorVisible"
@@ -637,6 +659,9 @@ function onTabMenuCommand(command: string, workspaceId: string, tab: TabReferenc
       break
     case 'editUrl':
       openEditUrlDialog(workspaceId, tab)
+      break
+    case 'editDesc':
+      openEditDescDialog(workspaceId, tab)
       break
     case 'tag':
       openTabTagEditor(workspaceId, tab)
@@ -952,6 +977,42 @@ async function handleSaveEditUrl() {
   if (res.success) {
     ElMessage.success('链接已更新')
     editUrlDialogVisible.value = false
+    await loadWorkspaces()
+  } else if (res.authError) {
+    ElMessage.warning('未连接后端，无法更新')
+  } else {
+    ElMessage.error(res.error || '更新失败')
+  }
+}
+
+// 编辑标签页描述
+const editDescDialogVisible = ref(false)
+const editDescSaving = ref(false)
+const editDescValue = ref('')
+const editDescTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
+
+function openEditDescDialog(workspaceId: string, tab: TabReference) {
+  editDescTarget.value = { workspaceId, tabId: tab.tabId }
+  editDescValue.value = tab.description || ''
+  editDescDialogVisible.value = true
+}
+
+async function handleSaveEditDesc() {
+  const target = editDescTarget.value
+  if (!target) return
+  editDescSaving.value = true
+  const res = await sendMessage({
+    action: 'UPDATE_WORKSPACE_TAB',
+    payload: {
+      workspaceId: target.workspaceId,
+      tabId: target.tabId,
+      description: editDescValue.value,
+    },
+  })
+  editDescSaving.value = false
+  if (res.success) {
+    ElMessage.success('描述已更新')
+    editDescDialogVisible.value = false
     await loadWorkspaces()
   } else if (res.authError) {
     ElMessage.warning('未连接后端，无法更新')
