@@ -40,26 +40,60 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 /** 「未分组」系统工作组的固定标识（见 server/internal/service/workspace.go） */
 const UNGROUPED_WORKSPACE_ID = 'ungrouped'
+// 页面右键菜单
 const MENU_SAVE_UNGROUPED = 'tab-sync-save-ungrouped'
 const MENU_SAVE_PICK = 'tab-sync-save-pick'
+// 标签页右键菜单（标签页菜单的 contexts 与页面不同，需独立菜单项）
+const MENU_TAB_SAVE_UNGROUPED = 'tab-sync-tab-save-ungrouped'
+const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
+// 标签组右键菜单
+const MENU_GROUP_SAVE_UNGROUPED = 'tab-sync-group-save-ungrouped'
+const MENU_GROUP_SAVE_PICK = 'tab-sync-group-save-pick'
 
 /** 创建右键菜单项（覆盖式重建，避免重复） */
 async function createContextMenus() {
   try {
     await chrome.contextMenus.removeAll()
-    const common: chrome.contextMenus.CreateProperties = {
+    // 页面右键：仅 http(s) 页面显示
+    const page: chrome.contextMenus.CreateProperties = {
       contexts: ['page'],
       documentUrlPatterns: ['http://*/*', 'https://*/*'],
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_UNGROUPED,
-      title: '保存到 Tab Sync 并关闭（未分组）',
-      ...common,
+      title: '保存到 [未分组] 并关闭',
+      ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
-      title: '保存到 Tab Sync 并关闭 → 选择分组…',
-      ...common,
+      title: '保存到选定分组…',
+      ...page,
+    })
+    // 标签页右键
+    const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
+    chrome.contextMenus.create({
+      id: MENU_TAB_SAVE_UNGROUPED,
+      title: '保存标签页到 [未分组] 并关闭',
+      ...tab,
+    })
+    chrome.contextMenus.create({
+      id: MENU_TAB_SAVE_PICK,
+      title: '保存标签页到选定分组…',
+      ...tab,
+    })
+    // 标签组右键（当前 @types/chrome 未收录 'tab_groups'，实际为 Chrome 89+ 支持的上下文类型）
+    const group: chrome.contextMenus.CreateProperties = {
+      contexts: ['tab_groups' as chrome.contextMenus.ContextType],
+    }
+    chrome.contextMenus.create({
+      id: MENU_GROUP_SAVE_UNGROUPED,
+      title: '保存标签组到 [未分组] 并关闭',
+      ...group,
+    })
+    chrome.contextMenus.create({
+      id: MENU_GROUP_SAVE_PICK,
+      title: '保存标签组到选定分组…',
+      ...group,
     })
     logger.info('右键菜单已创建')
   } catch (err) {
@@ -70,17 +104,35 @@ async function createContextMenus() {
 /** 右键菜单点击分发 */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab) return
-  if (info.menuItemId === MENU_SAVE_UNGROUPED) {
-    await saveTabToWorkspaceAndClose(tab, UNGROUPED_WORKSPACE_ID)
-  } else if (info.menuItemId === MENU_SAVE_PICK) {
-    await openPickerWindow(tab)
+  const id = info.menuItemId
+  if (id === MENU_SAVE_UNGROUPED || id === MENU_TAB_SAVE_UNGROUPED) {
+    await saveTabsToWorkspaceAndClose([tab], UNGROUPED_WORKSPACE_ID)
+  } else if (id === MENU_SAVE_PICK || id === MENU_TAB_SAVE_PICK) {
+    await openPickerWindow([tab])
+  } else if (id === MENU_GROUP_SAVE_UNGROUPED) {
+    const tabs = await getGroupTabs(tab)
+    if (tabs) await saveTabsToWorkspaceAndClose(tabs, UNGROUPED_WORKSPACE_ID)
+  } else if (id === MENU_GROUP_SAVE_PICK) {
+    const tabs = await getGroupTabs(tab)
+    if (tabs) await openPickerWindow(tabs)
   }
 })
 
-/** 在居中弹窗中打开分组选择器，选中后再加入并关闭当前页 */
-async function openPickerWindow(tab: chrome.tabs.Tab) {
-  if (!tab.id) return
-  const url = chrome.runtime.getURL('src/picker/index.html') + '?tabId=' + tab.id
+/** 取右键所在标签组的所有标签页（右键回调里的 tab 是组内标签页之一，经 groupId 反查整组） */
+async function getGroupTabs(tab: chrome.tabs.Tab): Promise<chrome.tabs.Tab[] | null> {
+  const groupId = tab.groupId
+  if (groupId == null || groupId < 0) {
+    await notify('无法保存标签组', '未能获取标签组信息')
+    return null
+  }
+  return chrome.tabs.query({ groupId })
+}
+
+/** 在居中弹窗中打开分组选择器，选中后再加入并关闭原标签页（支持标签组批量） */
+async function openPickerWindow(tabs: chrome.tabs.Tab[]) {
+  const ids = tabs.map((t) => t.id).filter((id): id is number => id != null)
+  if (ids.length === 0) return
+  const url = chrome.runtime.getURL('src/picker/index.html') + '?tabIds=' + ids.join(',')
   const width = 560
   const height = 600
   try {
@@ -95,21 +147,22 @@ async function openPickerWindow(tab: chrome.tabs.Tab) {
 }
 
 /**
- * 将单个标签页加入指定工作组并关闭：
- * 仅当加入成功后才关闭当前页；失败（含未登录）则保留页面并通知。
+ * 将标签页（支持批量，如标签组）加入指定工作组并关闭：
+ * 仅当加入成功后才关闭页面；失败（含未登录）则保留页面并通知。
+ * 非 http(s)/file 页面会被跳过，不影响其余标签页收藏。
  */
-async function saveTabToWorkspaceAndClose(tab: chrome.tabs.Tab, workspaceId: string) {
-  if (!tab.id || !tab.url) return
-
-  // 仅允许 http(s)/file 页面，浏览器内置页面不支持
-  let protocol = ''
-  try {
-    protocol = new URL(tab.url).protocol
-  } catch {
-    return
-  }
-  if (!['http:', 'https:', 'file:'].includes(protocol)) {
-    await notify('无法收藏该页面', '当前页面类型不支持收藏（如浏览器内置页面）')
+async function saveTabsToWorkspaceAndClose(tabs: chrome.tabs.Tab[], workspaceId: string) {
+  // 仅允许 http(s)/file 页面，浏览器内置页面不支持（组内混有此类页面时跳过）
+  const savable = tabs.filter((tab) => {
+    if (!tab.url) return false
+    try {
+      return ['http:', 'https:', 'file:'].includes(new URL(tab.url).protocol)
+    } catch {
+      return false
+    }
+  })
+  if (savable.length === 0) {
+    await notify('无法收藏', '当前页面类型不支持收藏（如浏览器内置页面）')
     return
   }
 
@@ -119,20 +172,21 @@ async function saveTabToWorkspaceAndClose(tab: chrome.tabs.Tab, workspaceId: str
     action: 'ADD_TABS_TO_WORKSPACE',
     payload: {
       workspaceId,
-      tabs: [
-        {
-          chromeTabId: tab.id ?? 0,
-          url: tab.url ?? '',
-          title: tab.title ?? '',
-          favIconUrl: tab.favIconUrl ?? '',
-        },
-      ],
+      tabs: savable.map((tab) => ({
+        chromeTabId: tab.id ?? 0,
+        url: tab.url ?? '',
+        title: tab.title ?? '',
+        favIconUrl: tab.favIconUrl ?? '',
+      })),
     },
   })
 
   if (res.success) {
-    await chrome.tabs.remove(tab.id)
-    await notify('已加入工作组', '当前标签页已收藏并关闭')
+    const ids = savable.map((t) => t.id).filter((id): id is number => id != null)
+    if (ids.length > 0) {
+      await chrome.tabs.remove(ids)
+    }
+    await notify('已加入工作组', savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭` : '当前标签页已收藏并关闭')
   } else if (res.authError) {
     await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
   } else {
@@ -184,16 +238,7 @@ async function handleSaveAndClose() {
   }
 
   // background 自身调用，直接走消息处理器（runtime.sendMessage 不会投递给自己）
-  const res = await handleMessage({
-    action: 'ADD_TABS_TO_WORKSPACE',
-    payload: { workspaceId: wsId, tabs: [{ chromeTabId: tab.id ?? 0, url: tab.url ?? '', title: tab.title ?? '', favIconUrl: tab.favIconUrl ?? '' }] },
-  })
-  if (res.success) {
-    await chrome.tabs.remove(tab.id!)
-    await notify('已加入工作组', '当前标签页已收藏并关闭')
-  } else {
-    await notify('收藏失败', res.error || '请检查后端连接')
-  }
+  await saveTabsToWorkspaceAndClose([tab], wsId)
 }
 
 /** 轻量桌面通知 */
