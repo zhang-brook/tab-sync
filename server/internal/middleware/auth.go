@@ -62,7 +62,9 @@ func TokenAuth(authSvc *service.AuthService) gin.HandlerFunc {
 }
 
 // AdminOrJWTAuth 管理员认证中间件（支持 Admin Token 或 JWT 会话）
-// 管理后台 Web 界面使用 JWT，API 调用使用 Admin Token
+// 管理后台 Web 界面使用 JWT，API 调用使用 Admin Token。
+// 状态码约定：凭证缺失/无效/过期返回 401（前端据此跳转登录页），
+// 凭证有效但权限不足返回 403。
 func AdminOrJWTAuth(authSvc *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -78,26 +80,42 @@ func AdminOrJWTAuth(authSvc *service.AuthService) gin.HandlerFunc {
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// 先尝试作为 Admin Token 验证
-		if authSvc.IsAdmin(tokenStr) {
-			c.Next()
+		// 先尝试作为访问 Token 验证：有效但非管理员 Token 属权限不足
+		if token, err := authSvc.VerifyToken(tokenStr); err == nil {
+			if token.IsAdmin {
+				c.Next()
+				return
+			}
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    403,
+				"success": false,
+				"message": "需要管理员权限",
+			})
+			c.Abort()
 			return
 		}
 
-		// 再尝试作为 JWT 验证
-		claims, err := authSvc.ValidateJWT(tokenStr)
-		if err == nil {
+		// 再尝试作为 JWT 会话验证
+		if claims, err := authSvc.ValidateJWT(tokenStr); err == nil {
 			sub, _ := claims.GetSubject()
 			if sub == "admin" {
 				c.Next()
 				return
 			}
+			c.JSON(http.StatusForbidden, gin.H{
+				"code":    403,
+				"success": false,
+				"message": "需要管理员权限",
+			})
+			c.Abort()
+			return
 		}
 
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    403,
+		// 凭证无效或已过期：视为未登录，前端据此跳转登录页
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
 			"success": false,
-			"message": "需要管理员权限",
+			"message": "认证无效或已过期，请重新登录",
 		})
 		c.Abort()
 	}

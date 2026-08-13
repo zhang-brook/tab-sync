@@ -11,15 +11,15 @@ func TestTagService_List_TabCount(t *testing.T) {
 	wsSvc := NewWorkspaceService(db, nil)
 
 	// 创建两个 tab 标签和一个 workspace 标签
-	tagA, err := tagSvc.Create("A", "#409EFF", "tab")
+	tagA, err := tagSvc.Create("A", "#409EFF", "tab", "")
 	if err != nil {
 		t.Fatalf("创建标签 A 失败: %v", err)
 	}
-	tagB, err := tagSvc.Create("B", "#67C23A", "tab")
+	tagB, err := tagSvc.Create("B", "#67C23A", "tab", "")
 	if err != nil {
 		t.Fatalf("创建标签 B 失败: %v", err)
 	}
-	if _, err := tagSvc.Create("WS", "#909399", "workspace"); err != nil {
+	if _, err := tagSvc.Create("WS", "#909399", "workspace", ""); err != nil {
 		t.Fatalf("创建工作区标签失败: %v", err)
 	}
 

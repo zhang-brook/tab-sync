@@ -901,14 +901,15 @@
     }
 
     // ============ 仪表盘 ============
-    // 统一的鉴权请求封装：自动携带 JWT；若后端返回 401（如密钥轮换/重启后旧会话失效），
+    // 统一的鉴权请求封装：自动携带 JWT
+    // 若后端返回 401（如密钥轮换/重启后旧会话失效）或 403（会话权限不足）
     // 则清除本地会话并跳转到登录页，避免停留在内容残缺的后台界面。
     async function apiFetch(path, opts = {}) {
       const jwt = localStorage.getItem('admin_jwt');
       const headers = Object.assign({}, opts.headers || {});
       if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
       const res = await fetch(API + path, Object.assign({}, opts, { headers }));
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         doLogout();
         const err = new Error('unauthorized');
         err.unauthorized = true;
