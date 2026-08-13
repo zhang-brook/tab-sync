@@ -4,77 +4,26 @@
     :title="title"
     :width="dialogWidth"
     append-to-body
-    @update:model-value="(v: boolean) => emit('update:modelValue', v)"
+    @update:model-value="onUpdateModelValue"
     @open="onOpen"
   >
-    <el-input
-      v-model="keyword"
-      placeholder="搜索工作组..."
-      size="default"
-      clearable
-      :prefix-icon="Search"
+    <WorkspacePickerPanel
+      ref="panelRef"
+      :confirmable="confirmable"
+      :close-tab="closeTab"
+      :close-tab-label="closeTabLabel"
+      :disabled-ids="disabledIds"
+      @select="onSelect"
+      @update:close-tab="onUpdateCloseTab"
+      @cancel="onCancel"
     />
-
-    <div class="picker-tree">
-      <div v-if="loading" class="picker-hint">加载中...</div>
-      <div v-else-if="treeData.length === 0" class="picker-hint">暂无工作组</div>
-      <el-tree
-        v-else
-        ref="treeRef"
-        :data="treeData"
-        node-key="id"
-        :props="treeProps"
-        :filter-node-method="filterNode"
-        :expand-on-click-node="false"
-        default-expand-all
-        highlight-current
-        @node-click="onNodeClick"
-      >
-        <template #default="{ data }">
-          <span
-            class="picker-node"
-            :class="{ 'is-disabled': disabledSet.has(data.id) }"
-            :title="disabledSet.has(data.id) ? '当前不可选择' : ''"
-          >
-            <span class="picker-dot" :style="{ backgroundColor: data.color }" />
-            <span class="picker-name">{{ data.name }}</span>
-            <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
-          </span>
-        </template>
-      </el-tree>
-    </div>
-
-    <template #footer>
-      <div class="picker-footer">
-        <el-checkbox
-          v-if="confirmable"
-          :model-value="closeTabModel"
-          @update:model-value="onCloseTabChange"
-        >
-          {{ closeTabLabel }}
-        </el-checkbox>
-        <div class="picker-footer-actions">
-          <el-button @click="emit('update:modelValue', false)">取消</el-button>
-          <el-button
-            v-if="confirmable"
-            type="primary"
-            :disabled="!selectedNode"
-            @click="onConfirm"
-          >
-            确认
-          </el-button>
-        </div>
-      </div>
-    </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
-import { sendMessage } from '../composables/useMessage'
-import { buildWorkspaceTree, type WorkspaceTreeNode } from '../utils/workspace-tree'
-import type { WorkspacesData } from '../types'
+import { ref } from 'vue'
+import WorkspacePickerPanel from './WorkspacePickerPanel.vue'
+import type { WorkspaceTreeNode } from '../utils/workspace-tree'
 
 const props = defineProps<{
   modelValue: boolean
@@ -99,135 +48,29 @@ const emit = defineEmits<{
 
 const title = props.title ?? '选择工作组'
 const dialogWidth = props.width ?? '420px'
-const closeTabLabel = props.closeTabLabel ?? '加入后关闭当前页'
 
-const closeTabModel = computed(() => props.closeTab ?? true)
+const panelRef = ref<InstanceType<typeof WorkspacePickerPanel>>()
 
-const loading = ref(false)
-const keyword = ref('')
-const treeData = ref<WorkspaceTreeNode[]>([])
-const treeRef = ref()
-/** 确认模式下的当前选中节点（未选中时「确认」按钮禁用） */
-const selectedNode = ref<WorkspaceTreeNode | null>(null)
-
-const treeProps = { label: 'name', children: 'children' }
-
-watch(keyword, (val) => {
-  treeRef.value?.filter(val)
-})
-
-function filterNode(value: string, data: Record<string, unknown>) {
-  if (!value) return true
-  return String((data as unknown as WorkspaceTreeNode).name).toLowerCase().includes(value.toLowerCase())
+// el-dialog 内容在打开时才渲染，首次打开时 Panel 挂载与 @open 事件先后触发，reload 幂等
+function onOpen() {
+  panelRef.value?.reload()
 }
 
-const disabledSet = computed(() => new Set(props.disabledIds || []))
-
-async function onOpen() {
-  keyword.value = ''
-  selectedNode.value = null
-  loading.value = true
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
-  if (res.success && res.data) {
-    treeData.value = buildWorkspaceTree(res.data.workspaces)
-  } else {
-    treeData.value = []
-  }
-  loading.value = false
-  await nextTick()
+function onUpdateModelValue(v: boolean) {
+  emit('update:modelValue', v)
 }
 
-// 注意：初始即以 modelValue=true 挂载时（如 picker 独立弹窗页），Element Plus 不会触发 @open 事件，
-// 需要在此主动加载一次，否则列表会一直显示空占位
-onMounted(() => {
-  if (props.modelValue) onOpen()
-})
-
-function onNodeClick(node: WorkspaceTreeNode) {
-  if (disabledSet.value.has(node.id)) return
-  if (props.confirmable) {
-    // 确认模式：仅记录选中项，「确认」按钮点击后才触发 select
-    selectedNode.value = node
-    return
-  }
+function onSelect(node: WorkspaceTreeNode) {
   emit('select', node)
-  emit('update:modelValue', false)
 }
 
-/** 底部复选框切换（el-checkbox 的 update:modelValue 参数可能是 boolean/string/number，统一转 boolean） */
-function onCloseTabChange(v: boolean | string | number) {
+/** el-checkbox 的 update:modelValue 参数可能是 boolean/string/number，统一转 boolean */
+function onUpdateCloseTab(v: boolean | string | number) {
   emit('update:closeTab', !!v)
 }
 
-/** 确认模式下点击「确认」：提交当前选中项（是否关闭弹窗由父组件决定） */
-function onConfirm() {
-  if (!selectedNode.value) return
-  emit('select', selectedNode.value)
+/** 非确认模式点节点 / 点「取消」：关闭弹窗 */
+function onCancel() {
+  emit('update:modelValue', false)
 }
 </script>
-
-<style scoped>
-.picker-footer {
-  display: flex;
-  align-items: center;
-}
-
-.picker-footer-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.picker-tree {
-  margin-top: 12px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.picker-hint {
-  padding: 24px;
-  text-align: center;
-  color: #909399;
-  font-size: 13px;
-}
-
-.picker-node {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.picker-node.is-disabled {
-  color: #c0c4cc;
-  cursor: not-allowed;
-}
-
-.picker-node.is-disabled .picker-dot {
-  opacity: 0.4;
-}
-
-.picker-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.picker-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.picker-count {
-  font-size: 11px;
-  color: #909399;
-  background: #f0f2f5;
-  border-radius: 8px;
-  padding: 0 6px;
-}
-</style>

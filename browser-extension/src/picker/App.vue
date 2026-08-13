@@ -1,14 +1,13 @@
 <template>
   <div class="picker-page">
-    <WorkspacePickerDialog
-      :model-value="true"
-      title="选择分组"
-      width="520px"
+    <WorkspacePickerPanel
+      ref="panelRef"
       confirmable
+      fill-height
       v-model:close-tab="closeTab"
       :close-tab-label="closeTabLabel"
       @select="onSelect"
-      @update:model-value="onCancel"
+      @cancel="onCancel"
     />
   </div>
 </template>
@@ -16,10 +15,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import WorkspacePickerPanel from '@/shared/components/WorkspacePickerPanel.vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
+const panelRef = ref<InstanceType<typeof WorkspacePickerPanel>>()
 const tabIds = ref<number[]>([])
 const tabs = ref<chrome.tabs.Tab[]>([])
 /** 「加入后关闭当前页」开关（底部复选框），默认勾选 */
@@ -54,6 +54,14 @@ onMounted(async () => {
   if (tabs.value.length === 0) {
     ElMessage.error('无法获取标签页信息')
   }
+  panelRef.value?.reload()
+
+  // 本窗口本身是 popup 弹窗，最小化后无意义且容易在任务栏留下残留，直接关闭
+  chrome.windows.onFocusChanged.addListener(async (windowId) => {
+    if (windowId !== chrome.windows.WINDOW_ID_NONE) return
+    const win = await chrome.windows.getCurrent()
+    if (win?.state === 'minimized') window.close()
+  })
 })
 
 /** 用户选中某个分组：加入工作组，成功后再关闭原页面 */
@@ -115,11 +123,10 @@ body,
   margin: 0;
 }
 .picker-page {
-  padding: 0;
-}
-/* 弹窗宽度随窗口自适应：即使窗口实际宽度小于预设值，也不会溢出产生横向滚动条
-   （append-to-body 后 el-dialog 被挂到 body 下，需用全局选择器） */
-.el-dialog {
-  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
 }
 </style>
