@@ -33,19 +33,40 @@
         @node-click="onNodeClick"
       >
         <template #default="{ data }">
-          <span
-            class="picker-node"
-            :class="{ 'is-disabled': disabledSet.has(data.id) }"
-            :title="disabledSet.has(data.id) ? '当前不可选择' : ''"
-          >
-            <span class="picker-dot" :style="{ backgroundColor: data.color }" />
-            <span class="picker-name">{{ data.name }}</span>
-            <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
-            <span v-if="manageable" class="picker-node-actions" @click.stop>
-              <el-icon title="重命名" @click="onRenameNode(data)"><Edit /></el-icon>
-              <el-icon title="删除" @click="onDeleteNode(data)"><Delete /></el-icon>
+          <ContextMenu @command="(cmd) => onNodeMenuCommand(cmd, data)">
+            <span
+              class="picker-node"
+              :class="{ 'is-disabled': disabledSet.has(data.id) }"
+              :title="disabledSet.has(data.id) ? '当前不可选择' : ''"
+            >
+              <span class="picker-dot" :style="{ backgroundColor: data.color }" />
+              <span class="picker-name">{{ data.name }}</span>
+              <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
+              <span v-if="manageable" class="picker-node-actions" @click.stop>
+                <el-icon title="重命名" @click="onRenameNode(data)"><Edit /></el-icon>
+                <el-icon title="删除" @click="onDeleteNode(data)"><Delete /></el-icon>
+              </span>
             </span>
-          </span>
+            <template #menu v-if="manageable">
+              <el-dropdown-menu>
+                <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace.isSystem">
+                  编辑
+                </el-dropdown-item>
+                <el-dropdown-item :command="'createChild'" :icon="FolderAdd">
+                  新建子工作组
+                </el-dropdown-item>
+                <el-dropdown-item
+                  :command="'delete'"
+                  :icon="Delete"
+                  divided
+                  class="danger-dropdown-item"
+                  :disabled="data.workspace.isSystem"
+                >
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </ContextMenu>
         </template>
       </el-tree>
     </div>
@@ -76,9 +97,10 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Edit, Delete, FolderAdd } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import ContextMenu from './ContextMenu.vue'
 import type { Workspace, WorkspacesData } from '../types'
 
 const props = withDefaults(defineProps<{
@@ -195,6 +217,42 @@ async function onCreate() {
     await reload()
   } else {
     ElMessage.error(res.error || '创建工作组失败')
+  }
+}
+
+/** 右键「新建子工作组」：创建到指定分组之下 */
+async function onCreateChild(node: WorkspaceTreeNode) {
+  const result = await ElMessageBox.prompt('请输入子工作组名称', '新建子工作组', {
+    confirmButtonText: '创建',
+    inputPlaceholder: '工作组名称',
+    inputValidator: (v) => (v?.trim() ? true : '请输入工作组名称'),
+  }).catch(() => null)
+  if (!result) return
+  const name = String(result.value).trim()
+  const res = await sendMessage({
+    action: 'CREATE_WORKSPACE',
+    payload: { name, color: '#409EFF', parentId: node.id },
+  })
+  if (res.success) {
+    ElMessage.success('子工作组已创建')
+    await reload()
+  } else {
+    ElMessage.error(res.error || '创建子工作组失败')
+  }
+}
+
+/** 树节点右键菜单命令分发 */
+function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
+  switch (command) {
+    case 'edit':
+      onRenameNode(node)
+      break
+    case 'createChild':
+      onCreateChild(node)
+      break
+    case 'delete':
+      onDeleteNode(node)
+      break
   }
 }
 
@@ -369,5 +427,16 @@ async function onDeleteNode(node: WorkspaceTreeNode) {
   background: #f0f2f5;
   border-radius: 8px;
   padding: 0 6px;
+}
+</style>
+
+<style>
+/* 下拉菜单的「删除」项：红字（与 dashboard 一致；菜单渲染在 body 下，需全局样式） */
+.danger-dropdown-item {
+  color: var(--el-color-danger) !important;
+}
+
+.danger-dropdown-item:hover {
+  background-color: var(--el-color-danger-light-9);
 }
 </style>
