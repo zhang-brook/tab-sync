@@ -3,7 +3,6 @@ import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
 import { storage, STORAGE_KEYS } from '../shared/storage'
-import { sendMessage } from '../shared/composables/useMessage'
 
 logger.info('Service Worker started')
 
@@ -75,7 +74,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 async function openPickerWindow(tab: chrome.tabs.Tab) {
   if (!tab.id) return
   const url = chrome.runtime.getURL('src/picker/index.html') + '?tabId=' + tab.id
-  const width = 480
+  const width = 560
   const height = 600
   try {
     const win = await chrome.windows.getLastFocused()
@@ -107,7 +106,9 @@ async function saveTabToWorkspaceAndClose(tab: chrome.tabs.Tab, workspaceId: str
     return
   }
 
-  const res = await sendMessage({
+  // 注意：这里是 background 自身发起操作，不能走 runtime.sendMessage（消息不会投递给自己，
+  // 会报 "Could not establish connection. Receiving end does not exist."），需直接调用消息处理器
+  const res = await handleMessage({
     action: 'ADD_TABS_TO_WORKSPACE',
     payload: {
       workspaceId,
@@ -175,7 +176,8 @@ async function handleSaveAndClose() {
     return
   }
 
-  const res = await sendMessage({
+  // background 自身调用，直接走消息处理器（runtime.sendMessage 不会投递给自己）
+  const res = await handleMessage({
     action: 'ADD_TABS_TO_WORKSPACE',
     payload: { workspaceId: wsId, tabs: [{ chromeTabId: tab.id ?? 0, url: tab.url ?? '', title: tab.title ?? '', favIconUrl: tab.favIconUrl ?? '' }] },
   })

@@ -3,6 +3,7 @@
     <WorkspacePickerDialog
       :model-value="true"
       title="选择分组（加入后关闭当前页）"
+      width="520px"
       @select="onSelect"
       @update:model-value="onCancel"
     />
@@ -100,5 +101,10 @@ body,
 }
 .picker-page {
   padding: 0;
+}
+/* 弹窗宽度随窗口自适应：即使窗口实际宽度小于预设值，也不会溢出产生横向滚动条
+   （append-to-body 后 el-dialog 被挂到 body 下，需用全局选择器） */
+.el-dialog {
+  max-width: calc(100vw - 24px);
 }
 </style>

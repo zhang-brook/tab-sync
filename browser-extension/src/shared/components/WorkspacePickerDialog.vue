@@ -2,7 +2,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="title"
-    width="420px"
+    :width="dialogWidth"
     append-to-body
     @update:model-value="(v: boolean) => emit('update:modelValue', v)"
     @open="onOpen"
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
 import { buildWorkspaceTree, type WorkspaceTreeNode } from '../utils/workspace-tree'
@@ -60,6 +60,8 @@ import type { WorkspacesData } from '../types'
 const props = defineProps<{
   modelValue: boolean
   title?: string
+  /** 弹窗宽度（CSS 宽度值，如 '420px'、'90%'），默认 '420px' */
+  width?: string
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
 }>()
@@ -70,6 +72,7 @@ const emit = defineEmits<{
 }>()
 
 const title = props.title ?? '选择工作组'
+const dialogWidth = props.width ?? '420px'
 
 const loading = ref(false)
 const keyword = ref('')
@@ -101,6 +104,12 @@ async function onOpen() {
   loading.value = false
   await nextTick()
 }
+
+// 注意：初始即以 modelValue=true 挂载时（如 picker 独立弹窗页），Element Plus 不会触发 @open 事件，
+// 需要在此主动加载一次，否则列表会一直显示空占位
+onMounted(() => {
+  if (props.modelValue) onOpen()
+})
 
 function onNodeClick(node: WorkspaceTreeNode) {
   if (disabledSet.value.has(node.id)) return
