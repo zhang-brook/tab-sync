@@ -54,6 +54,10 @@ const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
 // 同一动作在每个上下文需独立 id（追加上下文后缀），点击时按前缀分发
 const MENU_OPEN_SIDEPANEL = 'tab-sync-open-sidepanel'
 const MENU_OPEN_SETTINGS = 'tab-sync-open-settings'
+// 更多选项子菜单（父项带子菜单，子项以 parentId 挂在父项下）
+const MENU_MORE = 'tab-sync-more'
+const MENU_MORE_SHORTCUTS = 'tab-sync-more-shortcuts'
+const MENU_MORE_RELOAD = 'tab-sync-more-reload'
 
 /** 创建右键菜单项（覆盖式重建，避免重复） */
 async function createContextMenus() {
@@ -72,7 +76,7 @@ async function createContextMenus() {
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_DEFAULT,
-      title: '保存到默认分组并关闭（Shift+Alt+S）',
+      title: '保存到 默认分组并关闭（Shift+Alt+S）',
       ...page,
     })
     chrome.contextMenus.create({
@@ -83,14 +87,14 @@ async function createContextMenus() {
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
-      title: '保存到选定分组…（Alt+Shift+G）',
+      title: '保存到 选定分组…（Alt+Shift+G）',
       ...page,
     })
     // 标签页右键
     const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_DEFAULT,
-      title: '保存标签页到默认分组并关闭（Shift+Alt+S）',
+      title: '保存标签页到 默认分组并关闭（Shift+Alt+S）',
       ...tab,
     })
     chrome.contextMenus.create({
@@ -100,7 +104,7 @@ async function createContextMenus() {
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_PICK,
-      title: '保存标签页到选定分组…（Alt+Shift+G）',
+      title: '保存标签页到 选定分组…（Alt+Shift+G）',
       ...tab,
     })
 
@@ -139,6 +143,22 @@ async function createContextMenus() {
         contexts: [ctx],
       })
     }
+    // 更多选项：父项带子菜单（页面/标签页右键末尾）
+    chrome.contextMenus.create({
+      id: MENU_MORE,
+      title: '更多选项',
+      contexts: ['page', 'tab'],
+    })
+    chrome.contextMenus.create({
+      id: MENU_MORE_SHORTCUTS,
+      parentId: MENU_MORE,
+      title: '设置快捷键…',
+    })
+    chrome.contextMenus.create({
+      id: MENU_MORE_RELOAD,
+      parentId: MENU_MORE,
+      title: '重启扩展',
+    })
     logger.info('右键菜单已创建')
   } catch (err) {
     logger.error('创建右键菜单失败:', err)
@@ -161,6 +181,16 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (String(id).startsWith(MENU_OPEN_SETTINGS + '-')) {
     await openSettingsPage()
+    return
+  }
+  if (id === MENU_MORE_SHORTCUTS) {
+    // 快捷键配置页：在激活标签页之后打开
+    await openTabAfterActive('chrome://extensions/shortcuts')
+    return
+  }
+  if (id === MENU_MORE_RELOAD) {
+    // 重启扩展：Service Worker 重载后顶层 createContextMenus 会自动重建菜单
+    chrome.runtime.reload()
     return
   }
   if (!tab) return
