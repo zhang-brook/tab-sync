@@ -75,8 +75,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 async function openPickerWindow(tab: chrome.tabs.Tab) {
   if (!tab.id) return
   const url = chrome.runtime.getURL('src/picker/index.html') + '?tabId=' + tab.id
-  const width = 420
-  const height = 560
+  const width = 480
+  const height = 600
   try {
     const win = await chrome.windows.getLastFocused()
     const left = Math.max(0, Math.round((win.left ?? 0) + ((win.width ?? width) - width) / 2))

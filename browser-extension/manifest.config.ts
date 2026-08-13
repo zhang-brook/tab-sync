@@ -22,7 +22,10 @@ export default defineManifest({
   web_accessible_resources: [
     {
       // 把 src/picker/index.html 加入 web_accessible_resources（CRXJS 只打包在 manifest 中引用的 HTML，不加这一步弹窗页面不会被构建）
-      resources: ['src/picker/index.html'],
+      resources: [
+        'src/picker/index.html',
+        'src/dashboard/index.html',
+      ],
       matches: ['<all_urls>'],
     },
   ],
