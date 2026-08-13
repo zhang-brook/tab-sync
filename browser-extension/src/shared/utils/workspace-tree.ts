@@ -54,6 +54,16 @@ export function buildWorkspaceTree(workspaces: Workspace[]): WorkspaceTreeNode[]
   return roots
 }
 
+/** 在树中查找指定 id 的节点（含各级子节点），找不到返回 null */
+export function findWorkspaceTreeNode(nodes: WorkspaceTreeNode[], id: string): WorkspaceTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    const found = findWorkspaceTreeNode(node.children, id)
+    if (found) return found
+  }
+  return null
+}
+
 /**
  * 收集某个工作组的所有后代 id（不含自身）。
  */

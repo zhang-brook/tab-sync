@@ -15,6 +15,9 @@
     <el-dropdown-item :command="'createChild'" :icon="FolderAdd" divided>
       新建子工作组
     </el-dropdown-item>
+    <el-dropdown-item :command="'setDefault'" :icon="Star" :disabled="data.id === defaultWorkspaceId">
+      设置为默认分组
+    </el-dropdown-item>
     <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem">
       编辑
     </el-dropdown-item>
@@ -25,10 +28,12 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{
   data: WorkspaceTreeNode
+  /** 当前默认分组 ID，与节点 ID 一致时「设置为默认分组」置灰 */
+  defaultWorkspaceId?: string
 }>()
 </script>

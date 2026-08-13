@@ -14,6 +14,7 @@
       :close-tab-label="closeTabLabel"
       :disabled-ids="disabledIds"
       :manageable="manageable"
+      :highlight-default-workspace="highlightDefaultWorkspace"
       @select="onSelect"
       @update:close-tab="onUpdateCloseTab"
       @cancel="onCancel"
@@ -41,6 +42,8 @@ const props = defineProps<{
   disabledIds?: string[]
   /** 启用分组管理：新建 / 重命名 / 删除（不传时透传 undefined，Panel 默认开启） */
   manageable?: boolean
+  /** 打开时默认选中「默认分组」并标注 (默认)；传入 false 则不做默认选中，默认 true */
+  highlightDefaultWorkspace?: boolean
 }>()
 
 const emit = defineEmits<{

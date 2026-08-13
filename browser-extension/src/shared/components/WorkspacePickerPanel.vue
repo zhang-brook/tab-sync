@@ -41,6 +41,7 @@
             >
               <span class="picker-dot" :style="{ backgroundColor: data.color }" />
               <span class="picker-name">{{ data.name }}</span>
+              <span v-if="data.id === defaultWorkspaceId" class="picker-default">(默认)</span>
               <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
               <span v-if="manageable" class="picker-node-actions" @click.stop>
                 <el-icon title="重命名" @click="onRenameNode(data)"><Edit /></el-icon>
@@ -95,11 +96,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Edit, Delete, FolderAdd } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
-import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import { storage, STORAGE_KEYS } from '../storage'
+import { buildWorkspaceTree, collectDescendantIds, findWorkspaceTreeNode, type WorkspaceTreeNode } from '../utils/workspace-tree'
 import ContextMenu from './ContextMenu.vue'
 import type { Workspace, WorkspacesData } from '../types'
 
@@ -116,8 +118,11 @@ const props = withDefaults(defineProps<{
   fillHeight?: boolean
   /** 启用分组管理：顶部「新建工作组」按钮 + 节点悬停重命名/删除（系统分组仍受保护），默认 true */
   manageable?: boolean
+  /** 打开/刷新时默认选中「默认分组」并标注 (默认)；传入 false 则不做默认选中，默认 true */
+  highlightDefaultWorkspace?: boolean
 }>(), {
   manageable: true,
+  highlightDefaultWorkspace: true,
 })
 
 const emit = defineEmits<{
@@ -137,6 +142,10 @@ const treeData = ref<WorkspaceTreeNode[]>([])
 const treeRef = ref()
 /** 确认模式下的当前选中节点（未选中时「确认」按钮禁用） */
 const selectedNode = ref<WorkspaceTreeNode | null>(null)
+/** 当前默认分组 ID（用于「(默认)」标记与初始选中）；空值回退「未分组」 */
+const defaultWorkspaceId = ref('')
+// 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
+const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
 const treeProps = { label: 'name', children: 'children' }
 
@@ -156,9 +165,21 @@ async function reload() {
   keyword.value = ''
   selectedNode.value = null
   loading.value = true
+  if (props.highlightDefaultWorkspace) {
+    defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
+  }
   const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
     treeData.value = buildWorkspaceTree(res.data.workspaces)
+    // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）
+    const defaultNode = defaultWorkspaceId.value
+      ? findWorkspaceTreeNode(treeData.value, defaultWorkspaceId.value)
+      : null
+    if (defaultNode && !disabledSet.value.has(defaultNode.id)) {
+      await nextTick()
+      treeRef.value?.setCurrentKey(defaultNode.id)
+      selectedNode.value = defaultNode
+    }
   } else {
     treeData.value = []
   }
@@ -427,6 +448,12 @@ async function onDeleteNode(node: WorkspaceTreeNode) {
   background: #f0f2f5;
   border-radius: 8px;
   padding: 0 6px;
+}
+
+.picker-default {
+  font-size: 11px;
+  color: #909399;
+  flex-shrink: 0;
 }
 </style>
 

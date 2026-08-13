@@ -56,6 +56,7 @@
               <span class="tree-node">
                 <span class="tree-dot" :style="{ backgroundColor: data.color }" />
                 <span class="tree-name" :title="data.name">{{ data.name }}</span>
+                <span v-if="data.id === defaultWorkspaceId" class="tree-default">(默认)</span>
                 <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
                 <el-dropdown
                   trigger="click"
@@ -66,12 +67,12 @@
                     <el-icon class="dots-vertical"><MoreFilled /></el-icon>
                   </el-button>
                   <template #dropdown>
-                    <NodeDropdownMenu :data="data" />
+                    <NodeDropdownMenu :data="data" :default-workspace-id="defaultWorkspaceId" />
                   </template>
                 </el-dropdown>
               </span>
               <template #menu>
-                <NodeDropdownMenu :data="data" />
+                <NodeDropdownMenu :data="data" :default-workspace-id="defaultWorkspaceId" />
               </template>
             </ContextMenu>
           </template>
@@ -409,6 +410,7 @@ import TabDropdownMenu from '../components/TabDropdownMenu.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '@/shared/types'
@@ -436,6 +438,11 @@ const tagEditorTarget = ref<{ workspaceId: string; tabId?: string } | null>(null
 
 const treeRef = ref()
 const treeProps = { label: 'name', children: 'children' }
+
+// 快捷键「加入并关闭」的默认收藏分组 ID（本地存储）；空值回退到「未分组」
+// 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
+const UNGROUPED_WORKSPACE_ID = 'ungrouped'
+const defaultWorkspaceId = ref('')
 
 // 对话框
 const dialogVisible = ref(false)
@@ -561,7 +568,12 @@ function filterNode(value: string, data: Record<string, unknown>) {
 onMounted(() => {
   loadWorkspaces()
   void loadTabTags()
+  void loadDefaultWorkspaceId()
 })
+
+async function loadDefaultWorkspaceId() {
+  defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
+}
 
 async function loadWorkspaces() {
   loading.value = true
@@ -735,6 +747,9 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'createChild':
       showCreateDialog(ws.id)
       break
+    case 'setDefault':
+      handleSetDefaultWorkspace(ws)
+      break
     case 'edit':
       showEditDialog(ws)
       break
@@ -742,6 +757,13 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
       handleDelete(ws)
       break
   }
+}
+
+/** 设置为默认分组：写入本地存储，供「加入并关闭」等快捷操作使用 */
+async function handleSetDefaultWorkspace(ws: Workspace) {
+  defaultWorkspaceId.value = ws.id
+  await storage.set(STORAGE_KEYS.DEFAULT_WORKSPACE_ID, ws.id)
+  ElMessage.success(`已将「${ws.name}」设为默认分组`)
 }
 
 async function handleSave() {
@@ -1223,6 +1245,12 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   background: #f0f2f5;
   border-radius: 8px;
   padding: 0 6px;
+}
+
+.tree-default {
+  font-size: 11px;
+  color: #909399;
+  flex-shrink: 0;
 }
 
 /* 每个工作组项旁的竖三点按钮 */
