@@ -43,9 +43,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 /** 「未分组」系统工作组的固定标识（见 server/internal/service/workspace.go） */
 const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 // 页面右键菜单
+const MENU_SAVE_DEFAULT = 'tab-sync-save-default'
 const MENU_SAVE_UNGROUPED = 'tab-sync-save-ungrouped'
 const MENU_SAVE_PICK = 'tab-sync-save-pick'
 // 标签页右键菜单（标签页菜单的 contexts 与页面不同，需独立菜单项）
+const MENU_TAB_SAVE_DEFAULT = 'tab-sync-tab-save-default'
 const MENU_TAB_SAVE_UNGROUPED = 'tab-sync-tab-save-ungrouped'
 const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
 // 打开侧栏/设置页：工具栏图标右键（action）+ 页面/标签页右键。contextMenus id 全局唯一，
@@ -63,29 +65,42 @@ async function createContextMenus() {
       documentUrlPatterns: [
         'http://*/*',
         'https://*/*',
+        'file://*/*',
         'chrome://*/*',
+        'chrome-extension://*/*',
       ],
     }
     chrome.contextMenus.create({
+      id: MENU_SAVE_DEFAULT,
+      title: '保存到默认分组并关闭（Shift+Alt+S）',
+      ...page,
+    })
+    chrome.contextMenus.create({
       id: MENU_SAVE_UNGROUPED,
-      title: '保存到 [未分组] 并关闭',
+      // 标题末尾提示快捷键：Chrome 菜单项不支持内联快捷键，实际由 manifest commands 触发
+      title: '保存到 [未分组] 并关闭（Alt+Shift+U）',
       ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
-      title: '保存到选定分组…',
+      title: '保存到选定分组…（Alt+Shift+G）',
       ...page,
     })
     // 标签页右键
     const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
     chrome.contextMenus.create({
+      id: MENU_TAB_SAVE_DEFAULT,
+      title: '保存标签页到默认分组并关闭（Shift+Alt+S）',
+      ...tab,
+    })
+    chrome.contextMenus.create({
       id: MENU_TAB_SAVE_UNGROUPED,
-      title: '保存标签页到 [未分组] 并关闭',
+      title: '保存标签页到 [未分组] 并关闭（Alt+Shift+U）',
       ...tab,
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_PICK,
-      title: '保存标签页到选定分组…',
+      title: '保存标签页到选定分组…（Alt+Shift+G）',
       ...tab,
     })
 
@@ -149,7 +164,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return
   }
   if (!tab) return
-  if (id === MENU_SAVE_UNGROUPED || id === MENU_TAB_SAVE_UNGROUPED) {
+  if (id === MENU_SAVE_DEFAULT || id === MENU_TAB_SAVE_DEFAULT) {
+    await saveToDefaultWorkspaceAndClose(tab)
+  } else if (id === MENU_SAVE_UNGROUPED || id === MENU_TAB_SAVE_UNGROUPED) {
     await saveTabsToWorkspaceAndClose([tab], UNGROUPED_WORKSPACE_ID)
   } else if (id === MENU_SAVE_PICK || id === MENU_TAB_SAVE_PICK) {
     await openPickerWindow([tab])
@@ -256,7 +273,7 @@ async function saveTabsToWorkspaceAndClose(tabs: chrome.tabs.Tab[], workspaceId:
   }
 }
 
-// 快捷键：将当前标签页加入工作组并关闭
+// 快捷键分发。commands.onCommand 回调属于用户手势，打开侧栏需在此同步调用（await 后手势会失效）
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'save-and-close') {
     // 用户可在设置中关闭该快捷键
@@ -264,15 +281,32 @@ chrome.commands.onCommand.addListener((command) => {
       if (!enabled) return
       void handleSaveAndClose()
     })
+  } else if (command === 'open-sidepanel') {
+    if (lastFocusedWindowId != null) {
+      openSidePanel(lastFocusedWindowId)
+    }
+  } else if (command === 'open-settings') {
+    void openSettingsPage()
+  } else if (command === 'save-ungrouped') {
+    void handleSaveUngrouped()
+  } else if (command === 'save-pick') {
+    void handleSavePick()
   }
 })
 
 /**
- * 处理「加入并关闭」快捷键：
- * 1. 取当前激活标签页；2. 校验协议；3. 若已设置默认工作组则收藏并关闭，否则打开侧边栏兜底。
+ * 处理「加入并关闭」快捷键：取当前激活标签页后走 saveToDefaultWorkspaceAndClose。
  */
 async function handleSaveAndClose() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (tab) await saveToDefaultWorkspaceAndClose(tab)
+}
+
+/**
+ * 将标签页保存到用户设置的默认工作组并关闭（右键菜单与快捷键共用）：
+ * 1. 校验协议；2. 未设置默认工作组时打开侧边栏引导；3. 收藏并关闭。
+ */
+async function saveToDefaultWorkspaceAndClose(tab: chrome.tabs.Tab) {
   if (!tab?.url) return
 
   // 仅允许 http(s)/file 页面，浏览器内置页面不支持
@@ -295,12 +329,27 @@ async function handleSaveAndClose() {
     } catch {
       /* ignore */
     }
-    await notify('未设置默认收藏工作组', '请在设置中选择默认工作组后再使用快捷键')
+    await notify('未设置默认收藏工作组', '请在设置中选择默认工作组后再使用')
     return
   }
 
   // background 自身调用，直接走消息处理器（runtime.sendMessage 不会投递给自己）
   await saveTabsToWorkspaceAndClose([tab], wsId)
+}
+
+/** 快捷键：将当前激活标签页保存到 [未分组] 并关闭（Alt+Shift+U） */
+async function handleSaveUngrouped() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab?.url) return
+  // 协议校验与失败通知由 saveTabsToWorkspaceAndClose 内部处理
+  await saveTabsToWorkspaceAndClose([tab], UNGROUPED_WORKSPACE_ID)
+}
+
+/** 快捷键：打开分组选择器，将当前激活标签页保存到选定分组（Alt+Shift+G） */
+async function handleSavePick() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab?.url) return
+  await openPickerWindow([tab])
 }
 
 /** 轻量桌面通知 */
