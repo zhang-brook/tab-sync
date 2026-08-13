@@ -24,7 +24,7 @@ export default defineManifest({
       // 把 src/picker/index.html 加入 web_accessible_resources（CRXJS 只打包在 manifest 中引用的 HTML，不加这一步弹窗页面不会被构建）
       resources: [
         'src/picker/index.html',
-        'src/dashboard/index.html',
+        // 'src/dashboard/index.html',
       ],
       matches: ['<all_urls>'],
     },
@@ -43,6 +43,10 @@ export default defineManifest({
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
+  },
+  "options_ui": {
+    "page": "src/dashboard/index.html",
+    "open_in_tab": true,   // 是否在新标签页打开
   },
   icons: {
     16: 'public/icons/icon-16.png',
