@@ -86,7 +86,11 @@ async function createContextMenus() {
     })
     // 打开侧栏/设置页：在工具栏图标（action）及页面/标签页右键中均提供。
     // 注意：Chrome contextMenus 不支持 tab_groups 上下文（Firefox 才有），无法创建标签组右键菜单
-    const openMenuContexts: chrome.contextMenus.ContextType[] = ['action', 'page', 'tab']
+    const openMenuContexts: chrome.contextMenus.ContextType[] = [
+      chrome.contextMenus.ContextType.ACTION,
+      chrome.contextMenus.ContextType.PAGE,
+      chrome.contextMenus.ContextType.TAB
+    ]
     for (const ctx of openMenuContexts) {
       chrome.contextMenus.create({
         id: `${MENU_OPEN_SIDEPANEL}-${ctx}`,
