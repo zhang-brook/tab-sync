@@ -46,9 +46,10 @@ const MENU_SAVE_PICK = 'tab-sync-save-pick'
 // 标签页右键菜单（标签页菜单的 contexts 与页面不同，需独立菜单项）
 const MENU_TAB_SAVE_UNGROUPED = 'tab-sync-tab-save-ungrouped'
 const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
-// 标签组右键菜单
-const MENU_GROUP_SAVE_UNGROUPED = 'tab-sync-group-save-ungrouped'
-const MENU_GROUP_SAVE_PICK = 'tab-sync-group-save-pick'
+// 打开侧栏/设置页：工具栏图标右键（action）+ 页面/标签页右键。contextMenus id 全局唯一，
+// 同一动作在每个上下文需独立 id（追加上下文后缀），点击时按前缀分发
+const MENU_OPEN_SIDEPANEL = 'tab-sync-open-sidepanel'
+const MENU_OPEN_SETTINGS = 'tab-sync-open-settings'
 
 /** 创建右键菜单项（覆盖式重建，避免重复） */
 async function createContextMenus() {
@@ -81,20 +82,21 @@ async function createContextMenus() {
       title: '保存标签页到选定分组…',
       ...tab,
     })
-    // 标签组右键（当前 @types/chrome 未收录 'tab_groups'，实际为 Chrome 89+ 支持的上下文类型）
-    const group: chrome.contextMenus.CreateProperties = {
-      contexts: ['tab_groups' as chrome.contextMenus.ContextType],
+    // 打开侧栏/设置页：在工具栏图标（action）及页面/标签页右键中均提供。
+    // 注意：Chrome contextMenus 不支持 tab_groups 上下文（Firefox 才有），无法创建标签组右键菜单
+    const openMenuContexts: chrome.contextMenus.ContextType[] = ['action', 'page', 'tab']
+    for (const ctx of openMenuContexts) {
+      chrome.contextMenus.create({
+        id: `${MENU_OPEN_SIDEPANEL}-${ctx}`,
+        title: '打开侧栏',
+        contexts: [ctx],
+      })
+      chrome.contextMenus.create({
+        id: `${MENU_OPEN_SETTINGS}-${ctx}`,
+        title: '打开设置页',
+        contexts: [ctx],
+      })
     }
-    chrome.contextMenus.create({
-      id: MENU_GROUP_SAVE_UNGROUPED,
-      title: '保存标签组到 [未分组] 并关闭',
-      ...group,
-    })
-    chrome.contextMenus.create({
-      id: MENU_GROUP_SAVE_PICK,
-      title: '保存标签组到选定分组…',
-      ...group,
-    })
     logger.info('右键菜单已创建')
   } catch (err) {
     logger.error('创建右键菜单失败:', err)
@@ -103,29 +105,61 @@ async function createContextMenus() {
 
 /** 右键菜单点击分发 */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (!tab) return
   const id = info.menuItemId
+  // 打开侧栏/设置页按前缀分发（三个上下文各一个 id）；action 上下文点击时没有关联 tab，需在 tab 判空之前处理
+  if (String(id).startsWith(MENU_OPEN_SIDEPANEL + '-')) {
+    // sidePanel.open 必须在用户手势内同步调用，await 异步 API 后手势会失效：
+    // 页面/标签页上下文直接用 tab.windowId，action 上下文无 tab，用 onFocusChanged 缓存的最近聚焦窗口
+    if (tab?.windowId != null) {
+      openSidePanel(tab.windowId)
+    } else if (lastFocusedWindowId != null) {
+      openSidePanel(lastFocusedWindowId)
+    }
+    return
+  }
+  if (String(id).startsWith(MENU_OPEN_SETTINGS + '-')) {
+    await openSettingsPage()
+    return
+  }
+  if (!tab) return
   if (id === MENU_SAVE_UNGROUPED || id === MENU_TAB_SAVE_UNGROUPED) {
     await saveTabsToWorkspaceAndClose([tab], UNGROUPED_WORKSPACE_ID)
   } else if (id === MENU_SAVE_PICK || id === MENU_TAB_SAVE_PICK) {
     await openPickerWindow([tab])
-  } else if (id === MENU_GROUP_SAVE_UNGROUPED) {
-    const tabs = await getGroupTabs(tab)
-    if (tabs) await saveTabsToWorkspaceAndClose(tabs, UNGROUPED_WORKSPACE_ID)
-  } else if (id === MENU_GROUP_SAVE_PICK) {
-    const tabs = await getGroupTabs(tab)
-    if (tabs) await openPickerWindow(tabs)
   }
 })
 
-/** 取右键所在标签组的所有标签页（右键回调里的 tab 是组内标签页之一，经 groupId 反查整组） */
-async function getGroupTabs(tab: chrome.tabs.Tab): Promise<chrome.tabs.Tab[] | null> {
-  const groupId = tab.groupId
-  if (groupId == null || groupId < 0) {
-    await notify('无法保存标签组', '未能获取标签组信息')
-    return null
+// sidePanel.open 要求用户手势内同步调用，action 上下文菜单无 tab 可用，
+// 故缓存最近聚焦窗口的 ID 供其使用（启动时预热一次）
+let lastFocusedWindowId: number | undefined
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+    lastFocusedWindowId = windowId
   }
-  return chrome.tabs.query({ groupId })
+})
+void chrome.windows.getLastFocused().then((win) => {
+  if (win.id != null) lastFocusedWindowId = win.id
+})
+
+/** 同步打开侧边栏（不 await 以保留用户手势；失败仅记日志） */
+function openSidePanel(windowId: number) {
+  chrome.sidePanel.open({ windowId }).catch((err) => logger.error('打开侧边栏失败:', err))
+}
+
+/** 打开 Dashboard 设置页（已打开则激活并切换到设置路由，否则新建标签页） */
+async function openSettingsPage() {
+  const baseUrl = chrome.runtime.getURL('src/dashboard/index.html')
+  const settingsUrl = baseUrl + '#/settings'
+  // match pattern 不匹配 URL fragment，带 hash 的现有 Dashboard 标签页也能查到
+  const tabs = await chrome.tabs.query({ url: baseUrl + '*' })
+  if (tabs.length > 0 && tabs[0].id != null) {
+    await chrome.tabs.update(tabs[0].id, { active: true, url: settingsUrl })
+    if (tabs[0].windowId != null) {
+      await chrome.windows.update(tabs[0].windowId, { focused: true })
+    }
+  } else {
+    await chrome.tabs.create({ url: settingsUrl })
+  }
 }
 
 /** 在居中弹窗中打开分组选择器，选中后再加入并关闭原标签页（支持标签组批量） */
