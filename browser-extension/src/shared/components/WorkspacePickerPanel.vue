@@ -1,12 +1,21 @@
 <template>
   <div class="picker-panel" :class="{ 'is-fill': fillHeight }">
-    <el-input
-      v-model="keyword"
-      placeholder="搜索工作组..."
-      size="default"
-      clearable
-      :prefix-icon="Search"
-    />
+    <div class="picker-toolbar">
+      <el-input
+        v-model="keyword"
+        placeholder="搜索工作组..."
+        size="default"
+        clearable
+        :prefix-icon="Search"
+      />
+      <el-button
+        v-if="manageable"
+        circle
+        :icon="Plus"
+        title="新建工作组"
+        @click="onCreate"
+      />
+    </div>
 
     <div class="picker-tree">
       <div v-if="loading" class="picker-hint">加载中...</div>
@@ -32,6 +41,10 @@
             <span class="picker-dot" :style="{ backgroundColor: data.color }" />
             <span class="picker-name">{{ data.name }}</span>
             <span v-if="data.tabCount" class="picker-count">{{ data.tabCount }}</span>
+            <span v-if="manageable" class="picker-node-actions" @click.stop>
+              <el-icon title="重命名" @click="onRenameNode(data)"><Edit /></el-icon>
+              <el-icon title="删除" @click="onDeleteNode(data)"><Delete /></el-icon>
+            </span>
           </span>
         </template>
       </el-tree>
@@ -62,12 +75,13 @@
 
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
-import { buildWorkspaceTree, type WorkspaceTreeNode } from '../utils/workspace-tree'
-import type { WorkspacesData } from '../types'
+import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import type { Workspace, WorkspacesData } from '../types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** 确认模式：点击节点仅选中，需点击「确认」后才触发 select；默认 false（选中即触发） */
   confirmable?: boolean
   /** 确认模式下底部复选框是否勾选（如「加入后关闭当前页」），默认 true */
@@ -78,7 +92,11 @@ const props = defineProps<{
   disabledIds?: string[]
   /** 撑满父容器高度：树区自动拉伸，底部按钮区吸到容器底部（弹窗版不传） */
   fillHeight?: boolean
-}>()
+  /** 启用分组管理：顶部「新建工作组」按钮 + 节点悬停重命名/删除（系统分组仍受保护），默认 true */
+  manageable?: boolean
+}>(), {
+  manageable: true,
+})
 
 const emit = defineEmits<{
   (e: 'select', node: WorkspaceTreeNode): void
@@ -149,6 +167,89 @@ function onConfirm() {
   if (!selectedNode.value) return
   emit('select', selectedNode.value)
 }
+
+// ============ 分组管理（新建 / 重命名 / 删除） ============
+
+/** 将树节点拍平为原始工作组列表（用于统计删除影响范围） */
+function flattenWorkspaces(nodes: WorkspaceTreeNode[]): Workspace[] {
+  const out: Workspace[] = []
+  for (const node of nodes) {
+    out.push(node.workspace)
+    out.push(...flattenWorkspaces(node.children))
+  }
+  return out
+}
+
+/** 顶部「新建工作组」：默认创建在顶层（parentId 为空） */
+async function onCreate() {
+  const result = await ElMessageBox.prompt('请输入工作组名称', '新建工作组', {
+    confirmButtonText: '创建',
+    inputPlaceholder: '工作组名称',
+    inputValidator: (v) => (v?.trim() ? true : '请输入工作组名称'),
+  }).catch(() => null)
+  if (!result) return
+  const name = String(result.value).trim()
+  const res = await sendMessage({ action: 'CREATE_WORKSPACE', payload: { name, color: '#409EFF' } })
+  if (res.success) {
+    ElMessage.success('工作组已创建')
+    await reload()
+  } else {
+    ElMessage.error(res.error || '创建工作组失败')
+  }
+}
+
+/** 节点悬停「重命名」：仅修改名称，其余字段保持不变 */
+async function onRenameNode(node: WorkspaceTreeNode) {
+  if (node.workspace.isSystem) {
+    ElMessage.warning('系统分组不可改名')
+    return
+  }
+  const result = await ElMessageBox.prompt('请输入新的工作组名称', '重命名工作组', {
+    confirmButtonText: '保存',
+    inputValue: node.name,
+    inputValidator: (v) => (v?.trim() ? true : '请输入工作组名称'),
+  }).catch(() => null)
+  if (!result) return
+  const name = String(result.value).trim()
+  if (!name || name === node.name) return
+  const res = await sendMessage({ action: 'UPDATE_WORKSPACE', payload: { id: node.id, name } })
+  if (res.success) {
+    ElMessage.success('工作组已重命名')
+    await reload()
+  } else {
+    ElMessage.error(res.error || '重命名失败')
+  }
+}
+
+/** 节点悬停「删除」：确认时提示子分组与标签页将一并删除（与服务端递归删除行为一致） */
+async function onDeleteNode(node: WorkspaceTreeNode) {
+  if (node.workspace.isSystem) {
+    ElMessage.warning('系统分组不可删除')
+    return
+  }
+  const flat = flattenWorkspaces(treeData.value)
+  const descendantIds = collectDescendantIds(flat, node.id)
+  const childCount = descendantIds.length
+  const tabCount = flat
+    .filter((w) => w.id === node.id || descendantIds.includes(w.id))
+    .reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0)
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除工作组「${node.name}」吗？其 ${childCount} 个子工作组及全部 ${tabCount} 个标签页将一并删除，且不可恢复。`,
+      '删除工作组',
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: node.id } })
+  if (res.success) {
+    ElMessage.success('工作组已删除')
+    await reload()
+  } else {
+    ElMessage.error(res.error || '删除工作组失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -164,6 +265,45 @@ function onConfirm() {
   flex: 1;
   min-height: 0;
   max-height: none;
+}
+
+.picker-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.picker-toolbar .el-input {
+  flex: 1;
+}
+
+.picker-node-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.picker-node:hover .picker-node-actions {
+  display: flex;
+}
+
+.picker-node-actions .el-icon {
+  cursor: pointer;
+  color: #909399;
+  font-size: 14px;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.picker-node-actions .el-icon:hover {
+  color: #409eff;
+  background: #ecf5ff;
+}
+
+.picker-node-actions .el-icon:last-child:hover {
+  color: #f56c6c;
+  background: #fef0f0;
 }
 
 .picker-footer {

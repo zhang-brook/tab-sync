@@ -13,6 +13,7 @@
       :close-tab="closeTab"
       :close-tab-label="closeTabLabel"
       :disabled-ids="disabledIds"
+      :manageable="manageable"
       @select="onSelect"
       @update:close-tab="onUpdateCloseTab"
       @cancel="onCancel"
@@ -38,6 +39,8 @@ const props = defineProps<{
   closeTabLabel?: string
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
+  /** 启用分组管理：新建 / 重命名 / 删除（不传时透传 undefined，Panel 默认开启） */
+  manageable?: boolean
 }>()
 
 const emit = defineEmits<{
