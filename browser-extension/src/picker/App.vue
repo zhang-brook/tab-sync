@@ -2,8 +2,10 @@
   <div class="picker-page">
     <WorkspacePickerDialog
       :model-value="true"
-      title="选择分组（加入后关闭当前页）"
+      title="选择分组"
       width="520px"
+      confirmable
+      v-model:close-tab="closeTab"
       @select="onSelect"
       @update:model-value="onCancel"
     />
@@ -19,6 +21,8 @@ import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 const tabId = ref<number | null>(null)
 const currentTab = ref<chrome.tabs.Tab | null>(null)
+/** 「加入后关闭当前页」开关（底部复选框），默认勾选 */
+const closeTab = ref(true)
 // 标记是否处于「已选中、正在提交」状态，避免提交过程中被取消关闭
 let selecting = false
 
@@ -65,11 +69,13 @@ async function onSelect(node: WorkspaceTreeNode) {
     })
 
     if (res.success) {
-      // 确保成功添加后再关闭当前页面
-      try {
-        await chrome.tabs.remove(tabId.value)
-      } catch {
-        /* 标签可能已关闭，忽略 */
+      // 按「加入后关闭当前页」开关决定是否关闭原页面
+      if (closeTab.value) {
+        try {
+          await chrome.tabs.remove(tabId.value)
+        } catch {
+          /* 标签可能已关闭，忽略 */
+        }
       }
       window.close()
     } else if (res.authError) {

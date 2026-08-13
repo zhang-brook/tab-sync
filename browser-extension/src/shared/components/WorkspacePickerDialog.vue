@@ -45,7 +45,26 @@
     </div>
 
     <template #footer>
-      <el-button @click="emit('update:modelValue', false)">取消</el-button>
+      <div class="picker-footer">
+        <el-checkbox
+          v-if="confirmable"
+          :model-value="closeTabModel"
+          @update:model-value="onCloseTabChange"
+        >
+          {{ closeTabLabel }}
+        </el-checkbox>
+        <div class="picker-footer-actions">
+          <el-button @click="emit('update:modelValue', false)">取消</el-button>
+          <el-button
+            v-if="confirmable"
+            type="primary"
+            :disabled="!selectedNode"
+            @click="onConfirm"
+          >
+            确认
+          </el-button>
+        </div>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -62,6 +81,12 @@ const props = defineProps<{
   title?: string
   /** 弹窗宽度（CSS 宽度值，如 '420px'、'90%'），默认 '420px' */
   width?: string
+  /** 确认模式：点击节点仅选中，需点击「确认」后才触发 select；默认 false（选中即触发） */
+  confirmable?: boolean
+  /** 确认模式下底部复选框是否勾选（如「加入后关闭当前页」），默认 true */
+  closeTab?: boolean
+  /** 确认模式下底部复选框文案，默认「加入后关闭当前页」 */
+  closeTabLabel?: string
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
 }>()
@@ -69,15 +94,21 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'select', node: WorkspaceTreeNode): void
+  (e: 'update:closeTab', v: boolean): void
 }>()
 
 const title = props.title ?? '选择工作组'
 const dialogWidth = props.width ?? '420px'
+const closeTabLabel = props.closeTabLabel ?? '加入后关闭当前页'
+
+const closeTabModel = computed(() => props.closeTab ?? true)
 
 const loading = ref(false)
 const keyword = ref('')
 const treeData = ref<WorkspaceTreeNode[]>([])
 const treeRef = ref()
+/** 确认模式下的当前选中节点（未选中时「确认」按钮禁用） */
+const selectedNode = ref<WorkspaceTreeNode | null>(null)
 
 const treeProps = { label: 'name', children: 'children' }
 
@@ -94,6 +125,7 @@ const disabledSet = computed(() => new Set(props.disabledIds || []))
 
 async function onOpen() {
   keyword.value = ''
+  selectedNode.value = null
   loading.value = true
   const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
@@ -113,12 +145,39 @@ onMounted(() => {
 
 function onNodeClick(node: WorkspaceTreeNode) {
   if (disabledSet.value.has(node.id)) return
+  if (props.confirmable) {
+    // 确认模式：仅记录选中项，「确认」按钮点击后才触发 select
+    selectedNode.value = node
+    return
+  }
   emit('select', node)
   emit('update:modelValue', false)
+}
+
+/** 底部复选框切换（el-checkbox 的 update:modelValue 参数可能是 boolean/string/number，统一转 boolean） */
+function onCloseTabChange(v: boolean | string | number) {
+  emit('update:closeTab', !!v)
+}
+
+/** 确认模式下点击「确认」：提交当前选中项（是否关闭弹窗由父组件决定） */
+function onConfirm() {
+  if (!selectedNode.value) return
+  emit('select', selectedNode.value)
 }
 </script>
 
 <style scoped>
+.picker-footer {
+  display: flex;
+  align-items: center;
+}
+
+.picker-footer-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .picker-tree {
   margin-top: 12px;
   max-height: 320px;
