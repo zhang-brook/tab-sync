@@ -84,3 +84,44 @@ func TestTagService_List_TabCount(t *testing.T) {
 		}
 	}
 }
+
+func TestTagService_Update_ClearColor(t *testing.T) {
+	db, _ := setupTestDB(t)
+	tagSvc := NewTagService(db)
+
+	tag, err := tagSvc.Create("有颜色", "#FF0000", "tab", "")
+	if err != nil {
+		t.Fatalf("创建标签失败: %v", err)
+	}
+
+	// 清空颜色（传空字符串）
+	updated, err := tagSvc.Update(tag.ID, "", "", "")
+	if err != nil {
+		t.Fatalf("更新标签失败: %v", err)
+	}
+	if updated.Color != "" {
+		t.Errorf("清空颜色后响应中仍保留颜色: got %q, want \"\"", updated.Color)
+	}
+
+	// 重新从数据库读取确认持久化（对应前端“刷新列表后颜色恢复”场景）
+	tags, err := tagSvc.List("tab")
+	if err != nil {
+		t.Fatalf("列出标签失败: %v", err)
+	}
+	var found *TagResponse
+	for i := range tags {
+		if tags[i].ID == tag.ID {
+			found = &tags[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("未找到更新后的标签")
+	}
+	if found.Color != "" {
+		t.Errorf("刷新后颜色恢复: got %q, want \"\"", found.Color)
+	}
+	if found.Name != "有颜色" {
+		t.Errorf("名称被意外修改: got %q, want \"有颜色\"", found.Name)
+	}
+}

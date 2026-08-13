@@ -69,10 +69,9 @@ func (s *TagService) Update(id uint, name, color, description string) (*TagRespo
 	if name != "" {
 		tag.Name = name
 	}
-	if color != "" {
-		tag.Color = color
-	}
-	// 仅当用户主动设置描述时才更新（传空字符串表示清除描述）
+	// 空字符串表示清除颜色
+	tag.Color = color
+	// 空字符串表示清除描述
 	tag.Description = description
 	if err := s.db.Save(&tag).Error; err != nil {
 		return nil, err

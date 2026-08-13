@@ -103,7 +103,7 @@
           <el-input v-model="tagForm.name" placeholder="标签名称" maxlength="32" show-word-limit />
         </el-form-item>
         <el-form-item label="颜色">
-          <el-color-picker v-model="tagForm.color" />
+          <el-color-picker v-model="tagForm.color" color-format="hex" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -272,10 +272,12 @@ function openEdit(tag: TagInfo) {
 async function saveTag() {
   const name = tagForm.name.trim()
   if (!name || !editingTag.value) return
+  // 清空颜色时 picker 值为 undefined，归一化为空字符串以告知后端清除颜色
+  const color = tagForm.color || ''
   try {
     const res = await sendMessage({
       action: 'UPDATE_TAG',
-      payload: { tagId: editingTag.value.id, name, color: tagForm.color, description: tagForm.description },
+      payload: { tagId: editingTag.value.id, name, color, description: tagForm.description },
     })
     if (res.success) {
       ElMessage.success('已更新标签')
@@ -283,11 +285,11 @@ async function saveTag() {
       // 更新本地列表中的标签信息
       const idx = tags.value.findIndex(t => t.id === editingTag.value!.id)
       if (idx !== -1) {
-        tags.value[idx] = { ...tags.value[idx], name, color: tagForm.color, description: tagForm.description }
+        tags.value[idx] = { ...tags.value[idx], name, color, description: tagForm.description }
       }
       // 更新右侧选中的标签信息
       if (selectedTag.value?.id === editingTag.value!.id) {
-        selectedTag.value = { ...selectedTag.value, name, color: tagForm.color, description: tagForm.description }
+        selectedTag.value = { ...selectedTag.value, name, color, description: tagForm.description }
       }
     } else if (res.authError) {
       ElMessage.warning('未连接到后端')
