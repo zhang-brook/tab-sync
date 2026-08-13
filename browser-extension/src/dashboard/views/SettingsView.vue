@@ -182,11 +182,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from '../../shared/composables/useMessage'
-import { storage, STORAGE_KEYS } from '../../shared/storage'
-import type { StateData, WorkspacesData, Workspace } from '../../shared/types'
-import WorkspacePickerDialog from '../../shared/components/WorkspacePickerDialog.vue'
-import type { WorkspaceTreeNode as WsNode } from '../../shared/utils/workspace-tree'
+import { sendMessage } from '@/shared/composables/useMessage'
+import { storage, STORAGE_KEYS } from '@/shared/storage'
+import type { StateData, WorkspacesData, Workspace } from '@/shared/types'
+import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import type { WorkspaceTreeNode as WsNode } from '@/shared/utils/workspace-tree'
 
 const apiBaseUrl = ref('')
 const deviceId = ref('')

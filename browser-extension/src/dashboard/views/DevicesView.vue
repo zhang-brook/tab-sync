@@ -94,8 +94,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Monitor } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from '../../shared/composables/useMessage'
-import type { Device, DevicesData, StateData } from '../../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import type { Device, DevicesData, StateData } from '@/shared/types'
 
 const allDevices = ref<Device[]>([])
 const tabCount = ref({ open: 0, frozen: 0 })

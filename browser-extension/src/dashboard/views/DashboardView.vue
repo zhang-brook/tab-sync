@@ -88,8 +88,8 @@ import {
   Files,
   Refresh,
 } from '@element-plus/icons-vue'
-import { sendMessage } from '../../shared/composables/useMessage'
-import type { StateData, DevicesData, WorkspacesData, TagsData } from '../../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import type { StateData, DevicesData, WorkspacesData, TagsData } from '@/shared/types'
 
 interface DashboardStats {
   devices: number

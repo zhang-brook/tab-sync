@@ -66,8 +66,8 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Delete } from '@element-plus/icons-vue'
-import { sendMessage } from '../../shared/composables/useMessage'
-import type { TagInfo, TagsData } from '../../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import type { TagInfo, TagsData } from '@/shared/types'
 
 const props = defineProps<{
   modelValue: boolean

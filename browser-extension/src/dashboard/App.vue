@@ -88,9 +88,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
-import { sendMessage } from '../shared/composables/useMessage'
-import { STORAGE_KEYS } from '../shared/storage'
-import type { StateData } from '../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import { STORAGE_KEYS } from '@/shared/storage'
+import type { StateData } from '@/shared/types'
 
 const route = useRoute()
 

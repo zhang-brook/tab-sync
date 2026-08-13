@@ -69,8 +69,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Delete, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from '../../shared/composables/useMessage'
-import type { RecycleBinData, RecycleBinTab } from '../../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import type { RecycleBinData, RecycleBinTab } from '@/shared/types'
 
 const items = ref<RecycleBinTab[]>([])
 const loading = ref(true)

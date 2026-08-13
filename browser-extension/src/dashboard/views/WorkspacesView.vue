@@ -408,12 +408,12 @@ import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from '../../shared/composables/useMessage'
-import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '../../shared/utils/workspace-tree'
-import { openTabAfterActive } from '../../shared/utils/tab-utils'
-import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '../../shared/types'
+import { sendMessage } from '@/shared/composables/useMessage'
+import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '@/shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
-import WorkspacePickerDialog from '../../shared/components/WorkspacePickerDialog.vue'
+import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
