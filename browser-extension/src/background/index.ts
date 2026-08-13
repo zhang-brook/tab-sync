@@ -6,6 +6,15 @@ import { storage, STORAGE_KEYS } from '../shared/storage'
 
 logger.info('Service Worker started')
 
+/**
+ * 初始化右键菜单
+ *
+ * 每次 Service Worker 启动都重建右键菜单（createContextMenus 内部先 removeAll，幂等）：
+ * onInstalled 只在安装/更新时触发一次，reload 扩展时若 dev server 尚未就绪，
+ * worker 加载失败会跳过菜单创建且无法恢复，因此在顶层兜底重建
+ */
+void createContextMenus() // 对表达式求值，但把结果丢弃，返回 undefined
+
 // 点击工具栏图标时打开侧边栏（已移除 popup，故 onClicked 会触发）
 chrome.action.onClicked.addListener(async (tab) => {
   if (tab.windowId !== undefined) {
@@ -25,8 +34,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Device ID:', deviceId, 'Name:', deviceName)
   // 尝试向后端注册设备（后端未部署时静默失败）
   await tryRegisterDevice(deviceId)
-  // 初始化右键菜单
-  await createContextMenus()
 })
 
 // ============ 右键菜单：保存到 Tab Sync 并关闭 ============
