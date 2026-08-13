@@ -264,7 +264,8 @@ function openEdit(tag: TagInfo) {
   dialogMode.value = 'edit'
   editingTag.value = tag
   tagForm.name = tag.name
-  tagForm.color = tag.color || '#409EFF'
+  // 无颜色时保持为空，避免编辑未设置颜色的标签时被默认蓝色覆盖
+  tagForm.color = tag.color || ''
   tagForm.description = tag.description || ''
   dialogVisible.value = true
 }
