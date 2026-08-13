@@ -227,7 +227,7 @@
           </div>
         </el-form-item>
         <el-form-item label="标识色">
-          <el-color-picker v-model="formData.color" :predefine="presetColors" />
+          <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -748,7 +748,8 @@ async function handleSave() {
       payload: {
         id: editingId.value,
         name: formData.value.name.trim(),
-        color: formData.value.color,
+        // 清空颜色时 picker 值为 undefined，归一化为空字符串以告知后端清除颜色
+        color: formData.value.color || '',
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
       },
@@ -761,7 +762,7 @@ async function handleSave() {
       action: 'CREATE_WORKSPACE',
       payload: {
         name: formData.value.name.trim(),
-        color: formData.value.color,
+        color: formData.value.color || '',
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
       },
