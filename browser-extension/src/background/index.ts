@@ -1,6 +1,7 @@
 import { handleMessage } from './message-handler'
 import { logger } from '../shared/utils/logger'
 import { openTabAfterActive } from '../shared/utils/tab-utils'
+import { DASHBOARD_URL, PICKER_URL } from '../shared/utils/pages'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
 import { storage, STORAGE_KEYS } from '../shared/storage'
@@ -149,7 +150,7 @@ function openSidePanel(windowId: number) {
 
 /** 打开 Dashboard 设置页（已打开则激活并切换到设置路由，否则新建标签页） */
 async function openSettingsPage() {
-  const baseUrl = chrome.runtime.getURL('src/dashboard/index.html')
+  const baseUrl = DASHBOARD_URL
   const settingsUrl = baseUrl + '#/settings'
   // match pattern 不匹配 URL fragment，带 hash 的现有 Dashboard 标签页也能查到
   const tabs = await chrome.tabs.query({ url: baseUrl + '*' })
@@ -168,7 +169,7 @@ async function openSettingsPage() {
 async function openPickerWindow(tabs: chrome.tabs.Tab[]) {
   const ids = tabs.map((t) => t.id).filter((id): id is number => id != null)
   if (ids.length === 0) return
-  const url = chrome.runtime.getURL('src/picker/index.html') + '?tabIds=' + ids.join(',')
+  const url = PICKER_URL + '?tabIds=' + ids.join(',')
   const width = 560
   const height = 600
   try {

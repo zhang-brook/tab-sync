@@ -8,6 +8,7 @@ import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addW
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { openTabAfterActive, openTabsAfterActive } from '../shared/utils/tab-utils'
+import { DASHBOARD_URL } from '../shared/utils/pages'
 import { logger } from '../shared/utils/logger'
 
 /**
@@ -238,7 +239,7 @@ async function handleSetConnectionMode(
 
 /** 打开 Dashboard 管理面板 */
 async function handleOpenDashboard(): Promise<MessageResponse> {
-  const dashboardUrl = chrome.runtime.getURL('src/dashboard/index.html')
+  const dashboardUrl = DASHBOARD_URL
 
   // 检查是否已经有打开的 Dashboard 标签页，避免重复打开
   const tabs = await chrome.tabs.query({ url: dashboardUrl })

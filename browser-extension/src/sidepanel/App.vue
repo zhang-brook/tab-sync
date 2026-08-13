@@ -172,6 +172,7 @@ import { Search, Close, Loading, CaretRight, Monitor, Aim } from '@element-plus/
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { DASHBOARD_URL } from '@/shared/utils/pages'
 import LoginPanel from '@/shared/components/LoginPanel.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import type { StateData } from '@/shared/types'
@@ -259,7 +260,7 @@ async function logout() {
 }
 
 async function openSettings() {
-  const url = chrome.runtime.getURL('src/dashboard/index.html') + '#/settings'
+  const url = DASHBOARD_URL + '#/settings'
   await openTabAfterActive(url)
 }
 
