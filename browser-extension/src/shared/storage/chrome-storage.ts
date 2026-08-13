@@ -18,7 +18,8 @@ const DEFAULTS: StorageSchema = {
   [STORAGE_KEYS.DEVICE_ID]: null,
   [STORAGE_KEYS.DEVICE_NAME]: null,
   [STORAGE_KEYS.API_BASE_URL]: '',
-  [STORAGE_KEYS.DEFAULT_WORKSPACE_ID]: '',
+  // 默认收藏工作组初始为「未分组」系统工作组（见 background/index.ts UNGROUPED_WORKSPACE_ID）
+  [STORAGE_KEYS.DEFAULT_WORKSPACE_ID]: 'ungrouped',
   [STORAGE_KEYS.SHORTCUT_ENABLED]: true,
 }
 

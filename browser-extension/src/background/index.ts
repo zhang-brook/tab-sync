@@ -333,8 +333,8 @@ async function handleSaveAndClose() {
 }
 
 /**
- * 将标签页保存到用户设置的默认工作组并关闭（右键菜单与快捷键共用）：
- * 1. 校验协议；2. 未设置默认工作组时打开侧边栏引导；3. 收藏并关闭。
+ * 将标签页保存到默认收藏工作组并关闭（右键菜单与快捷键共用）：
+ * 1. 校验协议；2. 默认工作组初始为「未分组」，空值（历史数据）回退到「未分组」；3. 收藏并关闭。
  */
 async function saveToDefaultWorkspaceAndClose(tab: chrome.tabs.Tab) {
   if (!tab?.url) return
@@ -351,17 +351,7 @@ async function saveToDefaultWorkspaceAndClose(tab: chrome.tabs.Tab) {
     return
   }
 
-  const wsId = await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)
-  if (!wsId) {
-    // 兜底：打开侧边栏引导用户设置默认工作组
-    try {
-      await chrome.sidePanel.open({ windowId: tab.windowId })
-    } catch {
-      /* ignore */
-    }
-    await notify('未设置默认收藏工作组', '请在设置中选择默认工作组后再使用')
-    return
-  }
+  const wsId = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
 
   // background 自身调用，直接走消息处理器（runtime.sendMessage 不会投递给自己）
   await saveTabsToWorkspaceAndClose([tab], wsId)

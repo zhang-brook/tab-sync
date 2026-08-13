@@ -79,14 +79,10 @@
         </el-form-item>
         <el-form-item label="默认工作组">
           <div class="ws-picker-row">
-            <el-button @click="defaultPickerVisible = true">
-              {{ defaultWorkspaceName || '选择默认收藏工作组' }}
-            </el-button>
-            <el-button v-if="defaultWorkspaceId" text type="danger" @click="clearDefaultWorkspace">
-              清除
-            </el-button>
+            <span class="ws-current">{{ defaultWorkspaceName }}</span>
+            <el-button size="small" @click="defaultPickerVisible = true">修改</el-button>
           </div>
-          <div class="form-tip">未设置时，快捷键会打开侧边栏引导选择</div>
+          <div class="form-tip">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
         </el-form-item>
       </el-form>
     </el-card>
@@ -199,6 +195,8 @@ const versionChecking = ref(false)
 // 快捷键「加入并关闭」默认工作组
 const defaultWorkspaceId = ref('')
 const workspaceOptions = ref<Workspace[]>([])
+// 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
+const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
 // 是否启用「加入并关闭」快捷键
 const shortcutEnabled = ref(true)
@@ -206,17 +204,15 @@ const shortcutEnabled = ref(true)
 // 默认收藏工作组（通过公共分组选择器选择，支持树状展示与禁用）
 const defaultPickerVisible = ref(false)
 const defaultWorkspaceName = computed(() => {
-  if (!defaultWorkspaceId.value) return ''
-  return workspaceOptions.value.find((w) => w.id === defaultWorkspaceId.value)?.name ?? ''
+  // 初始/未设置时默认「未分组」；用户自定义组按 ID 查名称，查不到（后端未连接）时回退展示「未分组」
+  const id = defaultWorkspaceId.value || UNGROUPED_WORKSPACE_ID
+  if (id === UNGROUPED_WORKSPACE_ID) return '未分组'
+  return workspaceOptions.value.find((w) => w.id === id)?.name ?? '未分组'
 })
 function onSelectDefault(node: WsNode) {
   defaultWorkspaceId.value = node.id
   saveDefaultWorkspace()
   defaultPickerVisible.value = false
-}
-function clearDefaultWorkspace() {
-  defaultWorkspaceId.value = ''
-  saveDefaultWorkspace()
 }
 
 const extensionVersion = chrome.runtime.getManifest().version
@@ -251,8 +247,8 @@ onMounted(async () => {
     tabCount.value = res.data.tabCount ?? { open: 0, frozen: 0 }
   }
 
-  // 默认收藏工作组
-  defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || ''
+  // 默认收藏工作组：空值（历史数据）回退到初始默认「未分组」
+  defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
   await loadWorkspaces()
   shortcutEnabled.value = await storage.get(STORAGE_KEYS.SHORTCUT_ENABLED)
 })
@@ -312,7 +308,8 @@ async function handleLogout() {
 }
 
 async function loadWorkspaces() {
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' })
+  // includeSystem: 默认工作组可能是「未分组」系统工作组，需包含以便展示名称
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
     workspaceOptions.value = res.data.workspaces
   }
@@ -398,6 +395,12 @@ async function handleClearData() {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.ws-current {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
 }
 
 .mono-text {
