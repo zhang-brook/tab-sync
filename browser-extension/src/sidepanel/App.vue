@@ -171,6 +171,7 @@ import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/compo
 import { Search, Close, Loading, CaretRight, Monitor, Aim } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import LoginPanel from '@/shared/components/LoginPanel.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import type { StateData } from '@/shared/types'
@@ -257,9 +258,9 @@ async function logout() {
   ElMessage.success('已退出登录')
 }
 
-function openSettings() {
+async function openSettings() {
   const url = chrome.runtime.getURL('src/dashboard/index.html') + '#/settings'
-  chrome.tabs.create({ url })
+  await openTabAfterActive(url)
 }
 
 // ============ 标签页管理 ============

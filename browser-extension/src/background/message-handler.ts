@@ -7,7 +7,7 @@ import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWo
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
-import { openTabsAfterActive } from '../shared/utils/tab-utils'
+import { openTabAfterActive, openTabsAfterActive } from '../shared/utils/tab-utils'
 import { logger } from '../shared/utils/logger'
 
 /**
@@ -249,7 +249,8 @@ async function handleOpenDashboard(): Promise<MessageResponse> {
       await chrome.windows.update(tabs[0].windowId, { focused: true })
     }
   } else {
-    await chrome.tabs.create({ url: dashboardUrl })
+    // 在当前窗口的激活标签页之后打开（而非追加到末尾）
+    await openTabAfterActive(dashboardUrl)
   }
 
   return { success: true }
