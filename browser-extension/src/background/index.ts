@@ -1,5 +1,6 @@
 import { handleMessage } from './message-handler'
 import { logger } from '../shared/utils/logger'
+import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
 import { storage, STORAGE_KEYS } from '../shared/storage'
@@ -158,7 +159,8 @@ async function openSettingsPage() {
       await chrome.windows.update(tabs[0].windowId, { focused: true })
     }
   } else {
-    await chrome.tabs.create({ url: settingsUrl })
+    // 在当前窗口的激活标签页之后打开（而非追加到末尾）
+    await openTabAfterActive(settingsUrl)
   }
 }
 
