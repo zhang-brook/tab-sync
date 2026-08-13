@@ -60,7 +60,11 @@ async function createContextMenus() {
     // 页面右键：仅 http(s) 页面显示
     const page: chrome.contextMenus.CreateProperties = {
       contexts: ['page'],
-      documentUrlPatterns: ['http://*/*', 'https://*/*'],
+      documentUrlPatterns: [
+        'http://*/*',
+        'https://*/*',
+        'chrome://*/*',
+      ],
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_UNGROUPED,
@@ -84,12 +88,29 @@ async function createContextMenus() {
       title: '保存标签页到选定分组…',
       ...tab,
     })
+
+    // 分隔线：与上方收藏操作区分开（仅页面/标签页右键需要；图标右键无收藏项，不显示）。
+    // 按上下文各建一条：Chrome 对同一个 separator 挂多个 contexts 时，tab 上下文可能不渲染
+    chrome.contextMenus.create({
+      id: 'tab-sync-sep-open-page',
+      type: 'separator',
+      contexts: ['page'],
+    })
+    // 2026.08.14 备注：浏览器Tab标签页标题右键菜单 不支持添加分隔符，以下这行代码实际不起作用
+    /*
+    chrome.contextMenus.create({
+      id: 'tab-sync-sep-open-tab',
+      type: 'separator',
+      contexts: ['tab'],
+    })
+    */
+
     // 打开侧栏/设置页：在工具栏图标（action）及页面/标签页右键中均提供。
     // 注意：Chrome contextMenus 不支持 tab_groups 上下文（Firefox 才有），无法创建标签组右键菜单
     const openMenuContexts: chrome.contextMenus.ContextType[] = [
-      chrome.contextMenus.ContextType.ACTION,
-      chrome.contextMenus.ContextType.PAGE,
-      chrome.contextMenus.ContextType.TAB
+      // chrome.contextMenus.ContextType.ACTION, // 右上角扩展图标
+      chrome.contextMenus.ContextType.PAGE,   // 页面
+      chrome.contextMenus.ContextType.TAB,    // 标签页标题
     ]
     for (const ctx of openMenuContexts) {
       chrome.contextMenus.create({
