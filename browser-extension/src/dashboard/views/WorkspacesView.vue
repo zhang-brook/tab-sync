@@ -227,7 +227,7 @@
           </div>
         </el-form-item>
         <el-form-item label="标识色">
-          <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors" />
+          <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors" @active-change="onColorActiveChange" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -683,6 +683,16 @@ async function copyToClipboard(text: string, successMsg: string) {
   } catch {
     ElMessage.error('复制失败')
   }
+}
+
+/**
+ * 颜色悬浮面板实时同步：面板内选色后若不点「确定」直接点旁边关闭，
+ * 组件内部会 resetColor 回退到关闭前的值（等效取消），导致选色丢失。
+ * 这里把面板实时预览色同步进表单，使失焦关闭等同于点「确定」；
+ * 弹窗本身的「取消」不受影响，仍不会提交任何修改。
+ */
+function onColorActiveChange(color: string | null) {
+  if (color && color !== formData.value.color) formData.value.color = color
 }
 
 function showCreateDialog(parentId: string) {
