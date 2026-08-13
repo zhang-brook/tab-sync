@@ -14,9 +14,17 @@ export default defineManifest({
     'activeTab',
     'sidePanel',
     'notifications',
+    'contextMenus',
   ],
   host_permissions: [
     '<all_urls>',
+  ],
+  web_accessible_resources: [
+    {
+      // 把 src/picker/index.html 加入 web_accessible_resources（CRXJS 只打包在 manifest 中引用的 HTML，不加这一步弹窗页面不会被构建）
+      resources: ['src/picker/index.html'],
+      matches: ['<all_urls>'],
+    },
   ],
   background: {
     service_worker: 'src/background/index.ts',

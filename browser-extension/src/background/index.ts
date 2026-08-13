@@ -26,7 +26,111 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   logger.info('Device ID:', deviceId, 'Name:', deviceName)
   // 尝试向后端注册设备（后端未部署时静默失败）
   await tryRegisterDevice(deviceId)
+  // 初始化右键菜单
+  await createContextMenus()
 })
+
+// ============ 右键菜单：保存到 Tab Sync 并关闭 ============
+
+/** 「未分组」系统工作组的固定标识（见 server/internal/service/workspace.go） */
+const UNGROUPED_WORKSPACE_ID = 'ungrouped'
+const MENU_SAVE_UNGROUPED = 'tab-sync-save-ungrouped'
+const MENU_SAVE_PICK = 'tab-sync-save-pick'
+
+/** 创建右键菜单项（覆盖式重建，避免重复） */
+async function createContextMenus() {
+  try {
+    await chrome.contextMenus.removeAll()
+    const common: chrome.contextMenus.CreateProperties = {
+      contexts: ['page'],
+      documentUrlPatterns: ['http://*/*', 'https://*/*'],
+    }
+    chrome.contextMenus.create({
+      id: MENU_SAVE_UNGROUPED,
+      title: '保存到 Tab Sync 并关闭（未分组）',
+      ...common,
+    })
+    chrome.contextMenus.create({
+      id: MENU_SAVE_PICK,
+      title: '保存到 Tab Sync 并关闭 → 选择分组…',
+      ...common,
+    })
+    logger.info('右键菜单已创建')
+  } catch (err) {
+    logger.error('创建右键菜单失败:', err)
+  }
+}
+
+/** 右键菜单点击分发 */
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab) return
+  if (info.menuItemId === MENU_SAVE_UNGROUPED) {
+    await saveTabToWorkspaceAndClose(tab, UNGROUPED_WORKSPACE_ID)
+  } else if (info.menuItemId === MENU_SAVE_PICK) {
+    await openPickerWindow(tab)
+  }
+})
+
+/** 在居中弹窗中打开分组选择器，选中后再加入并关闭当前页 */
+async function openPickerWindow(tab: chrome.tabs.Tab) {
+  if (!tab.id) return
+  const url = chrome.runtime.getURL('src/picker/index.html') + '?tabId=' + tab.id
+  const width = 420
+  const height = 560
+  try {
+    const win = await chrome.windows.getLastFocused()
+    const left = Math.max(0, Math.round((win.left ?? 0) + ((win.width ?? width) - width) / 2))
+    const top = Math.max(0, Math.round((win.top ?? 0) + ((win.height ?? height) - height) / 2))
+    await chrome.windows.create({ url, type: 'popup', focused: true, width, height, left, top })
+  } catch {
+    // 兜底：不指定位置
+    await chrome.windows.create({ url, type: 'popup', focused: true, width, height })
+  }
+}
+
+/**
+ * 将单个标签页加入指定工作组并关闭：
+ * 仅当加入成功后才关闭当前页；失败（含未登录）则保留页面并通知。
+ */
+async function saveTabToWorkspaceAndClose(tab: chrome.tabs.Tab, workspaceId: string) {
+  if (!tab.id || !tab.url) return
+
+  // 仅允许 http(s)/file 页面，浏览器内置页面不支持
+  let protocol = ''
+  try {
+    protocol = new URL(tab.url).protocol
+  } catch {
+    return
+  }
+  if (!['http:', 'https:', 'file:'].includes(protocol)) {
+    await notify('无法收藏该页面', '当前页面类型不支持收藏（如浏览器内置页面）')
+    return
+  }
+
+  const res = await sendMessage({
+    action: 'ADD_TABS_TO_WORKSPACE',
+    payload: {
+      workspaceId,
+      tabs: [
+        {
+          chromeTabId: tab.id ?? 0,
+          url: tab.url ?? '',
+          title: tab.title ?? '',
+          favIconUrl: tab.favIconUrl ?? '',
+        },
+      ],
+    },
+  })
+
+  if (res.success) {
+    await chrome.tabs.remove(tab.id)
+    await notify('已加入工作组', '当前标签页已收藏并关闭')
+  } else if (res.authError) {
+    await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
+  } else {
+    await notify('收藏失败', res.error || '请检查后端连接')
+  }
+}
 
 // 快捷键：将当前标签页加入工作组并关闭
 chrome.commands.onCommand.addListener((command) => {

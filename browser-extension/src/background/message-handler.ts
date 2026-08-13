@@ -321,8 +321,8 @@ async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
 async function handleAddTabsToWorkspace(
   payload: { workspaceId: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
-  // 1. 获取所有工作组
-  const res = await getWorkspaces()
+  // 1. 获取所有工作组（含系统工作组「未分组」，否则右键菜单「保存到未分组」无法定位目标）
+  const res = await getWorkspaces(true)
   if (!res.ok || !res.data) {
     logger.warn('addTabsToWorkspace: getWorkspaces failed:', res.error)
     return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
