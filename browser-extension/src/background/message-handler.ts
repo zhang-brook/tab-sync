@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl } from '../shared/api/workspaces'
+import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -576,44 +576,16 @@ async function handleUpdateWorkspaceTab(
   }
 }
 
-/** 从工作组中移除指定标签页 */
+/** 从工作组中移除指定标签页（后端 DELETE 会将其统一移入回收站） */
 async function handleRemoveWorkspaceTab(workspaceId: string, tabId: string): Promise<MessageResponse> {
   try {
-    // 1. 获取所有工作组（含系统工作组「未分组」，否则其下的标签页无法定位）
-    const res = await getWorkspaces(true)
-    if (!res.ok || !res.data) {
-      return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
-    }
-
-    // 2. 找到目标工作组
-    const workspace = res.data.workspaces.find(w => w.id === workspaceId)
-    if (!workspace) {
-      return { success: false, error: '工作组不存在' }
-    }
-
-    // 3. 过滤掉要移除的标签页
-    const remainingTabs = workspace.tabs.filter(t => t.tabId !== tabId)
-    if (remainingTabs.length === workspace.tabs.length) {
-      return { success: false, error: '标签页不在该工作组中' }
-    }
-
-    // 4. 构造更新 payload（保留 tabId，chromeTabId=0 表示未知）
-    const tabPayloads = remainingTabs.map(t => ({
-      tabId: t.tabId,
-      url: t.url,
-      title: t.title,
-      favIconUrl: t.favIconUrl,
-      chromeTabId: 0,
-    }))
-
-    // 5. 调用更新 API
-    const updateRes = await updateWorkspace(workspaceId, { tabs: tabPayloads })
-    if (updateRes.ok) {
-      logger.info(`Tab ${tabId} removed from workspace "${workspace.name}"`)
+    const res = await deleteWorkspaceTab(workspaceId, tabId)
+    if (res.ok) {
+      logger.info(`Tab ${tabId} removed from workspace "${workspaceId}"`)
       return { success: true }
     }
-    logger.warn('removeWorkspaceTab: updateWorkspace failed:', updateRes.error)
-    return { success: false, error: updateRes.error || '移除标签页失败', authError: updateRes.status === 401 }
+    logger.warn('removeWorkspaceTab: deleteWorkspaceTab failed:', res.error)
+    return { success: false, error: res.error || '移除标签页失败', authError: res.status === 401 }
   } catch (err) {
     logger.warn('removeWorkspaceTab error:', err)
     return { success: false, error: '移除标签页失败: ' + String(err) }

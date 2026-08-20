@@ -115,6 +115,7 @@ func main() {
 			auth.POST("/workspaces", handlers.Workspace.Create)
 			auth.PUT("/workspaces/:id", handlers.Workspace.Update)
 			auth.DELETE("/workspaces/:id", handlers.Workspace.Delete)
+			auth.DELETE("/workspaces/:id/tabs/:tabId", handlers.Workspace.DeleteTab)
 			auth.GET("/workspaces/tabs-summary", handlers.Workspace.TabsSummary)
 			auth.POST("/workspaces/:id/tabs/move", handlers.Workspace.MoveTab)
 			auth.POST("/workspaces/:id/tabs", handlers.Workspace.AddTabByURL)

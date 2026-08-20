@@ -318,6 +318,51 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 	return nil
 }
 
+// DeleteTab 删除工作组中的单个标签页。
+// 被移除的标签页统一进入回收站（与 Put/Update 删除分支行为一致），而非直接物理删除，
+// 以便恢复。使用独立的 DELETE 接口替代「读全量 → 过滤 → 整体覆盖」的 RMW 方式，
+// 避免并发删除不同标签页时的 lost-update 问题。
+func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
+	uid, err := strconv.ParseUint(tabID, 10, 64)
+	if err != nil {
+		return errors.New("标签页 ID 无效")
+	}
+
+	var ws model.Workspace
+	if err := s.db.Where("workspace_id = ? AND is_deleted = ?", workspaceID, false).First(&ws).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("工作组不存在")
+		}
+		return err
+	}
+
+	var tab model.WorkspaceTab
+	if err := s.db.Where("id = ? AND workspace_id = ?", uint(uid), workspaceID).First(&tab).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("标签页不存在")
+		}
+		return err
+	}
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if s.RecycleBin != nil {
+			if aerr := s.RecycleBin.Add(tx, workspaceID, ws.Name, tab); aerr != nil {
+				return aerr
+			}
+		}
+		return tx.Where("id = ?", uint(uid)).Delete(&model.WorkspaceTab{}).Error
+	})
+	if err != nil {
+		return err
+	}
+
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("removed", "tab", tabID, map[string]string{"workspaceId": workspaceID, "tabId": tabID})
+	}
+
+	return nil
+}
+
 // TabsSummary 获取所有工作组标签页摘要
 func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 	var workspaces []model.Workspace

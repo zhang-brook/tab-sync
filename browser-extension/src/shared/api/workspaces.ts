@@ -64,3 +64,10 @@ export function updateWorkspaceTab(
     payload,
   )
 }
+
+/** 删除工作组内的单个标签页（被移除的标签页统一进入回收站） */
+export function deleteWorkspaceTab(workspaceId: string, tabId: string) {
+  return apiClient.delete<{ success: boolean }>(
+    `/v1/tab-sync/workspaces/${encodeURIComponent(workspaceId)}/tabs/${encodeURIComponent(tabId)}`,
+  )
+}

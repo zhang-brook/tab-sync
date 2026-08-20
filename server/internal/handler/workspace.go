@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/spidermemos/tab-sync-server/internal/service"
@@ -83,6 +85,21 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	// 默认分组由前端以查询参数传入，避免其被删后「加入并关闭」等快捷操作失效
 	defaultWorkspaceID := c.Query("defaultWorkspaceId")
 	if err := h.svc.Delete(id, defaultWorkspaceID); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	Success(c, gin.H{"success": true})
+}
+
+// DeleteTab 删除工作组中的单个标签页（统一进入回收站）
+func (h *WorkspaceHandler) DeleteTab(c *gin.Context) {
+	workspaceID := c.Param("id")
+	tabID := c.Param("tabId")
+	if err := h.svc.DeleteTab(workspaceID, tabID); err != nil {
+		if strings.Contains(err.Error(), "不存在") {
+			NotFound(c, err.Error())
+			return
+		}
 		BadRequest(c, err.Error())
 		return
 	}
