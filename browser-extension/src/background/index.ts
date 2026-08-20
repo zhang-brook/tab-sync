@@ -61,6 +61,8 @@ const MENU_MORE = 'tab-sync-more'
 const MENU_MORE_SHORTCUTS = 'tab-sync-more-shortcuts'
 const MENU_MORE_RELOAD = 'tab-sync-more-reload'
 
+const NOTIFICATION_SAVE_TAB_SUCCESS = 'save-tab-success'
+
 /** 截断分组名：超过 10 个字显示前 10 字 + '...'（右键菜单标题提示用） */
 function truncateGroupName(name: string, max = 10): string {
   const chars = Array.from(name)
@@ -354,7 +356,11 @@ async function saveTabsToWorkspaceAndClose(tabs: chrome.tabs.Tab[], workspaceId:
     if (ids.length > 0) {
       await chrome.tabs.remove(ids)
     }
-    await notify('已加入工作组', savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭` : '当前标签页已收藏并关闭')
+    await notify(
+      '已加入工作组',
+      savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭，点击查看` : '当前标签页已收藏并关闭，点击查看',
+      NOTIFICATION_SAVE_TAB_SUCCESS,
+    )
   } else if (res.authError) {
     await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
   } else {
@@ -431,19 +437,36 @@ async function handleSavePick() {
   await openPickerWindow([tab])
 }
 
-/** 轻量桌面通知 */
-async function notify(title: string, message: string) {
+/**
+ * 轻量桌面通知。idPrefix 非空时用于标记通知类型：
+ * 通知 ID 以「{idPrefix}|{时间戳}」命名，点击行为在 notifications.onClicked 中按前缀分发。
+ */
+async function notify(title: string, message: string, idPrefix?: string) {
+  const options = {
+    type: 'basic' as const,
+    iconUrl: 'public/icons/icon-48.png',
+    title,
+    message,
+  }
   try {
-    await chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'public/icons/icon-48.png',
-      title,
-      message,
-    })
+    if (idPrefix) {
+      // 指定 ID（带时间戳避免覆盖同类型通知），供 onClicked 按前缀识别点击行为
+      await chrome.notifications.create(`${idPrefix}|${Date.now()}`, options)
+    } else {
+      await chrome.notifications.create(options)
+    }
   } catch {
     /* ignore */
   }
 }
+
+// 通知点击：保存成功类通知 → 打开管理后台工作组页（ID 前缀判断，SW 重启后依然有效）
+chrome.notifications.onClicked.addListener((id) => {
+  void chrome.notifications.clear(id)
+  if (id.startsWith(NOTIFICATION_SAVE_TAB_SUCCESS + '|')) {
+    void openWorkspacesPage()
+  }
+})
 
 // 浏览器启动时注册设备
 chrome.runtime.onStartup.addListener(async () => {
