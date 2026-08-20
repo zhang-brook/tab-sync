@@ -31,6 +31,7 @@ type RecycleBinTabResponse struct {
 	Title                 string    `json:"title"`
 	DisplayName           string    `json:"displayName"`
 	FavIconURL            string    `json:"favIconUrl"`
+	Description           string    `json:"description"`
 	DeletedAt             time.Time `json:"deletedAt"`
 }
 
@@ -61,6 +62,7 @@ func (s *RecycleBinService) Add(tx *gorm.DB, originalWorkspaceID, originalWorksp
 		FavIconURL:            tab.FavIconURL,
 		SortOrder:             tab.SortOrder,
 		AddedAt:               tab.AddedAt,
+		Description:           tab.Description,
 		DeletedAt:             time.Now(),
 	}
 	return tx.Create(&item).Error
@@ -90,6 +92,8 @@ func (s *RecycleBinService) Restore(id uint) error {
 		SortOrder:   0,
 		// 优先保留回收站中记录的添加时间（用户可能手动改过），为空时回退到当前时间
 		AddedAt: addedAtOrNow(item.AddedAt),
+		// 保留回收站中记录的描述（用户可能手动设置过），为空时继承原行为
+		Description: item.Description,
 	}
 	if err := s.db.Create(&newTab).Error; err != nil {
 		return err
@@ -127,6 +131,7 @@ func toRecycleBinResponse(it model.RecycleBinTab) RecycleBinTabResponse {
 		Title:                 it.Title,
 		DisplayName:           it.DisplayName,
 		FavIconURL:            it.FavIconURL,
+		Description:           it.Description,
 		DeletedAt:             it.DeletedAt,
 	}
 }

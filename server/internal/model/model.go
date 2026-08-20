@@ -83,7 +83,7 @@ type WorkspaceTab struct {
 	FavIconURL  string `gorm:"size:2048"`
 	SortOrder   int    `gorm:"default:0"` // 排序序号
 	AddedAt     time.Time
-	Description string `gorm:\"size:500\"` // 标签页描述（仅用户主动设置时保存）
+	Description string `gorm:"size:500"` // 标签页描述（仅用户主动设置时保存）
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Tags        []TabTag `gorm:"foreignKey:WorkspaceTabID"`
@@ -108,12 +108,12 @@ type SyncEvent struct {
 
 // Tag 全局标签（不绑定设备，按 scope 区分用途）
 type Tag struct {
-	ID        uint   `gorm:"primaryKey;autoIncrement"`
-	Name      string `gorm:"size:32;not null;index"`
-	Color     string `gorm:"size:7"`
-	Scope     string `gorm:"size:8;index"`
+	ID          uint   `gorm:"primaryKey;autoIncrement"`
+	Name        string `gorm:"size:32;not null;index"`
+	Color       string `gorm:"size:7"`
+	Scope       string `gorm:"size:8;index"`
 	Description string `gorm:"size:500"` // 标签描述（仅用户主动设置时保存）
-	CreatedAt time.Time
+	CreatedAt   time.Time
 }
 
 // TabTag 标签页与标签的关联（关联 WorkspaceTab）
@@ -147,6 +147,7 @@ type RecycleBinTab struct {
 	FavIconURL            string    `gorm:"size:2048"`
 	SortOrder             int       `gorm:"default:0"`
 	AddedAt               time.Time // 标签页在原工作组中的添加时间（恢复时回填，避免丢失用户自定义时间）
+	Description           string    `gorm:"size:500"` // 标签页描述（仅用户主动设置时保存，恢复时回填）
 	DeletedAt             time.Time // 移入回收站的时间
 	CreatedAt             time.Time
 }

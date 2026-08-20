@@ -35,6 +35,7 @@
               {{ displayName(item) }}
             </div>
             <div class="item-url" :title="item.url">{{ item.url }}</div>
+            <div v-if="item.description" class="item-desc" :title="item.description">{{ item.description }}</div>
             <div class="item-meta">
               <el-tag size="small" type="info" effect="plain">
                 来自：{{ item.originalWorkspaceName || '未知工作组' }}

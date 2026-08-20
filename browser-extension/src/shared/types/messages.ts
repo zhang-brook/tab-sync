@@ -257,6 +257,8 @@ export interface RecycleBinTab {
   /** 用户自定义显示名（可选，为空时使用 title） */
   displayName?: string
   favIconUrl: string
+  /** 标签页描述（可选，用户主动设置时保存） */
+  description?: string
   /** 移入回收站的时间 */
   deletedAt: string
 }
