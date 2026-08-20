@@ -70,12 +70,20 @@
       </template>
 
       <el-form label-width="120px" label-position="left">
-        <el-form-item label="加入并关闭">
-          <span class="form-tip">按 <code>Shift+Alt+S</code> 将当前标签页加入默认工作组并关闭</span>
+        <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
+        <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label">
+          <span class="form-tip">
+            <template v-if="sc.shortcut">
+              按 <code>{{ sc.shortcut }}</code> {{ sc.description }}，<el-button link type="primary" size="small" @click="openShortcutsPage">前往修改</el-button>
+            </template>
+            <template v-else>
+              未设置按键，<el-button link type="primary" size="small" @click="openShortcutsPage">前往设置</el-button>
+            </template>
+          </span>
         </el-form-item>
         <el-form-item label="启用快捷键">
           <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
-          <div class="form-tip">关闭后 <code>Shift+Alt+S</code> 将不再触发收藏</div>
+          <div class="form-tip">关闭后「加入并关闭」快捷键将不再触发收藏</div>
         </el-form-item>
         <el-form-item label="默认工作组">
           <div class="ws-picker-row">
@@ -83,6 +91,13 @@
             <el-button size="small" @click="defaultPickerVisible = true">修改</el-button>
           </div>
           <div class="form-tip">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
+        </el-form-item>
+        <el-form-item>
+          <el-button size="small" @click="openShortcutsPage">打开 Chrome 快捷键设置页</el-button>
+          <div class="form-tip">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
+          <div class="form-tip" v-if="true/* Chrome 浏览器 */">
+            Chrome 修改快捷键后，需重新加载扩展后生效
+          </div>
         </el-form-item>
       </el-form>
     </el-card>
@@ -180,6 +195,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
+import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { StateData, WorkspacesData, Workspace } from '@/shared/types'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import type { WorkspaceTreeNode as WsNode } from '@/shared/utils/workspace-tree'
@@ -200,6 +216,32 @@ const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
 // 是否启用「加入并关闭」快捷键
 const shortcutEnabled = ref(true)
+
+// 快捷键命令元信息：展示顺序与 manifest.config.ts 的 commands 保持一致
+const SHORTCUT_ORDER = ['save-and-close', 'save-ungrouped', 'save-pick', 'open-sidepanel', 'open-settings']
+const SHORTCUT_META: Record<string, { label: string; description: string }> = {
+  'save-and-close': { label: '加入并关闭', description: '将当前标签页加入默认工作组并关闭' },
+  'save-ungrouped': { label: '保存到 [未分组]', description: '将当前标签页保存到 [未分组] 并关闭' },
+  'save-pick': { label: '保存到选定分组', description: '选择分组后将当前标签页保存并关闭' },
+  'open-sidepanel': { label: '打开侧栏', description: '打开 Tab Sync 侧边栏' },
+  'open-settings': { label: '打开设置页', description: '打开 Tab Sync 设置页面' },
+}
+const shortcuts = ref<{ id: string; label: string; description: string; shortcut: string }[]>([])
+
+async function loadShortcuts() {
+  const commands = await chrome.commands.getAll()
+  const byName = new Map(commands.map((c) => [c.name, c.shortcut ?? '']))
+  shortcuts.value = SHORTCUT_ORDER.map((name) => ({
+    id: name,
+    ...SHORTCUT_META[name],
+    shortcut: byName.get(name) ?? '',
+  }))
+}
+
+function openShortcutsPage() {
+  // chrome://extensions/shortcuts 无法在扩展页内直接跳转，通过新标签页打开
+  void openTabAfterActive('chrome://extensions/shortcuts')
+}
 
 // 默认收藏工作组（通过公共分组选择器选择，支持树状展示与禁用）
 const defaultPickerVisible = ref(false)
@@ -251,6 +293,7 @@ onMounted(async () => {
   defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
   await loadWorkspaces()
   shortcutEnabled.value = await storage.get(STORAGE_KEYS.SHORTCUT_ENABLED)
+  await loadShortcuts()
 })
 
 async function handleModeChange() {
