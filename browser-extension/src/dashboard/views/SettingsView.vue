@@ -75,7 +75,7 @@
           <div class="shortcut-row">
             <span class="shortcut-key">
               <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
-              <template v-else>未设置按键</template>
+              <template v-else>未设置快捷键</template>
 
               <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
               <span v-else class="shortcut-text shortcut-default">(默认)</span>
@@ -85,7 +85,7 @@
               </el-button>
             </span>
             <div class="form-tip">
-              {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default }}）</template>
+              {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default || '无快捷键' }}）</template>
             </div>
           </div>
         </el-form-item>
@@ -254,8 +254,8 @@ async function loadShortcuts() {
       id: name,
       ...meta,
       shortcut,
-      // 已绑定且与默认键不同视为用户修改过
-      modified: !!shortcut && !!meta.default && normalizeShortcut(shortcut) !== normalizeShortcut(meta.default),
+      // 已绑定且与默认键不同视为修改过；无默认键的命令（如打开侧栏）只要用户绑定了即视为修改
+      modified: !!shortcut && (meta.default ? normalizeShortcut(shortcut) !== normalizeShortcut(meta.default) : true),
     }
   })
 }

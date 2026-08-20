@@ -64,6 +64,17 @@ const MENU_MORE_RELOAD = 'tab-sync-more-reload'
 
 const NOTIFICATION_SAVE_TAB_SUCCESS = 'save-tab-success'
 
+/** 从 chrome.commands.getAll() 读取命令名 → 快捷键映射（菜单标题提示用） */
+async function getCommandShortcutMap(): Promise<Map<string, string>> {
+  const commands = await chrome.commands.getAll()
+  // Command.name 类型定义为可选（实际总是存在），过滤后收窄
+  const map = new Map<string, string>()
+  for (const c of commands) {
+    if (c.name) map.set(c.name, c.shortcut ?? '')
+  }
+  return map
+}
+
 /** 截断分组名：超过 10 个字显示前 10 字 + '...'（右键菜单标题提示用） */
 function truncateGroupName(name: string, max = 10): string {
   const chars = Array.from(name)
@@ -86,6 +97,13 @@ async function getDefaultWorkspaceName(): Promise<string | null> {
 async function createContextMenus() {
   try {
     await chrome.contextMenus.removeAll()
+    // 动态读取快捷键：用户可在 chrome://extensions/shortcuts 修改/移除绑定，标题提示需随之更新
+    const keys = await getCommandShortcutMap()
+    // 未绑定快捷键时不显示括号提示（与设置页「未设置按键」文案一致）
+    const hint = (name: string) => {
+      const key = keys.get(name)
+      return key ? `（${key}）` : ''
+    }
     // 默认分组名：登录且能定位到分组时展示实际名字（如「保存到 [未分组](默认分组) 并关闭」），否则回退通用文案
     const defaultName = await getDefaultWorkspaceName()
     const defaultGroupLabel = defaultName ? `[${truncateGroupName(defaultName)}](默认分组) ` : '默认分组'
@@ -102,35 +120,35 @@ async function createContextMenus() {
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_DEFAULT,
-      title: `保存到 ${defaultGroupLabel} 并关闭（Shift+Alt+S）`,
+      title: `保存到 ${defaultGroupLabel} 并关闭${hint('save-and-close')}`,
       ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_UNGROUPED,
       // 标题末尾提示快捷键：Chrome 菜单项不支持内联快捷键，实际由 manifest commands 触发
-      title: '保存到 [未分组] 并关闭（Alt+Shift+U）',
+      title: `保存到 [未分组] 并关闭${hint('save-ungrouped')}`,
       ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
-      title: '保存到 选定分组…（Alt+Shift+G）',
+      title: `保存到 选定分组…${hint('save-pick')}`,
       ...page,
     })
     // 标签页右键
     const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_DEFAULT,
-      title: `保存标签页到 ${defaultGroupLabel} 并关闭（Shift+Alt+S）`,
+      title: `保存标签页到 ${defaultGroupLabel} 并关闭${hint('save-and-close')}`,
       ...tab,
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_UNGROUPED,
-      title: '保存标签页到 [未分组] 并关闭（Alt+Shift+U）',
+      title: `保存标签页到 [未分组] 并关闭${hint('save-ungrouped')}`,
       ...tab,
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_PICK,
-      title: '保存标签页到 选定分组…（Alt+Shift+G）',
+      title: `保存标签页到 选定分组…${hint('save-pick')}`,
       ...tab,
     })
 
@@ -173,6 +191,11 @@ async function createContextMenus() {
         title: '打开设置页',
         contexts: [ctx],
       })
+      chrome.contextMenus.create({
+        id: `${'tab-sync-sep-2'}-${ctx}`,
+        type: 'separator',
+        contexts: ['page', 'tab'],
+      })
     }
     // 更多选项：父项带子菜单（页面/标签页右键末尾）
     chrome.contextMenus.create({
@@ -204,6 +227,17 @@ async function createContextMenus() {
     logger.error('创建右键菜单失败:', err)
   }
 }
+
+// 注意：Chrome 的 chrome.commands API 没有 onChanged 事件（该事件是 Firefox 的
+// browser.commands.onChanged，Firefox 139+ 才有）。在 Chrome 中调用会抛
+// "Cannot read properties of undefined (reading 'addListener')"，导致 Service Worker
+// 脚本求值失败、注册失败（Status code: 15）。
+// 用户在 chrome://extensions/shortcuts 修改快捷键后 Chrome 不会通知扩展，
+// 菜单标题中的快捷键提示会在下一次 Service Worker 启动时由顶层 createContextMenus() 自动刷新。
+// // 用户在快捷键设置页修改/移除绑定后，重建菜单使标题提示同步（createContextMenus 幂等）
+// chrome.commands.onChanged.addListener(() => {
+//   void createContextMenus()
+// })
 
 // 默认分组或登录状态变化后重建菜单，使标题中的分组名同步（createContextMenus 幂等）
 chrome.storage.onChanged.addListener((changes, area) => {
