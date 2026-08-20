@@ -239,11 +239,16 @@
     </el-dialog>
 
     <!-- 修改添加时间对话框 -->
-    <el-dialog v-model="timeDialogVisible" title="修改添加时间" width="420px" destroy-on-close>
+    <el-dialog v-model="timeDialogVisible" title="修改添加时间" width="450px" destroy-on-close>
       <el-form label-width="90px" label-position="left">
         <el-form-item label="添加时间">
-          <el-date-picker v-model="timeValue" type="datetime" placeholder="选择日期时间" :clearable="false"
-            style="width: 100%" />
+          <div style="display: flex; align-items: center; gap: 8px; width: 100%">
+            <el-date-picker v-model="timeValue" type="datetime" placeholder="选择日期时间" :clearable="false"
+              style="flex: 1;" />
+            <el-link type="primary" :underline="false" @click="setTimeToNow" style="margin-left: 15px; margin-right: 10px;">
+              设为当前时间
+            </el-link>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -852,6 +857,10 @@ function formatAddedAtFull(addedAt: string): string {
   const d = new Date(addedAt)
   if (isNaN(d.getTime())) return '未知'
   return d.toLocaleString()
+}
+
+function setTimeToNow() {
+  timeValue.value = new Date()
 }
 
 function openEditTimeDialog(workspaceId: string, tab: TabReference) {
