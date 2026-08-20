@@ -6,6 +6,7 @@ import { DASHBOARD_URL, PICKER_URL } from '../shared/utils/pages'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
 import { getWorkspaces } from '../shared/api/workspaces'
+import { DEFAULT_WORKSPACE_COLOR } from '../shared/constants/theme'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 
 logger.info('Service Worker started')
@@ -52,6 +53,10 @@ const MENU_SAVE_PICK = 'tab-sync-save-pick'
 const MENU_TAB_SAVE_DEFAULT = 'tab-sync-tab-save-default'
 const MENU_TAB_SAVE_UNGROUPED = 'tab-sync-tab-save-ungrouped'
 const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
+// 标签组整体保存为新工作组（Chrome 不支持 tab_groups 右键上下文，改为组内标签页右键提供）
+const MENU_TAB_SAVE_GROUP_NEW = 'tab-sync-tab-save-group-new'
+// 多选标签页 → 创建新工作组并保存（弹窗命名 + 添加后关闭复选框）
+const MENU_TAB_SAVE_AS_NEW = 'tab-sync-tab-save-as-new'
 // 打开侧栏/设置页：工具栏图标右键（action）+ 页面/标签页右键。contextMenus id 全局唯一，
 // 同一动作在每个上下文需独立 id（追加上下文后缀），点击时按前缀分发
 const MENU_OPEN_SIDEPANEL = 'tab-sync-open-sidepanel'
@@ -157,6 +162,21 @@ async function createContextMenus() {
       id: MENU_TAB_SAVE_PICK,
       title: `保存此标签页到 选定分组…${shortcutHint('save-pick')}`,
       ...tab,
+    })
+    // 多选标签页 → 创建新工作组并保存：仅当选中多个标签页时显示（visible 由 onHighlighted 动态切换）
+    chrome.contextMenus.create({
+      id: MENU_TAB_SAVE_AS_NEW,
+      title: '保存此标签页到 新工作组…',
+      ...tab,
+    })
+    // 标签组整体保存：Chrome 不支持 tab_groups 右键上下文（Firefox 才有），故在组内标签页标题
+    // 上提供；仅当选中集合全部处于同一标签组时显示，标题「含 x 个页面」与 visible 由
+    // tabs.onHighlighted/onUpdated 动态更新（默认隐藏，避免单选/未分组时误显示）
+    chrome.contextMenus.create({
+      id: MENU_TAB_SAVE_GROUP_NEW,
+      title: '将此标签页所在标签组保存为 新工作组…',
+      ...tab,
+      visible: false,
     })
 
     // 分隔线：与上方收藏操作区分开（仅页面/标签页右键需要；图标右键无收藏项，不显示）。
@@ -272,6 +292,64 @@ chrome.tabs.onHighlighted.addListener((highlightInfo) => {
   chrome.contextMenus.update(MENU_TAB_SAVE_PICK, {
     title: `保存 ${subject}到 选定分组…${shortcutHint('save-pick')}`,
   })
+  chrome.contextMenus.update(MENU_TAB_SAVE_AS_NEW, {
+    title: `保存 ${subject}到 新工作组…${''/*shortcutHint('save-pick')*/}`,
+  })
+  // 标签组菜单标题：按选中集合（高亮集）的分组状态更新
+  void updateGroupMenuTitles(highlightInfo.tabIds)
+})
+
+/**
+ * 更新「组保存」与「多选新建」两个菜单项的可见性与标题：
+ * - 多选（选中数量 > 1）→ 显示「创建新的工作组并保存」；单选 → 隐藏；
+ * - 选中集合全部处于同一标签组 → 显示「将所在标签组（含 x 个页面）保存为新工作组…」；否则隐藏。
+ * 由 tabs.onHighlighted / tabs.onUpdated（groupId 变化）触发，Chrome 无菜单弹出前回调，
+ * 只能预先更新；点击行为仍以点击时选中集合的实际分组为准。
+ */
+async function updateGroupMenuTitles(tabIds: number[]) {
+  if (tabIds.length === 0) return
+  // 并行读取标签信息，已关闭的跳过
+  const tabs = (
+    await Promise.all(tabIds.map((id) => chrome.tabs.get(id).catch(() => null)))
+  ).filter((t): t is chrome.tabs.Tab => t != null)
+  if (tabs.length === 0) return
+
+  // 判定是否全部处于同一标签组（未分组标签页 groupId 为 -1）
+  let groupId = 0
+  let sameGroup = true
+  for (const t of tabs) {
+    if (t.groupId < 0) {
+      sameGroup = false
+      break
+    }
+    if (groupId === 0) groupId = t.groupId
+    else if (groupId !== t.groupId) {
+      sameGroup = false
+      break
+    }
+  }
+  if (sameGroup && groupId > 0) {
+    let count = 0
+    try {
+      count = (await chrome.tabs.query({ groupId })).length
+    } catch {
+      // 组可能已解散，保留回退标题
+    }
+    const groupLabel = `（含 ${count} 个页面）`
+    chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, {
+      visible: true,
+      title: `将所在标签组 ${groupLabel} 保存为 新工作组…`,
+    })
+  } else {
+    chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, { visible: false })
+  }
+}
+
+// 标签页加入/移出标签组时同步更新两个菜单的可见性与标题（以该标签页为集合）
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.groupId !== undefined) {
+    void updateGroupMenuTitles([tabId])
+  }
 })
 
 /** 右键菜单点击分发 */
@@ -319,6 +397,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await openPickerWindow([tab])
   } else if (id === MENU_TAB_SAVE_PICK) {
     await openPickerWindow(await resolveTabSelection(tab))
+  } else if (id === MENU_TAB_SAVE_GROUP_NEW) {
+    await handleSaveGroupClick(tab)
+  } else if (id === MENU_TAB_SAVE_AS_NEW) {
+    await openPickerWindow(await resolveTabSelection(tab), { mode: 'create' })
   }
 })
 
@@ -381,11 +463,24 @@ async function openPage(page: string) {
   }
 }
 
-/** 在居中弹窗中打开分组选择器，选中后再加入并关闭原标签页（支持标签组批量） */
-async function openPickerWindow(tabs: chrome.tabs.Tab[]) {
+/**
+ * 在居中弹窗中打开分组选择器：
+ * - 默认（不传 options）为「选择已有分组」模式；
+ * - options.mode === 'create' 时为「新建工作组并保存」模式，可传 defaultName/color 作为弹窗默认值。
+ */
+async function openPickerWindow(
+  tabs: chrome.tabs.Tab[],
+  options?: { mode?: 'create'; defaultName?: string; color?: string },
+) {
   const ids = tabs.map((t) => t.id).filter((id): id is number => id != null)
   if (ids.length === 0) return
-  const url = PICKER_URL + '?tabIds=' + ids.join(',')
+  const params = new URLSearchParams({ tabIds: ids.join(',') })
+  if (options?.mode === 'create') {
+    params.set('mode', 'create')
+    if (options.defaultName) params.set('defaultName', options.defaultName)
+    if (options.color) params.set('color', options.color)
+  }
+  const url = PICKER_URL + '?' + params.toString()
   const width = 560
   const height = 600
   try {
@@ -435,20 +530,101 @@ async function saveTabsToWorkspaceAndClose(tabs: chrome.tabs.Tab[], workspaceId:
   })
 
   if (res.success) {
+    const data = (res.data ?? {}) as { added?: number; skipped?: number }
+    const added = data.added ?? savable.length
+    const skipped = data.skipped ?? 0
+    // 「保存并关闭」语义：无论新增还是跳过，统一关闭用户选中的可收藏页面，避免混选时行为不一致
     const ids = savable.map((t) => t.id).filter((id): id is number => id != null)
     if (ids.length > 0) {
       await chrome.tabs.remove(ids)
     }
-    await notify(
-      '已加入工作组',
-      savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭，点击查看` : '当前标签页已收藏并关闭，点击查看',
-      NOTIFICATION_SAVE_TAB_SUCCESS,
-    )
+    // 读取分组名用于提示文案（失败不影响主流程，回退通用表述）
+    let wsLabel = '该分组'
+    try {
+      const wsRes = await getWorkspaces(true)
+      if (wsRes.ok && wsRes.data) {
+        const name = wsRes.data.workspaces.find((w) => w.id === workspaceId)?.name
+        if (name) wsLabel = `「${name}」`
+      }
+    } catch {
+      /* ignore */
+    }
+    let title: string
+    let message: string
+    if (added === 0 && skipped > 0) {
+      // 全部已存在：跳过（页面仍按"保存并关闭"语义关闭）
+      title = '已存在'
+      message = `${wsLabel}下已存在该页面，已跳过并关闭`
+    } else if (skipped > 0) {
+      // 部分已存在：加入新增项并关闭
+      title = '已加入工作组'
+      message =
+        savable.length > 1
+          ? `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过），已全部关闭，点击查看`
+          : `已收藏（${wsLabel}下已存在该页面，已跳过），已关闭，点击查看`
+    } else {
+      title = '已加入工作组'
+      message =
+        savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭，点击查看` : '当前标签页已收藏并关闭，点击查看'
+    }
+    await notify(title, message, NOTIFICATION_SAVE_TAB_SUCCESS)
   } else if (res.authError) {
     await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
   } else {
     await notify('收藏失败', res.error || '请检查后端连接')
   }
+}
+
+/** 浏览器标签组颜色 → 工作组标识色 (hex)，未知颜色回退默认色 */
+const TAB_GROUP_COLOR_HEX: Record<string, string> = {
+  grey: '#909399',
+  blue: '#409EFF',
+  red: '#F56C6C',
+  yellow: '#E6A23C',
+  green: '#67C23A',
+  pink: '#E84393',
+  purple: '#9B59B6',
+  cyan: '#16A085',
+  orange: '#E6A23C',
+}
+
+/** 是否为可收藏的页面协议（http/https/file），浏览器内置页面不支持 */
+function isSavableTab(tab: { url?: string }): boolean {
+  if (!tab.url) return false
+  try {
+    return ['http:', 'https:', 'file:'].includes(new URL(tab.url).protocol)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 组保存菜单点击：解析选中集合，全部处于同一标签组时打开「新建工作组并保存」命名弹窗，
+ * 默认名称取标签组标题、颜色取标签组颜色，保存对象为组内全部可收藏标签页（由弹窗统一创建并保存）。
+ */
+async function handleSaveGroupClick(tab: chrome.tabs.Tab) {
+  const selection = await resolveTabSelection(tab)
+  if (selection.length === 0) return
+  const first = selection[0]
+  const sameGroup = first.groupId > 0 && selection.every((t) => t.groupId === first.groupId)
+  if (!sameGroup) return
+
+  const groupTabs = (await chrome.tabs.query({ groupId: first.groupId })).filter(isSavableTab)
+  if (groupTabs.length === 0) {
+    await notify('无法收藏', '标签组中的页面均不支持收藏（如浏览器内置页面）')
+    return
+  }
+  // 组标题/颜色：优先取标签组自身属性，缺失时回退默认
+  let groupName = '标签组'
+  let groupColor = DEFAULT_WORKSPACE_COLOR
+  try {
+    const group = await chrome.tabGroups.get(first.groupId)
+    if (group.title) groupName = group.title
+    if (group.color) groupColor = TAB_GROUP_COLOR_HEX[group.color] ?? DEFAULT_WORKSPACE_COLOR
+  } catch {
+    // 标签组可能已解散，使用回退值
+  }
+  await openPickerWindow(groupTabs, { mode: 'create', defaultName: groupName, color: groupColor })
 }
 
 // 快捷键分发。commands.onCommand 回调属于用户手势，打开侧栏需在此同步调用（await 后手势会失效）
@@ -560,6 +736,11 @@ async function savePickerTabsToWorkspace(
   })
 
   if (res.success) {
+    const data = (res.data ?? {}) as { added?: number; skipped?: number }
+    const added = data.added ?? payload.tabs.length
+    const skipped = data.skipped ?? 0
+    const count = payload.tabs.length
+    // 「保存并关闭」语义：无论新增还是跳过，统一关闭用户选中的页面，避免混选时行为不一致
     let closed = false
     if (payload.closeAfterAdd) {
       const ids = payload.tabs.map((t) => t.chromeTabId).filter((id) => id > 0)
@@ -573,15 +754,40 @@ async function savePickerTabsToWorkspace(
         }
       }
     }
-    const count = payload.tabs.length
-    const detail = closed
-      ? count > 1
-        ? `已收藏 ${count} 个标签页并关闭，点击查看`
-        : '当前标签页已收藏并关闭，点击查看'
-      : count > 1
-        ? `已收藏 ${count} 个标签页，点击查看`
-        : '当前标签页已收藏，点击查看'
-    await notify('已加入工作组', detail, NOTIFICATION_SAVE_TAB_SUCCESS)
+    // 读取分组名用于提示文案（失败不影响主流程，回退通用表述）
+    let wsLabel = '该分组'
+    try {
+      const wsRes = await getWorkspaces(true)
+      if (wsRes.ok && wsRes.data) {
+        const name = wsRes.data.workspaces.find((w) => w.id === payload.workspaceId)?.name
+        if (name) wsLabel = `「${name}」`
+      }
+    } catch {
+      /* ignore */
+    }
+    let title: string
+    let detail: string
+    if (added === 0 && skipped > 0) {
+      // 全部已存在：跳过（页面仍按"保存并关闭"语义关闭）
+      title = '已存在'
+      detail = `${wsLabel}下已存在该页面，已跳过并关闭`
+    } else if (skipped > 0) {
+      // 部分已存在：加入新增项并关闭
+      title = '已加入工作组'
+      detail = closed
+        ? `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过）并关闭，点击查看`
+        : `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过），点击查看`
+    } else {
+      title = '已加入工作组'
+      detail = closed
+        ? count > 1
+          ? `已收藏 ${count} 个标签页并关闭，点击查看`
+          : '当前标签页已收藏并关闭，点击查看'
+        : count > 1
+          ? `已收藏 ${count} 个标签页，点击查看`
+          : '当前标签页已收藏，点击查看'
+    }
+    await notify(title, detail, NOTIFICATION_SAVE_TAB_SUCCESS)
   }
   return res
 }
