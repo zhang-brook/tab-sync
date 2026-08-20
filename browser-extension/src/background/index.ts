@@ -208,7 +208,7 @@ async function createContextMenus() {
     chrome.contextMenus.create({
       id: MENU_MORE,
       title: '更多选项',
-      contexts: ['page', 'tab'],
+      contexts: ['page', /* 'tab' */], // tab 似乎不支持二级菜单，所以这里先注释掉了
     })
     chrome.contextMenus.create({
       id: MENU_MORE_SHORTCUTS,
