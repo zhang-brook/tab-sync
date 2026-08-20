@@ -181,6 +181,15 @@ async function createContextMenus() {
       parentId: MENU_MORE,
       title: '重启扩展',
     })
+
+    {
+      const ctx = chrome.contextMenus.ContextType.ACTION
+      chrome.contextMenus.create({
+        id: `${MENU_MORE_RELOAD}-${ctx}`,
+        title: '重启扩展',
+        contexts: [ctx],
+      })
+    }
     logger.info('右键菜单已创建')
   } catch (err) {
     logger.error('创建右键菜单失败:', err)
@@ -218,7 +227,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await openTabAfterActive('chrome://extensions/shortcuts')
     return
   }
-  if (id === MENU_MORE_RELOAD) {
+  if (id === MENU_MORE_RELOAD || id === `${MENU_MORE_RELOAD}-${chrome.contextMenus.ContextType.ACTION}`) {
     // 重启扩展：Service Worker 重载后顶层 createContextMenus 会自动重建菜单
     chrome.runtime.reload()
     return
