@@ -103,7 +103,7 @@
           <el-input v-model="tagForm.name" placeholder="标签名称" maxlength="32" show-word-limit />
         </el-form-item>
         <el-form-item label="颜色">
-          <el-color-picker v-model="tagForm.color" color-format="hex" />
+          <el-color-picker v-model="tagForm.color" color-format="hex" @active-change="onColorActiveChange" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -162,6 +162,11 @@ const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const editingTag = ref<TagInfo | null>(null)
 const tagForm = reactive({ name: '', color: '#409EFF', description: '' })
+
+// 颜色面板失焦关闭时会回退到关闭前的值，实时同步预览色使选色直接生效
+function onColorActiveChange(color: string | null) {
+  if (color && color !== tagForm.color) tagForm.color = color
+}
 
 async function loadTags() {
   tagsLoading.value = true

@@ -51,7 +51,7 @@
       <!-- 从列表新建标签 -->
       <div class="tag-create">
         <el-input v-model="newName" placeholder="新标签名称" size="small" style="flex: 1" maxlength="20" show-word-limit />
-        <el-color-picker v-model="newColor" size="small" />
+        <el-color-picker v-model="newColor" size="small" @active-change="onColorActiveChange" />
         <el-button size="small" type="primary" :disabled="!newName.trim()" @click="createTagFromList">新建</el-button>
       </div>
     </div>
@@ -95,6 +95,11 @@ const filterKeyword = ref('')
 // 列表新建标签
 const newName = ref('')
 const newColor = ref('')
+
+// 颜色面板失焦关闭时会回退到关闭前的值，实时同步预览色使选色直接生效
+function onColorActiveChange(color: string | null) {
+  if (color && color !== newColor.value) newColor.value = color
+}
 
 // 防循环同步标志
 let syncingInput = false
