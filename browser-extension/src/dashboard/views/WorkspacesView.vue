@@ -718,6 +718,9 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'delete':
       handleDelete(ws)
       break
+    case 'copyTitle':
+      copyToClipboard(node.name, '标题已复制')
+      break
   }
 }
 

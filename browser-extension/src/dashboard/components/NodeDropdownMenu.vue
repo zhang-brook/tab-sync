@@ -12,14 +12,17 @@
     <el-dropdown-item :command="'openAsGroup'" :icon="Collection" :disabled="data.tabCount === 0">
       打开所有标签页（打开为标签组）
     </el-dropdown-item>
-    <el-dropdown-item :command="'createChild'" :icon="FolderAdd" divided>
+    <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem" divided>
+      编辑
+    </el-dropdown-item>
+    <el-dropdown-item :command="'createChild'" :icon="FolderAdd">
       新建子工作组
     </el-dropdown-item>
     <el-dropdown-item :command="'setDefault'" :icon="Star" :disabled="data.id === defaultWorkspaceId">
       设置为默认分组
     </el-dropdown-item>
-    <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem">
-      编辑
+    <el-dropdown-item :command="'copyTitle'" :icon="DocumentCopy" divided>
+      复制标题
     </el-dropdown-item>
     <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem || data.id === defaultWorkspaceId">
       删除
@@ -28,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{
