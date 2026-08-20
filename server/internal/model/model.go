@@ -146,6 +146,7 @@ type RecycleBinTab struct {
 	DisplayName           string    `gorm:"size:500"` // 用户自定义显示名
 	FavIconURL            string    `gorm:"size:2048"`
 	SortOrder             int       `gorm:"default:0"`
+	AddedAt               time.Time // 标签页在原工作组中的添加时间（恢复时回填，避免丢失用户自定义时间）
 	DeletedAt             time.Time // 移入回收站的时间
 	CreatedAt             time.Time
 }

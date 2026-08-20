@@ -60,6 +60,7 @@ func (s *RecycleBinService) Add(tx *gorm.DB, originalWorkspaceID, originalWorksp
 		DisplayName:           tab.DisplayName,
 		FavIconURL:            tab.FavIconURL,
 		SortOrder:             tab.SortOrder,
+		AddedAt:               tab.AddedAt,
 		DeletedAt:             time.Now(),
 	}
 	return tx.Create(&item).Error
@@ -87,7 +88,8 @@ func (s *RecycleBinService) Restore(id uint) error {
 		DisplayName: item.DisplayName,
 		FavIconURL:  item.FavIconURL,
 		SortOrder:   0,
-		AddedAt:     time.Now(),
+		// 优先保留回收站中记录的添加时间（用户可能手动改过），为空时回退到当前时间
+		AddedAt: addedAtOrNow(item.AddedAt),
 	}
 	if err := s.db.Create(&newTab).Error; err != nil {
 		return err
@@ -105,6 +107,15 @@ func (s *RecycleBinService) Delete(id uint) error {
 // Empty 清空回收站
 func (s *RecycleBinService) Empty() error {
 	return s.db.Where("1 = 1").Delete(&model.RecycleBinTab{}).Error
+}
+
+// addedAtOrNow 返回回收站记录的添加时间；若该时间为空（旧数据或从未设置），
+// 回退为当前时间，并统一截断到秒，与新增标签页的存储格式保持一致。
+func addedAtOrNow(addedAt time.Time) time.Time {
+	if addedAt.IsZero() {
+		return time.Now().Truncate(time.Second)
+	}
+	return addedAt.Truncate(time.Second)
 }
 
 func toRecycleBinResponse(it model.RecycleBinTab) RecycleBinTabResponse {
