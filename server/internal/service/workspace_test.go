@@ -82,7 +82,7 @@ func TestWorkspaceService_Delete(t *testing.T) {
 
 	result, _ := svc.Create(CreateWorkspacePayload{Name: "待删除"})
 
-	err := svc.Delete(result.Workspace.ID)
+	err := svc.Delete(result.Workspace.ID, "")
 	if err != nil {
 		t.Fatalf("删除工作组失败: %v", err)
 	}

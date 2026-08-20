@@ -306,6 +306,10 @@ async function onDeleteNode(node: WorkspaceTreeNode) {
     ElMessage.warning('系统分组不可删除')
     return
   }
+  if (node.id === defaultWorkspaceId.value) {
+    ElMessage.warning('默认分组不可删除，请先更改默认分组')
+    return
+  }
   const flat = flattenWorkspaces(treeData.value)
   const descendantIds = collectDescendantIds(flat, node.id)
   const childCount = descendantIds.length
@@ -321,7 +325,7 @@ async function onDeleteNode(node: WorkspaceTreeNode) {
   } catch {
     return
   }
-  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: node.id } })
+  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: node.id, defaultWorkspaceId: defaultWorkspaceId.value } })
   if (res.success) {
     ElMessage.success('工作组已删除')
     await reload()

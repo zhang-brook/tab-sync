@@ -21,7 +21,7 @@
     <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem">
       编辑
     </el-dropdown-item>
-    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem">
+    <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem || data.id === defaultWorkspaceId">
       删除
     </el-dropdown-item>
   </el-dropdown-menu>

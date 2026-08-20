@@ -263,7 +263,9 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 }
 
 // Delete 递归删除工作区及其整棵子树（含所有子/孙工作组与它们的标签页）
-func (s *WorkspaceService) Delete(id string) error {
+// defaultWorkspaceID 为前端当前默认分组 ID（可选）：若待删分组正是默认分组则拒绝删除，
+// 防止同步「加入并关闭」等快捷操作因默认分组被删而失效。
+func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 加载全部未删除工作组，构建 parentId -> 子级 映射
 		var all []model.Workspace
@@ -274,6 +276,9 @@ func (s *WorkspaceService) Delete(id string) error {
 		for _, w := range all {
 			if w.WorkspaceID == id && w.IsSystem {
 				return errors.New("系统工作组不可删除")
+			}
+			if defaultWorkspaceID != "" && w.WorkspaceID == id && w.WorkspaceID == defaultWorkspaceID {
+				return errors.New("默认分组不可删除，请先更改默认分组")
 			}
 			childrenMap[w.ParentID] = append(childrenMap[w.ParentID], w.WorkspaceID)
 		}

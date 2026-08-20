@@ -80,8 +80,10 @@ func (h *WorkspaceHandler) Update(c *gin.Context) {
 // Delete 删除工作区
 func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.svc.Delete(id); err != nil {
-		InternalError(c, "删除工作区失败")
+	// 默认分组由前端以查询参数传入，避免其被删后「加入并关闭」等快捷操作失效
+	defaultWorkspaceID := c.Query("defaultWorkspaceId")
+	if err := h.svc.Delete(id, defaultWorkspaceID); err != nil {
+		BadRequest(c, err.Error())
 		return
 	}
 	Success(c, gin.H{"success": true})

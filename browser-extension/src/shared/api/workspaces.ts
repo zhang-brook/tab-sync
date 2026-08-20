@@ -28,9 +28,11 @@ export function updateWorkspace(
   return apiClient.put<{ workspace: Workspace }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`, payload)
 }
 
-/** 删除工作区 */
-export function deleteWorkspace(id: string) {
-  return apiClient.delete<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`)
+/** 删除工作区。defaultWorkspaceId 为当前默认分组 ID（可选），传给后端作为兜底校验，
+ * 防止默认分组被删除后「加入并关闭」等快捷操作失效。 */
+export function deleteWorkspace(id: string, defaultWorkspaceId?: string) {
+  const query = defaultWorkspaceId ? `?defaultWorkspaceId=${encodeURIComponent(defaultWorkspaceId)}` : ''
+  return apiClient.delete<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}${query}`)
 }
 
 /** 获取所有工作组标签页摘要（用于 TabsView 交叉比对打 tag） */

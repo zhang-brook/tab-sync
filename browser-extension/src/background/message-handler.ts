@@ -47,7 +47,7 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return handleUpdateWorkspace(message.payload)
 
     case 'DELETE_WORKSPACE':
-      return handleDeleteWorkspace(message.payload.id)
+      return handleDeleteWorkspace(message.payload.id, message.payload.defaultWorkspaceId)
 
     case 'OPEN_WORKSPACE':
       return handleOpenWorkspace(message.payload)
@@ -309,8 +309,8 @@ async function handleUpdateWorkspace(
 }
 
 /** 删除工作组（通过后端 API） */
-async function handleDeleteWorkspace(id: string): Promise<MessageResponse> {
-  const res = await deleteWorkspace(id)
+async function handleDeleteWorkspace(id: string, defaultWorkspaceId?: string): Promise<MessageResponse> {
+  const res = await deleteWorkspace(id, defaultWorkspaceId)
   if (res.ok) {
     logger.info('Workspace deleted:', id)
     return { success: true }

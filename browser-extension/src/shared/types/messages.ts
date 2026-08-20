@@ -93,7 +93,7 @@ export interface UpdateWorkspaceMessage {
 
 export interface DeleteWorkspaceMessage {
   action: 'DELETE_WORKSPACE'
-  payload: { id: string }
+  payload: { id: string; defaultWorkspaceId?: string }
 }
 
 export interface OpenWorkspaceMessage {

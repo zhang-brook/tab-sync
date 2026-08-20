@@ -122,8 +122,8 @@
                   <span>编辑组</span>
                 </el-button>
               </el-tooltip>
-              <el-tooltip content="删除" placement="top">
-                <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem"
+              <el-tooltip :content="selectedWorkspace?.isSystem ? '系统分组不可删除' : (selectedWorkspace?.id === defaultWorkspaceId ? '默认分组不可删除' : '删除')" placement="top">
+                <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem || selectedWorkspace?.id === defaultWorkspaceId"
                   @click="handleDelete(selectedWorkspace)">
                   <el-icon>
                     <Delete />
@@ -766,6 +766,11 @@ async function handleSave() {
 }
 
 async function handleDelete(ws: Workspace) {
+  // 默认分组不可删除，请先更改默认分组
+  if (ws.id === defaultWorkspaceId.value) {
+    ElMessage.warning('默认分组不可删除，请先更改默认分组')
+    return
+  }
   const descendantIds = collectDescendantIds(workspaces.value, ws.id)
   const childCount = descendantIds.length
   const tabCount = workspaces.value
@@ -781,7 +786,7 @@ async function handleDelete(ws: Workspace) {
     return
   }
 
-  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: ws.id } })
+  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: ws.id, defaultWorkspaceId: defaultWorkspaceId.value } })
   if (res.success) {
     ElMessage.success('工作组已删除')
     if (selectedId.value === ws.id) selectedId.value = ''
