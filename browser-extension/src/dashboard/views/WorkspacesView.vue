@@ -249,7 +249,7 @@
           <div style="display: flex; align-items: center; gap: 8px; width: 100%">
             <el-date-picker v-model="timeValue" type="datetime" placeholder="选择日期时间" :clearable="false"
               style="flex: 1;" />
-            <el-link type="primary" :underline="false" @click="setTimeToNow" style="margin-left: 15px; margin-right: 10px;">
+            <el-link type="primary" underline="never" @click="setTimeToNow" style="margin-left: 15px; margin-right: 10px;">
               设为当前时间
             </el-link>
           </div>
