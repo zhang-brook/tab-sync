@@ -4,6 +4,7 @@ import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { DASHBOARD_URL, PICKER_URL } from '../shared/utils/pages'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
+import { getWorkspaces } from '../shared/api/workspaces'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 
 logger.info('Service Worker started')
@@ -59,10 +60,31 @@ const MENU_MORE = 'tab-sync-more'
 const MENU_MORE_SHORTCUTS = 'tab-sync-more-shortcuts'
 const MENU_MORE_RELOAD = 'tab-sync-more-reload'
 
+/** 截断分组名：超过 10 个字显示前 10 字 + '...'（右键菜单标题提示用） */
+function truncateGroupName(name: string, max = 10): string {
+  const chars = Array.from(name)
+  return chars.length > max ? chars.slice(0, max).join('') + '...' : name
+}
+
+/** 读取默认收藏分组名：未登录/获取失败返回 null，调用方回退展示「默认分组」 */
+async function getDefaultWorkspaceName(): Promise<string | null> {
+  try {
+    const wsId = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
+    const res = await getWorkspaces(true)
+    if (!res.ok || !res.data) return null
+    return res.data.workspaces.find((w) => w.id === wsId)?.name ?? null
+  } catch {
+    return null
+  }
+}
+
 /** 创建右键菜单项（覆盖式重建，避免重复） */
 async function createContextMenus() {
   try {
     await chrome.contextMenus.removeAll()
+    // 默认分组名：登录且能定位到分组时展示实际名字（如「保存到 [未分组](默认分组) 并关闭」），否则回退通用文案
+    const defaultName = await getDefaultWorkspaceName()
+    const defaultGroupLabel = defaultName ? `[${truncateGroupName(defaultName)}](默认分组) ` : '默认分组'
     // 页面右键：仅 http(s) 页面显示
     const page: chrome.contextMenus.CreateProperties = {
       contexts: ['page'],
@@ -76,7 +98,7 @@ async function createContextMenus() {
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_DEFAULT,
-      title: '保存到 默认分组并关闭（Shift+Alt+S）',
+      title: `保存到 ${defaultGroupLabel} 并关闭（Shift+Alt+S）`,
       ...page,
     })
     chrome.contextMenus.create({
@@ -94,7 +116,7 @@ async function createContextMenus() {
     const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_DEFAULT,
-      title: '保存标签页到 默认分组并关闭（Shift+Alt+S）',
+      title: `保存标签页到 ${defaultGroupLabel} 并关闭（Shift+Alt+S）`,
       ...tab,
     })
     chrome.contextMenus.create({
@@ -164,6 +186,14 @@ async function createContextMenus() {
     logger.error('创建右键菜单失败:', err)
   }
 }
+
+// 默认分组或登录状态变化后重建菜单，使标题中的分组名同步（createContextMenus 幂等）
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return
+  if (changes[STORAGE_KEYS.DEFAULT_WORKSPACE_ID] || changes[STORAGE_KEYS.AUTH_TOKEN]) {
+    void createContextMenus()
+  }
+})
 
 /** 右键菜单点击分发 */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
