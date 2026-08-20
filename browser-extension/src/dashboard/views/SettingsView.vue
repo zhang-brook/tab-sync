@@ -115,6 +115,19 @@
       </el-form>
     </el-card>
 
+    <!-- 扩展管理 -->
+    <el-card shadow="never">
+      <template #header>
+        <span class="card-title">扩展管理</span>
+      </template>
+      <el-form label-width="96px" label-position="left">
+        <el-form-item label="重新加载">
+          <el-button size="small" type="primary" @click="reloadExtension">重新加载扩展</el-button>
+          <div class="form-tip">修改快捷键后点击此按钮重新加载扩展使新按键立即生效（等同于 chrome://extensions 页面的「重新加载」）</div>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
     <!-- 版本协商 -->
     <el-card v-if="versionInfo" shadow="never">
       <template #header>
@@ -146,11 +159,8 @@
 
       <el-form label-width="120px" label-position="left">
         <el-form-item label="设备 ID">
-          <el-input :model-value="deviceId" readonly>
-            <template #append>
-              <el-button @click="copyDeviceId">复制</el-button>
-            </template>
-          </el-input>
+          <span class="device-id-text">{{ deviceId }}</span>
+          <el-button link type="primary" size="small" @click="copyDeviceId" style="margin-left: 8px">复制</el-button>
         </el-form-item>
         <el-form-item label="设备名称">
           <span>{{ deviceName || '--' }}</span>
@@ -275,6 +285,12 @@ async function loadShortcuts() {
 function openShortcutsPage() {
   // chrome://extensions/shortcuts 无法在扩展页内直接跳转，通过新标签页打开
   void openTabAfterActive('chrome://extensions/shortcuts')
+}
+
+function reloadExtension() {
+  // 重新加载整个扩展（MV3 中 chrome.runtime.reload 等同于 chrome://extensions 页面的「重新加载」按钮）
+  // 用于让用户在 chrome://extensions/shortcuts 修改的快捷键立即生效
+  chrome.runtime.reload()
 }
 
 // 默认收藏工作组（通过公共分组选择器选择，支持树状展示与禁用）
@@ -426,7 +442,7 @@ async function checkVersion() {
 
 function copyDeviceId() {
   navigator.clipboard.writeText(deviceId.value).then(() => {
-    ElMessage.success('已复制到剪贴板')
+    ElMessage.success('设备 ID 已复制到剪贴板')
   })
 }
 
@@ -466,6 +482,13 @@ async function handleClearData() {
   color: #909399;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+.device-id-text {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  color: #303133;
+  word-break: break-all;
 }
 
 /* 快捷键按键：第一行黑字展示按键，描述放第二行小字 */
