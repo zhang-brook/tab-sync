@@ -26,7 +26,7 @@ chrome.tabs.onHighlighted.addListener((highlightInfo) => {
     title: `保存 ${subject}到 选定分组…${shortcutHint('save-pick')}`,
   })
   chrome.contextMenus.update(MENU_TAB_SAVE_AS_NEW, {
-    title: `保存 ${subject}到 新工作组…${''/*shortcutHint('save-pick')*/}`,
+    title: `保存 ${subject}到 新工作组…${''/*shortcutHint('save-as-new')*/}`,
   })
   // 标签组菜单标题：按选中集合（高亮集）的分组状态更新
   void updateGroupMenuTitles(highlightInfo.tabIds)

@@ -25,7 +25,7 @@
       复制标题
     </el-dropdown-item>
     <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem || data.id === defaultWorkspaceId">
-      删除
+      彻底删除（不经过回收站）
     </el-dropdown-item>
   </el-dropdown-menu>
 </template>
