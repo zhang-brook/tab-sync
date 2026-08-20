@@ -55,6 +55,7 @@ const MENU_TAB_SAVE_PICK = 'tab-sync-tab-save-pick'
 // 同一动作在每个上下文需独立 id（追加上下文后缀），点击时按前缀分发
 const MENU_OPEN_SIDEPANEL = 'tab-sync-open-sidepanel'
 const MENU_OPEN_SETTINGS = 'tab-sync-open-settings'
+const MENU_OPEN_WORKSPACES = 'tab-sync-open-workspaces'
 // 更多选项子菜单（父项带子菜单，子项以 parentId 挂在父项下）
 const MENU_MORE = 'tab-sync-more'
 const MENU_MORE_SHORTCUTS = 'tab-sync-more-shortcuts'
@@ -155,6 +156,11 @@ async function createContextMenus() {
     ]
     for (const ctx of openMenuContexts) {
       chrome.contextMenus.create({
+        id: `${MENU_OPEN_WORKSPACES}-${ctx}`,
+        title: '查看已同步工作组',
+        contexts: [ctx],
+      })
+      chrome.contextMenus.create({
         id: `${MENU_OPEN_SIDEPANEL}-${ctx}`,
         title: '打开侧栏',
         contexts: [ctx],
@@ -218,6 +224,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
     return
   }
+  if (String(id).startsWith(MENU_OPEN_WORKSPACES + '-')) {
+    await openWorkspacesPage()
+    return
+  }
   if (String(id).startsWith(MENU_OPEN_SETTINGS + '-')) {
     await openSettingsPage()
     return
@@ -261,18 +271,28 @@ function openSidePanel(windowId: number) {
 
 /** 打开 Dashboard 设置页（已打开则激活并切换到设置路由，否则新建标签页） */
 async function openSettingsPage() {
+  openPage('#/settings')
+}
+
+/** 打开 Dashboard 工作组页（已打开则激活并切换到工作组路由，否则新建标签页） */
+async function openWorkspacesPage() {
+  openPage('#/workspaces')
+}
+
+/** 打开页（已打开则激活并切换到指定页的路由，否则新建标签页） */
+async function openPage(page: string) {
   const baseUrl = DASHBOARD_URL
-  const settingsUrl = baseUrl + '#/settings'
+  const pageUrl = baseUrl + page
   // match pattern 不匹配 URL fragment，带 hash 的现有 Dashboard 标签页也能查到
   const tabs = await chrome.tabs.query({ url: baseUrl + '*' })
   if (tabs.length > 0 && tabs[0].id != null) {
-    await chrome.tabs.update(tabs[0].id, { active: true, url: settingsUrl })
+    await chrome.tabs.update(tabs[0].id, { active: true, url: pageUrl })
     if (tabs[0].windowId != null) {
       await chrome.windows.update(tabs[0].windowId, { focused: true })
     }
   } else {
     // 在当前窗口的激活标签页之后打开（而非追加到末尾）
-    await openTabAfterActive(settingsUrl)
+    await openTabAfterActive(pageUrl)
   }
 }
 
