@@ -70,25 +70,30 @@
       </template>
 
       <el-form label-width="120px" label-position="left">
-        <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
-        <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label" label-width="170px">
-          <div class="shortcut-row">
-            <span class="shortcut-key">
-              <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
-              <template v-else>未设置快捷键</template>
+        <!-- 加载中占位 -->
+        <el-skeleton v-if="shortcutsLoading" :rows="5" animated />
 
-              <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
-              <span v-else class="shortcut-text shortcut-default">(默认)</span>
+        <template v-else>
+          <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
+          <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label" label-width="170px">
+            <div class="shortcut-row">
+              <span class="shortcut-key">
+                <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
+                <template v-else>未设置快捷键</template>
 
-              <el-button link type="primary" size="small" @click="openShortcutsPage" style="margin-left: 5px">
-                {{ sc.shortcut ? '前往修改' : '前往设置' }}
-              </el-button>
-            </span>
-            <div class="form-tip">
-              {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default || '无快捷键' }}）</template>
+                <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
+                <span v-else class="shortcut-text shortcut-default">(默认)</span>
+
+                <el-button link type="primary" size="small" @click="openShortcutsPage" style="margin-left: 5px">
+                  {{ sc.shortcut ? '前往修改' : '前往设置' }}
+                </el-button>
+              </span>
+              <div class="form-tip">
+                {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default || '无快捷键' }}）</template>
+              </div>
             </div>
-          </div>
-        </el-form-item>
+          </el-form-item>
+        </template>
         <el-form-item label="启用快捷键">
           <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
           <div class="form-tip">关闭后「加入并关闭」快捷键将不再触发收藏</div>
@@ -236,6 +241,8 @@ const SHORTCUT_META: Record<string, { label: string; description: string; defaul
 }
 
 const shortcuts = ref<{ id: string; label: string; description: string; shortcut: string; default: string; modified: boolean }[]>([])
+// 快捷键加载占位：chrome.commands.getAll() 为异步读取，加载完成前展示 skeleton
+const shortcutsLoading = ref(true)
 
 // Chrome 会按修饰键字母顺序规范化按键（如 Shift+Alt+S → Alt+Shift+S），比较前先统一排序避免误判
 function normalizeShortcut(key: string): string {
@@ -245,19 +252,24 @@ function normalizeShortcut(key: string): string {
 }
 
 async function loadShortcuts() {
-  const commands = await chrome.commands.getAll()
-  const byName = new Map(commands.map((c) => [c.name, c.shortcut ?? '']))
-  shortcuts.value = SHORTCUT_ORDER.map((name) => {
-    const meta = SHORTCUT_META[name]
-    const shortcut = byName.get(name) ?? ''
-    return {
-      id: name,
-      ...meta,
-      shortcut,
-      // 已绑定且与默认键不同视为修改过；无默认键的命令（如打开侧栏）只要用户绑定了即视为修改
-      modified: !!shortcut && (meta.default ? normalizeShortcut(shortcut) !== normalizeShortcut(meta.default) : true),
-    }
-  })
+  shortcutsLoading.value = true
+  try {
+    const commands = await chrome.commands.getAll()
+    const byName = new Map(commands.map((c) => [c.name, c.shortcut ?? '']))
+    shortcuts.value = SHORTCUT_ORDER.map((name) => {
+      const meta = SHORTCUT_META[name]
+      const shortcut = byName.get(name) ?? ''
+      return {
+        id: name,
+        ...meta,
+        shortcut,
+        // 已绑定且与默认键不同视为修改过；无默认键的命令（如打开侧栏）只要用户绑定了即视为修改
+        modified: !!shortcut && (meta.default ? normalizeShortcut(shortcut) !== normalizeShortcut(meta.default) : true),
+      }
+    })
+  } finally {
+    shortcutsLoading.value = false
+  }
 }
 
 function openShortcutsPage() {
