@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/spidermemos/tab-sync-server/internal/service"
 )
@@ -129,6 +131,10 @@ func (h *TagHandler) RemoveFromTab(c *gin.Context) {
 	tabID, _ := strconv.ParseUint(c.Param("tabId"), 10, 64)
 	tagID, _ := strconv.ParseUint(c.Param("tagId"), 10, 64)
 	if err := h.svc.RemoveFromTab(wsID, uint(tabID), uint(tagID)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			NotFound(c, "标签页或标签关联不存在")
+			return
+		}
 		InternalError(c, "移除标签失败")
 		return
 	}
@@ -157,6 +163,10 @@ func (h *TagHandler) RemoveFromWorkspace(c *gin.Context) {
 	wsID := c.Param("id")
 	tagID, _ := strconv.ParseUint(c.Param("tagId"), 10, 64)
 	if err := h.svc.RemoveFromWorkspace(wsID, uint(tagID)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			NotFound(c, "工作组或标签关联不存在")
+			return
+		}
 		InternalError(c, "移除标签失败")
 		return
 	}

@@ -115,8 +115,15 @@ func (s *TagService) AddToTab(workspaceID string, tabID, tagID uint) error {
 
 // RemoveFromTab 去掉标签页上的标签
 func (s *TagService) RemoveFromTab(workspaceID string, tabID, tagID uint) error {
-	return s.db.Where("workspace_tab_id = ? AND workspace_id = ? AND tag_id = ?", tabID, workspaceID, tagID).
-		Delete(&model.TabTag{}).Error
+	res := s.db.Where("workspace_tab_id = ? AND workspace_id = ? AND tag_id = ?", tabID, workspaceID, tagID).
+		Delete(&model.TabTag{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // AddToWorkspace 给工作组打标签（校验工作组存在）
@@ -137,8 +144,15 @@ func (s *TagService) AddToWorkspace(workspaceID string, tagID uint) error {
 
 // RemoveFromWorkspace 去掉工作组上的标签
 func (s *TagService) RemoveFromWorkspace(workspaceID string, tagID uint) error {
-	return s.db.Where("workspace_id = ? AND tag_id = ?", workspaceID, tagID).
-		Delete(&model.WorkspaceTag{}).Error
+	res := s.db.Where("workspace_id = ? AND tag_id = ?", workspaceID, tagID).
+		Delete(&model.WorkspaceTag{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // TagTabItem 表示带有某个标签的云端标签页（关联 WorkspaceTab）
