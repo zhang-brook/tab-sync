@@ -1,5 +1,5 @@
-import { DEFAULT_WORKSPACE_COLOR } from '../../shared/constants/theme'
 import { getWorkspaces } from '../../shared/api/workspaces'
+import { DEFAULT_WORKSPACE_COLOR } from '../../shared/constants/theme'
 import { storage, STORAGE_KEYS } from '../../shared/storage'
 import { logger } from '../../shared/utils/logger'
 import { DASHBOARD_URL, PICKER_URL } from '../../shared/utils/pages'
@@ -41,12 +41,12 @@ export function openSidePanel(windowId: number) {
 
 /** 打开 Dashboard 设置页（已打开则激活并切换到设置路由，否则新建标签页） */
 export async function openSettingsPage() {
-  openPage('#/settings')
+  await openPage('#/settings')
 }
 
 /** 打开 Dashboard 工作组页（已打开则激活并切换到工作组路由，否则新建标签页） */
 export async function openWorkspacesPage() {
-  openPage('#/workspaces')
+  await openPage('#/workspaces')
 }
 
 /** 打开页（已打开则激活并切换到指定页的路由，否则新建标签页） */
