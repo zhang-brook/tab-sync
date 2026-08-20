@@ -72,17 +72,17 @@ export default defineManifest({
     // 添加到用户设置的默认分组
     'save-and-close': {
       suggested_key: { default: 'Shift+Alt+S' },
-      description: '将当前标签页加入工作组并关闭',
+      description: '【加入默认工作组并关闭】将当前标签页加入工作组并关闭（默认：Shift+Alt+S）',
     },
     // 添加到 [未分组]
     'save-ungrouped': {
       suggested_key: { default: 'Alt+Shift+U' },
-      description: '保存当前标签页到 [未分组] 并关闭',
+      description: '【保存到 [未分组]】保存当前标签页到 [未分组] 并关闭（默认：Shift+Alt+U）',
     },
     // 选择指定分组，然后添加
     'save-pick': {
       suggested_key: { default: 'Alt+Shift+G' },
-      description: '保存当前标签页到选定分组',
+      description: '【保存到选定分组】保存当前标签页到选定分组（默认：Alt+Shift+G）',
     },
     // 注意：Chrome 仅自动分配前 4 个命令的快捷键，多余的键需在 chrome://extensions/shortcuts 手动绑定
   },

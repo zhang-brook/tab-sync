@@ -71,15 +71,23 @@
 
       <el-form label-width="120px" label-position="left">
         <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
-        <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label">
-          <span class="form-tip">
-            <template v-if="sc.shortcut">
-              按 <code>{{ sc.shortcut }}</code> {{ sc.description }}，<el-button link type="primary" size="small" @click="openShortcutsPage">前往修改</el-button>
-            </template>
-            <template v-else>
-              未设置按键，<el-button link type="primary" size="small" @click="openShortcutsPage">前往设置</el-button>
-            </template>
-          </span>
+        <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label" label-width="170px">
+          <div class="shortcut-row">
+            <span class="shortcut-key">
+              <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
+              <template v-else>未设置按键</template>
+
+              <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
+              <span v-else class="shortcut-text shortcut-default">(默认)</span>
+
+              <el-button link type="primary" size="small" @click="openShortcutsPage" style="margin-left: 5px">
+                {{ sc.shortcut ? '前往修改' : '前往设置' }}
+              </el-button>
+            </span>
+            <div class="form-tip">
+              {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default }}）</template>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="启用快捷键">
           <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
@@ -217,25 +225,39 @@ const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 // 是否启用「加入并关闭」快捷键
 const shortcutEnabled = ref(true)
 
-// 快捷键命令元信息：展示顺序与 manifest.config.ts 的 commands 保持一致
+// 快捷键命令元信息：展示顺序与 manifest.config.ts 的 commands 保持一致；default 为其 suggested_key（无默认值的命令为空）
 const SHORTCUT_ORDER = ['save-and-close', 'save-ungrouped', 'save-pick', 'open-sidepanel', 'open-settings']
-const SHORTCUT_META: Record<string, { label: string; description: string }> = {
-  'save-and-close': { label: '加入并关闭', description: '将当前标签页加入默认工作组并关闭' },
-  'save-ungrouped': { label: '保存到 [未分组]', description: '将当前标签页保存到 [未分组] 并关闭' },
-  'save-pick': { label: '保存到选定分组', description: '选择分组后将当前标签页保存并关闭' },
-  'open-sidepanel': { label: '打开侧栏', description: '打开 Tab Sync 侧边栏' },
-  'open-settings': { label: '打开设置页', description: '打开 Tab Sync 设置页面' },
+const SHORTCUT_META: Record<string, { label: string; description: string; default: string }> = {
+  'save-and-close': { label: '加入默认工作组并关闭', description: '将当前标签页加入默认工作组并关闭', default: 'Shift+Alt+S' },
+  'save-ungrouped': { label: '保存到 [未分组]', description: '将当前标签页保存到 [未分组] 并关闭', default: 'Alt+Shift+U' },
+  'save-pick': { label: '保存到选定分组', description: '选择分组后将当前标签页保存并关闭', default: 'Alt+Shift+G' },
+  'open-sidepanel': { label: '打开侧栏', description: '打开 Tab Sync 侧边栏', default: '' },
+  'open-settings': { label: '打开设置页', description: '打开 Tab Sync 设置页面', default: '' },
 }
-const shortcuts = ref<{ id: string; label: string; description: string; shortcut: string }[]>([])
+
+const shortcuts = ref<{ id: string; label: string; description: string; shortcut: string; default: string; modified: boolean }[]>([])
+
+// Chrome 会按修饰键字母顺序规范化按键（如 Shift+Alt+S → Alt+Shift+S），比较前先统一排序避免误判
+function normalizeShortcut(key: string): string {
+  const parts = key.split('+')
+  const mods = parts.slice(0, -1).sort((a, b) => ['Ctrl', 'Alt', 'Shift'].indexOf(a) - ['Ctrl', 'Alt', 'Shift'].indexOf(b))
+  return [...mods, parts[parts.length - 1]].join('+')
+}
 
 async function loadShortcuts() {
   const commands = await chrome.commands.getAll()
   const byName = new Map(commands.map((c) => [c.name, c.shortcut ?? '']))
-  shortcuts.value = SHORTCUT_ORDER.map((name) => ({
-    id: name,
-    ...SHORTCUT_META[name],
-    shortcut: byName.get(name) ?? '',
-  }))
+  shortcuts.value = SHORTCUT_ORDER.map((name) => {
+    const meta = SHORTCUT_META[name]
+    const shortcut = byName.get(name) ?? ''
+    return {
+      id: name,
+      ...meta,
+      shortcut,
+      // 已绑定且与默认键不同视为用户修改过
+      modified: !!shortcut && !!meta.default && normalizeShortcut(shortcut) !== normalizeShortcut(meta.default),
+    }
+  })
 }
 
 function openShortcutsPage() {
@@ -432,6 +454,34 @@ async function handleClearData() {
   color: #909399;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+/* 快捷键按键：第一行黑字展示按键，描述放第二行小字 */
+.shortcut-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcut-key {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.shortcut-text {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* 已修改标记：与第二行默认提示同为小字，用警示色突出状态 */
+.shortcut-modified {
+  color: #e6a23c;
+}
+
+.shortcut-default {
+  color: #909399;
 }
 
 .ws-picker-row {
