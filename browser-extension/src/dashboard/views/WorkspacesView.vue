@@ -350,8 +350,9 @@ import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/compo
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
@@ -385,6 +386,8 @@ const treeProps = { label: 'name', children: 'children' }
 // 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
 const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 const defaultWorkspaceId = ref('')
+
+const { confirmDeleteWorkspace } = useWorkspaceActions()
 
 // 对话框
 const dialogVisible = ref(false)
@@ -766,33 +769,10 @@ async function handleSave() {
 }
 
 async function handleDelete(ws: Workspace) {
-  // 默认分组不可删除，请先更改默认分组
-  if (ws.id === defaultWorkspaceId.value) {
-    ElMessage.warning('默认分组不可删除，请先更改默认分组')
-    return
-  }
-  const descendantIds = collectDescendantIds(workspaces.value, ws.id)
-  const childCount = descendantIds.length
-  const tabCount = workspaces.value
-    .filter((w) => w.id === ws.id || descendantIds.includes(w.id))
-    .reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0)
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除工作组「${ws.name}」吗？其 ${childCount} 个子工作组及全部 ${tabCount} 个标签页将一并删除，且不可恢复。`,
-      '删除工作组',
-      { type: 'warning' },
-    )
-  } catch {
-    return
-  }
-
-  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: ws.id, defaultWorkspaceId: defaultWorkspaceId.value } })
-  if (res.success) {
-    ElMessage.success('工作组已删除')
+  const ok = await confirmDeleteWorkspace(workspaces.value, ws, defaultWorkspaceId.value)
+  if (ok) {
     if (selectedId.value === ws.id) selectedId.value = ''
     await loadWorkspaces()
-  } else {
-    ElMessage.error(res.error || '删除失败')
   }
 }
 

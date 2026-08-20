@@ -85,3 +85,26 @@ export function collectDescendantIds(workspaces: Workspace[], rootId: string): s
   }
   return result
 }
+
+/**
+ * 计算删除某个工作组时的影响范围（含其整棵子树）。
+ * 返回受影响的子工作组数量与标签页总数。
+ */
+export function getDeleteImpact(workspaces: Workspace[], id: string): { childCount: number; tabCount: number } {
+  const descendantIds = collectDescendantIds(workspaces, id)
+  const childCount = descendantIds.length
+  const tabCount = workspaces
+    .filter((w) => w.id === id || descendantIds.includes(w.id))
+    .reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0)
+  return { childCount, tabCount }
+}
+
+/** 将工作组树节点拍平为原始工作组列表 */
+export function flattenWorkspaces(nodes: WorkspaceTreeNode[]): Workspace[] {
+  const out: Workspace[] = []
+  for (const node of nodes) {
+    out.push(node.workspace)
+    out.push(...flattenWorkspaces(node.children))
+  }
+  return out
+}

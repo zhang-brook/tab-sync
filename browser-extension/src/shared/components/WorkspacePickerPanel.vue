@@ -103,10 +103,11 @@ import { ref, watch, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Edit, Delete, FolderAdd, Open } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
+import { useWorkspaceActions } from '../composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '../storage'
-import { buildWorkspaceTree, collectDescendantIds, findWorkspaceTreeNode, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import { buildWorkspaceTree, findWorkspaceTreeNode, flattenWorkspaces, type WorkspaceTreeNode } from '../utils/workspace-tree'
 import ContextMenu from './ContextMenu.vue'
-import type { Workspace, WorkspacesData } from '../types'
+import type { WorkspacesData } from '../types'
 import { DASHBOARD_URL } from '../utils/pages'
 
 const props = withDefaults(defineProps<{
@@ -148,6 +149,7 @@ const treeRef = ref()
 const selectedNode = ref<WorkspaceTreeNode | null>(null)
 /** 当前默认分组 ID（用于「(默认)」标记与初始选中）；空值回退「未分组」 */
 const defaultWorkspaceId = ref('')
+const { confirmDeleteWorkspace } = useWorkspaceActions()
 // 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
 const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
@@ -218,16 +220,6 @@ function onConfirm() {
 }
 
 // ============ 分组管理（新建 / 重命名 / 删除） ============
-
-/** 将树节点拍平为原始工作组列表（用于统计删除影响范围） */
-function flattenWorkspaces(nodes: WorkspaceTreeNode[]): Workspace[] {
-  const out: Workspace[] = []
-  for (const node of nodes) {
-    out.push(node.workspace)
-    out.push(...flattenWorkspaces(node.children))
-  }
-  return out
-}
 
 /** 顶部「新建工作组」：默认创建在顶层（parentId 为空） */
 async function onCreate() {
@@ -326,38 +318,18 @@ async function onRenameNode(node: WorkspaceTreeNode) {
   }
 }
 
-/** 节点悬停「删除」：确认时提示子分组与标签页将一并删除（与服务端递归删除行为一致） */
+/** 节点悬停「删除」：系统分组直接拦截，其余走统一删除流程（含影响统计与确认弹窗） */
 async function onDeleteNode(node: WorkspaceTreeNode) {
   if (node.workspace.isSystem) {
     ElMessage.warning('系统分组不可删除')
     return
   }
-  if (node.id === defaultWorkspaceId.value) {
-    ElMessage.warning('默认分组不可删除，请先更改默认分组')
-    return
-  }
-  const flat = flattenWorkspaces(treeData.value)
-  const descendantIds = collectDescendantIds(flat, node.id)
-  const childCount = descendantIds.length
-  const tabCount = flat
-    .filter((w) => w.id === node.id || descendantIds.includes(w.id))
-    .reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0)
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除工作组「${node.name}」吗？其 ${childCount} 个子工作组及全部 ${tabCount} 个标签页将一并删除，且不可恢复。`,
-      '删除工作组',
-      { type: 'warning' },
-    )
-  } catch {
-    return
-  }
-  const res = await sendMessage({ action: 'DELETE_WORKSPACE', payload: { id: node.id, defaultWorkspaceId: defaultWorkspaceId.value } })
-  if (res.success) {
-    ElMessage.success('工作组已删除')
-    await reload()
-  } else {
-    ElMessage.error(res.error || '删除工作组失败')
-  }
+  const ok = await confirmDeleteWorkspace(
+    flattenWorkspaces(treeData.value),
+    node.workspace,
+    defaultWorkspaceId.value,
+  )
+  if (ok) await reload()
 }
 </script>
 
