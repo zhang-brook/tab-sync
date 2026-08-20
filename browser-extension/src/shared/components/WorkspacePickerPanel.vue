@@ -51,7 +51,10 @@
             <template #menu v-if="manageable">
               <el-dropdown-menu>
                 <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace.isSystem">
-                  编辑
+                  编辑名称
+                </el-dropdown-item>
+                <el-dropdown-item :command="'goToSettings'" :icon="Open">
+                  前往设置页编辑备注
                 </el-dropdown-item>
                 <el-dropdown-item :command="'createChild'" :icon="FolderAdd">
                   新建子工作组
@@ -98,12 +101,13 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Edit, Delete, FolderAdd } from '@element-plus/icons-vue'
+import { Search, Plus, Edit, Delete, FolderAdd, Open } from '@element-plus/icons-vue'
 import { sendMessage } from '../composables/useMessage'
 import { storage, STORAGE_KEYS } from '../storage'
 import { buildWorkspaceTree, collectDescendantIds, findWorkspaceTreeNode, type WorkspaceTreeNode } from '../utils/workspace-tree'
 import ContextMenu from './ContextMenu.vue'
 import type { Workspace, WorkspacesData } from '../types'
+import { DASHBOARD_URL } from '../utils/pages'
 
 const props = withDefaults(defineProps<{
   /** 确认模式：点击节点仅选中，需点击「确认」后才触发 select；默认 false（选中即触发） */
@@ -268,12 +272,32 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'edit':
       onRenameNode(node)
       break
+    case 'goToSettings':
+      goToDashboardSettings(node)
+      break
     case 'createChild':
       onCreateChild(node)
       break
     case 'delete':
       onDeleteNode(node)
       break
+  }
+}
+
+/** 跳转到后台管理页面的设置页（编辑备注） */
+async function goToDashboardSettings(node: WorkspaceTreeNode) {
+  // 打开带 hash 路由的设置页：#/settings?workspaceId=xxx
+  const url = `${DASHBOARD_URL}#/settings?workspaceId=${encodeURIComponent(node.id)}`
+  const tabs = await chrome.tabs.query({ url: DASHBOARD_URL + '*' })
+  if (tabs.length > 0 && tabs[0].id != null) {
+    // 已有 Dashboard 标签页，切换到它并跳转
+    await chrome.tabs.update(tabs[0].id, { active: true, url })
+    if (tabs[0].windowId != null) {
+      await chrome.windows.update(tabs[0].windowId, { focused: true })
+    }
+  } else {
+    // 没有打开的 Dashboard，打开新标签页
+    await chrome.tabs.create({ url, active: true })
   }
 }
 
