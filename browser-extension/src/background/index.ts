@@ -64,6 +64,11 @@ const MENU_MORE_RELOAD = 'tab-sync-more-reload'
 
 const NOTIFICATION_SAVE_TAB_SUCCESS = 'save-tab-success'
 
+/** 命令名 → 快捷键映射缓存（创建菜单时写入，tabs.onHighlighted 动态更新标题时复用） */
+let menuShortcutMap = new Map<string, string>()
+/** 默认分组菜单标签缓存（如「[未分组](默认分组) 」），tabs.onHighlighted 动态更新标题时复用 */
+let menuDefaultGroupLabel = '默认分组'
+
 /** 从 chrome.commands.getAll() 读取命令名 → 快捷键映射（菜单标题提示用） */
 async function getCommandShortcutMap(): Promise<Map<string, string>> {
   const commands = await chrome.commands.getAll()
@@ -73,6 +78,12 @@ async function getCommandShortcutMap(): Promise<Map<string, string>> {
     if (c.name) map.set(c.name, c.shortcut ?? '')
   }
   return map
+}
+
+/** 未绑定快捷键时不显示括号提示（与设置页「未设置按键」文案一致） */
+function shortcutHint(name: string): string {
+  const key = menuShortcutMap.get(name)
+  return key ? `（${key}）` : ''
 }
 
 /** 截断分组名：超过 10 个字显示前 10 字 + '...'（右键菜单标题提示用） */
@@ -98,15 +109,11 @@ async function createContextMenus() {
   try {
     await chrome.contextMenus.removeAll()
     // 动态读取快捷键：用户可在 chrome://extensions/shortcuts 修改/移除绑定，标题提示需随之更新
-    const keys = await getCommandShortcutMap()
-    // 未绑定快捷键时不显示括号提示（与设置页「未设置按键」文案一致）
-    const hint = (name: string) => {
-      const key = keys.get(name)
-      return key ? `（${key}）` : ''
-    }
+    menuShortcutMap = await getCommandShortcutMap()
     // 默认分组名：登录且能定位到分组时展示实际名字（如「保存到 [未分组](默认分组) 并关闭」），否则回退通用文案
     const defaultName = await getDefaultWorkspaceName()
-    const defaultGroupLabel = defaultName ? `[${truncateGroupName(defaultName)}](默认分组) ` : '默认分组'
+    menuDefaultGroupLabel = defaultName ? `[${truncateGroupName(defaultName)}](默认分组) ` : '默认分组'
+    const defaultGroupLabel = menuDefaultGroupLabel
     // 页面右键：仅 http(s) 页面显示
     const page: chrome.contextMenus.CreateProperties = {
       contexts: ['page'],
@@ -120,35 +127,35 @@ async function createContextMenus() {
     }
     chrome.contextMenus.create({
       id: MENU_SAVE_DEFAULT,
-      title: `保存到 ${defaultGroupLabel} 并关闭${hint('save-and-close')}`,
+      title: `保存到 ${defaultGroupLabel} 并关闭${shortcutHint('save-and-close')}`,
       ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_UNGROUPED,
       // 标题末尾提示快捷键：Chrome 菜单项不支持内联快捷键，实际由 manifest commands 触发
-      title: `保存到 [未分组] 并关闭${hint('save-ungrouped')}`,
+      title: `保存到 [未分组] 并关闭${shortcutHint('save-ungrouped')}`,
       ...page,
     })
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
-      title: `保存到 选定分组…${hint('save-pick')}`,
+      title: `保存到 选定分组…${shortcutHint('save-pick')}`,
       ...page,
     })
-    // 标签页右键
+    // 标签页右键：静态标题默认单数文案，多选时由 tabs.onHighlighted 预先替换为「保存 x 个选中的标签页…」
     const tab: chrome.contextMenus.CreateProperties = { contexts: ['tab'] }
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_DEFAULT,
-      title: `保存标签页到 ${defaultGroupLabel} 并关闭${hint('save-and-close')}`,
+      title: `保存此标签页到 ${defaultGroupLabel} 并关闭${shortcutHint('save-and-close')}`,
       ...tab,
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_UNGROUPED,
-      title: `保存标签页到 [未分组] 并关闭${hint('save-ungrouped')}`,
+      title: `保存此标签页到 [未分组] 并关闭${shortcutHint('save-ungrouped')}`,
       ...tab,
     })
     chrome.contextMenus.create({
       id: MENU_TAB_SAVE_PICK,
-      title: `保存标签页到 选定分组…${hint('save-pick')}`,
+      title: `保存此标签页到 选定分组…${shortcutHint('save-pick')}`,
       ...tab,
     })
 
@@ -247,6 +254,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 })
 
+// 标签页标题右键菜单的动态标题：Chrome 的 contextMenus 没有 onShown 事件（Firefox 的 menus
+// API 才有），菜单弹出前无法改标题，改用 tabs.onHighlighted 预先更新——
+// Ctrl+点击选中多个标签页（或取消多选）都会触发高亮集变化，此时把标题更新为
+// 「保存 x 个选中的标签页…」/「保存此标签页…」，用户随后右键菜单显示的就是对应文案。
+// 菜单标题全局共享：多窗口交错右键时文案可能短暂滞后，但点击行为（onClicked 中
+// resolveTabSelection）始终以实际高亮集合为准
+chrome.tabs.onHighlighted.addListener((highlightInfo) => {
+  const count = highlightInfo.tabIds.length
+  const subject = count > 1 ? `${count} 个选中的标签页` : '此标签页'
+  chrome.contextMenus.update(MENU_TAB_SAVE_DEFAULT, {
+    title: `保存 ${subject}到 ${menuDefaultGroupLabel} 并关闭${shortcutHint('save-and-close')}`,
+  })
+  chrome.contextMenus.update(MENU_TAB_SAVE_UNGROUPED, {
+    title: `保存 ${subject}到 [未分组] 并关闭${shortcutHint('save-ungrouped')}`,
+  })
+  chrome.contextMenus.update(MENU_TAB_SAVE_PICK, {
+    title: `保存 ${subject}到 选定分组…${shortcutHint('save-pick')}`,
+  })
+})
+
 /** 右键菜单点击分发 */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const id = info.menuItemId
@@ -280,14 +307,35 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return
   }
   if (!tab) return
-  if (id === MENU_SAVE_DEFAULT || id === MENU_TAB_SAVE_DEFAULT) {
-    await saveToDefaultWorkspaceAndClose(tab)
-  } else if (id === MENU_SAVE_UNGROUPED || id === MENU_TAB_SAVE_UNGROUPED) {
+  if (id === MENU_SAVE_DEFAULT) {
+    await saveToDefaultWorkspaceAndClose([tab])
+  } else if (id === MENU_TAB_SAVE_DEFAULT) {
+    await saveToDefaultWorkspaceAndClose(await resolveTabSelection(tab))
+  } else if (id === MENU_SAVE_UNGROUPED) {
     await saveTabsToWorkspaceAndClose([tab], UNGROUPED_WORKSPACE_ID)
-  } else if (id === MENU_SAVE_PICK || id === MENU_TAB_SAVE_PICK) {
+  } else if (id === MENU_TAB_SAVE_UNGROUPED) {
+    await saveTabsToWorkspaceAndClose(await resolveTabSelection(tab), UNGROUPED_WORKSPACE_ID)
+  } else if (id === MENU_SAVE_PICK) {
     await openPickerWindow([tab])
+  } else if (id === MENU_TAB_SAVE_PICK) {
+    await openPickerWindow(await resolveTabSelection(tab))
   }
 })
+
+/**
+ * 解析标签页标题右键菜单实际操作的标签集合：
+ * 被右键的标签页属于当前窗口高亮多选（Ctrl+点击选中多个标签页）时，返回全部高亮标签页；
+ * 否则（普通右键或右键未选中的标签页）仅返回该标签页。
+ * 页面（page）上下文右键不适用此逻辑，调用方仅对 tab 上下文菜单调用。
+ */
+async function resolveTabSelection(tab: chrome.tabs.Tab): Promise<chrome.tabs.Tab[]> {
+  if (tab.windowId == null) return [tab]
+  const highlighted = await chrome.tabs.query({ highlighted: true, windowId: tab.windowId })
+  if (highlighted.length > 1 && highlighted.some((t) => t.id === tab.id)) {
+    return highlighted
+  }
+  return [tab]
+}
 
 // sidePanel.open 要求用户手势内同步调用，action 上下文菜单无 tab 可用，
 // 故缓存最近聚焦窗口的 ID 供其使用（启动时预热一次）
@@ -429,32 +477,18 @@ chrome.commands.onCommand.addListener((command) => {
  */
 async function handleSaveAndClose() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  if (tab) await saveToDefaultWorkspaceAndClose(tab)
+  if (tab) await saveToDefaultWorkspaceAndClose([tab])
 }
 
 /**
- * 将标签页保存到默认收藏工作组并关闭（右键菜单与快捷键共用）：
- * 1. 校验协议；2. 默认工作组初始为「未分组」，空值（历史数据）回退到「未分组」；3. 收藏并关闭。
+ * 将标签页（支持多选批量）保存到默认收藏工作组并关闭（右键菜单与快捷键共用）：
+ * 1. 默认工作组初始为「未分组」，空值（历史数据）回退到「未分组」；
+ * 2. 协议校验（非 http(s)/file 跳过）、失败通知与关闭由 saveTabsToWorkspaceAndClose 内部处理。
  */
-async function saveToDefaultWorkspaceAndClose(tab: chrome.tabs.Tab) {
-  if (!tab?.url) return
-
-  // 仅允许 http(s)/file 页面，浏览器内置页面不支持
-  let protocol = ''
-  try {
-    protocol = new URL(tab.url).protocol
-  } catch {
-    return
-  }
-  if (!['http:', 'https:', 'file:'].includes(protocol)) {
-    await notify('无法收藏该页面', '当前页面类型不支持收藏（如浏览器内置页面）')
-    return
-  }
-
+async function saveToDefaultWorkspaceAndClose(tabs: chrome.tabs.Tab[]) {
+  if (tabs.length === 0) return
   const wsId = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
-
-  // background 自身调用，直接走消息处理器（runtime.sendMessage 不会投递给自己）
-  await saveTabsToWorkspaceAndClose([tab], wsId)
+  await saveTabsToWorkspaceAndClose(tabs, wsId)
 }
 
 /** 快捷键：将当前激活标签页保存到 [未分组] 并关闭（Alt+Shift+U） */
