@@ -5,7 +5,7 @@
     <el-dropdown-item command="copyLink" :icon="Link">复制链接</el-dropdown-item>
     <el-dropdown-item command="editTime" :icon="Clock" divided>修改添加时间</el-dropdown-item>
     <el-dropdown-item command="rename" :icon="Edit">重命名</el-dropdown-item>
-    <el-dropdown-item command="editUrl" :icon="EditPen">编辑链接</el-dropdown-item>
+    <el-dropdown-item command="editUrl" :icon="EditPen">编辑标题/链接</el-dropdown-item>
     <el-dropdown-item command="editDesc" :icon="Memo">编辑描述</el-dropdown-item>
     <el-dropdown-item command="tag" :icon="PriceTag">标签</el-dropdown-item>
     <el-dropdown-item command="move" :icon="Rank">移动到其他工作组</el-dropdown-item>

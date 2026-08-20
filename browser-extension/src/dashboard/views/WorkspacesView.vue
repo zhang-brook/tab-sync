@@ -267,8 +267,12 @@
     </el-dialog>
 
     <!-- 编辑链接对话框 -->
-    <el-dialog v-model="editUrlDialogVisible" title="编辑链接" width="520px" destroy-on-close>
+    <el-dialog v-model="editUrlDialogVisible" title="编辑标题/链接" width="520px" destroy-on-close>
       <el-form label-width="70px" label-position="left">
+        <el-form-item label="标题" required>
+          <el-input v-model="editUrlTitleValue" placeholder="留空则使用链接作为标题" maxlength="500" show-word-limit clearable
+            @keyup.enter="handleSaveEditUrl" />
+        </el-form-item>
         <el-form-item label="链接" required>
           <el-input v-model="editUrlValue" placeholder="https://example.com" clearable @keyup.enter="handleSaveEditUrl">
             <template #prepend>
@@ -277,10 +281,6 @@
               </el-icon>
             </template>
           </el-input>
-        </el-form-item>
-        <el-form-item label="标题">
-          <el-input v-model="editUrlTitleValue" placeholder="留空则使用链接作为标题" maxlength="500" show-word-limit clearable
-            @keyup.enter="handleSaveEditUrl" />
         </el-form-item>
       </el-form>
       <template #footer>
