@@ -173,21 +173,23 @@ async function reload() {
     defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
   }
   const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
-  if (res.success && res.data) {
-    treeData.value = buildWorkspaceTree(res.data.workspaces)
-    // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）
-    const defaultNode = defaultWorkspaceId.value
-      ? findWorkspaceTreeNode(treeData.value, defaultWorkspaceId.value)
-      : null
-    if (defaultNode && !disabledSet.value.has(defaultNode.id)) {
-      await nextTick()
-      treeRef.value?.setCurrentKey(defaultNode.id)
-      selectedNode.value = defaultNode
-    }
-  } else {
+  if (!res.success || !res.data) {
     treeData.value = []
+    loading.value = false
+    return
   }
+  treeData.value = buildWorkspaceTree(res.data.workspaces)
+  // 先结束 loading 让 el-tree 完成渲染，否则下一帧 treeRef 尚未挂载，高亮会被静默跳过
   loading.value = false
+  // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）
+  const defaultNode = defaultWorkspaceId.value
+    ? findWorkspaceTreeNode(treeData.value, defaultWorkspaceId.value)
+    : null
+  if (defaultNode && !disabledSet.value.has(defaultNode.id)) {
+    await nextTick()
+    treeRef.value?.setCurrentKey(defaultNode.id)
+    selectedNode.value = defaultNode
+  }
 }
 
 defineExpose({ reload })
