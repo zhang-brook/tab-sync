@@ -22,10 +22,10 @@ import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 const panelRef = ref<InstanceType<typeof WorkspacePickerPanel>>()
 const tabIds = ref<number[]>([])
 const tabs = ref<chrome.tabs.Tab[]>([])
-/** 「加入后关闭当前页」开关（底部复选框），默认勾选 */
+/** 「加入后关闭该页面」开关（底部复选框），默认勾选 */
 const closeTab = ref(true)
 /** 复选框文案：标签组批量收藏时提示关闭对象不同 */
-const closeTabLabel = computed(() => (tabs.value.length > 1 ? '加入后关闭这些标签页' : '加入后关闭当前页'))
+const closeTabLabel = computed(() => (tabs.value.length > 1 ? '加入后关闭这些标签页' : '加入后关闭该页面'))
 // 标记是否处于「已选中、正在提交」状态，避免提交过程中被取消关闭
 let selecting = false
 
@@ -86,7 +86,7 @@ async function onSelect(node: WorkspaceTreeNode) {
     })
 
     if (res.success) {
-      // 按「加入后关闭当前页」开关决定是否关闭原页面
+      // 按「加入后关闭该页面」开关决定是否关闭原页面
       if (closeTab.value) {
         try {
           await chrome.tabs.remove(tabIds.value)

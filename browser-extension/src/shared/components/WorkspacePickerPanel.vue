@@ -108,9 +108,9 @@ import type { Workspace, WorkspacesData } from '../types'
 const props = withDefaults(defineProps<{
   /** 确认模式：点击节点仅选中，需点击「确认」后才触发 select；默认 false（选中即触发） */
   confirmable?: boolean
-  /** 确认模式下底部复选框是否勾选（如「加入后关闭当前页」），默认 true */
+  /** 确认模式下底部复选框是否勾选（如「加入后关闭该页面」），默认 true */
   closeTab?: boolean
-  /** 确认模式下底部复选框文案，默认「加入后关闭当前页」 */
+  /** 确认模式下底部复选框文案，默认「加入后关闭该页面」 */
   closeTabLabel?: string
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
@@ -132,7 +132,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const closeTabLabel = props.closeTabLabel ?? '加入后关闭当前页'
+const closeTabLabel = props.closeTabLabel ?? '加入后关闭该页面'
 
 const closeTabModel = computed(() => props.closeTab ?? true)
 
