@@ -3,17 +3,10 @@
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索工作组..."
-          clearable
-          style="width: 220px"
-          :prefix-icon="Search"
-        />
+        <el-input v-model="searchKeyword" placeholder="搜索工作组..." clearable style="width: 220px" :prefix-icon="Search" />
       </div>
       <div class="toolbar-right">
-        <el-button @click="loadWorkspaces">
-          <el-icon><Refresh /></el-icon>
+        <el-button @click="loadWorkspaces" :icon="Refresh">
           刷新
         </el-button>
       </div>
@@ -28,29 +21,17 @@
           <div class="pane-title-actions">
             <el-tooltip content="新建工作组" placement="top">
               <el-button size="small" text type="primary" @click="showCreateDialog('')">
-                <el-icon><Plus /></el-icon>
+                <el-icon>
+                  <Plus />
+                </el-icon>
                 <span>新建</span>
               </el-button>
             </el-tooltip>
           </div>
         </div>
-        <el-empty
-          v-if="treeData.length === 0 && !loading"
-          :image-size="60"
-          description="暂无工作组"
-        />
-        <el-tree
-          v-else
-          ref="treeRef"
-          :data="treeData"
-          node-key="id"
-          :props="treeProps"
-          :filter-node-method="filterNode"
-          :expand-on-click-node="false"
-          highlight-current
-          default-expand-all
-          @node-click="onSelectNode"
-        >
+        <el-empty v-if="treeData.length === 0 && !loading" :image-size="60" description="暂无工作组" />
+        <el-tree v-else ref="treeRef" :data="treeData" node-key="id" :props="treeProps" :filter-node-method="filterNode"
+          :expand-on-click-node="false" highlight-current default-expand-all @node-click="onSelectNode">
           <template #default="{ data }">
             <ContextMenu @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @open="() => onNodeContextMenu(data)">
               <span class="tree-node">
@@ -58,13 +39,11 @@
                 <span class="tree-name" :title="data.name">{{ data.name }}</span>
                 <span v-if="data.id === defaultWorkspaceId" class="tree-default">(默认)</span>
                 <span v-if="data.tabCount" class="tree-count">{{ data.tabCount }}</span>
-                <el-dropdown
-                  trigger="click"
-                  @command="(cmd: string) => onNodeMenuCommand(cmd, data)"
-                  @click.stop
-                >
+                <el-dropdown trigger="click" @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @click.stop>
                   <el-button size="small" text class="node-dots-btn" @click.stop>
-                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                    <el-icon class="dots-vertical">
+                      <MoreFilled />
+                    </el-icon>
                   </el-button>
                   <template #dropdown>
                     <NodeDropdownMenu :data="data" :default-workspace-id="defaultWorkspaceId" />
@@ -89,55 +68,74 @@
             <div class="detail-title-row">
               <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
               <span class="ws-name">{{ selectedWorkspace.name }}</span>
-              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="plain"
+                :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
               <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
             <div class="detail-actions">
               <el-tooltip content="工作组标签" placement="top">
                 <el-button size="small" text @click="openWorkspaceTagEditor(selectedWorkspace)">
-                  <el-icon><PriceTag /></el-icon>
+                  <el-icon>
+                    <PriceTag />
+                  </el-icon>
                   <span>标签</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开所有标签页" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, false)">
-                  <el-icon><FolderOpened /></el-icon>
+                  <el-icon>
+                    <FolderOpened />
+                  </el-icon>
                   <span>打开</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="在新窗口中打开" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenWorkspace(selectedWorkspace.id, true)">
-                  <el-icon><CopyDocument /></el-icon>
+                  <el-icon>
+                    <CopyDocument />
+                  </el-icon>
                   <span>打开(新窗口)</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开为标签组" placement="top">
                 <el-button size="small" text type="primary" @click="handleOpenAsTabGroup(selectedWorkspace.id)">
-                  <el-icon><Collection /></el-icon>
+                  <el-icon>
+                    <Collection />
+                  </el-icon>
                   <span>打开(标签组)</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="新建子工作组" placement="top">
                 <el-button size="small" text @click="showCreateDialog(selectedWorkspace.id)">
-                  <el-icon><FolderAdd /></el-icon>
+                  <el-icon>
+                    <FolderAdd />
+                  </el-icon>
                   <span>建子组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="编辑" placement="top">
-                <el-button size="small" text :disabled="selectedWorkspace?.isSystem" @click="showEditDialog(selectedWorkspace)">
-                  <el-icon><Edit /></el-icon>
+                <el-button size="small" text :disabled="selectedWorkspace?.isSystem"
+                  @click="showEditDialog(selectedWorkspace)">
+                  <el-icon>
+                    <Edit />
+                  </el-icon>
                   <span>编辑组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
-                <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem" @click="handleDelete(selectedWorkspace)">
-                  <el-icon><Delete /></el-icon>
+                <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem"
+                  @click="handleDelete(selectedWorkspace)">
+                  <el-icon>
+                    <Delete />
+                  </el-icon>
                   <span>删除组</span>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="通过 URL 添加标签页" placement="top">
                 <el-button size="small" text type="primary" @click="addUrlDialogVisible = true">
-                  <el-icon><Plus /></el-icon>
+                  <el-icon>
+                    <Plus />
+                  </el-icon>
                   <span>加网址</span>
                 </el-button>
               </el-tooltip>
@@ -146,7 +144,9 @@
 
           <!-- 工作组描述（仅在填写后展示） -->
           <div v-if="selectedWorkspace.description" class="ws-description">
-            <el-icon class="ws-description-icon"><Memo /></el-icon>
+            <el-icon class="ws-description-icon">
+              <Memo />
+            </el-icon>
             <p class="ws-description-text">{{ selectedWorkspace.description }}</p>
           </div>
 
@@ -156,44 +156,39 @@
               <el-radio-button value="current">仅本层级</el-radio-button>
               <el-radio-button value="all">包含子工作组</el-radio-button>
             </el-radio-group>
-            <el-select v-model="tagFilter" placeholder="按标签筛选" clearable size="small" style="width: 160px; margin-left: 12px">
+            <el-select v-model="tagFilter" placeholder="按标签筛选" clearable size="small"
+              style="width: 160px; margin-left: 12px">
               <el-option v-for="t in allTabTags" :key="t.id" :label="t.name" :value="t.id" />
             </el-select>
           </div>
 
           <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标） -->
           <div class="detail-body">
-            <el-empty
-              v-if="rightTabs.length === 0"
-              :image-size="60"
-              :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'"
-            />
+            <el-empty v-if="rightTabs.length === 0" :image-size="60"
+              :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'" />
 
-            <TabList
-              v-else
-              :items="tabListItems"
-              :sortable="tabScope === 'current' && tagFilter == null"
-              @sort="onTabSort"
-              @click="(item: any) => openSingleTab(item.tab.url)"
-              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
-            >
+            <TabList v-else :items="tabListItems" :sortable="tabScope === 'current' && tagFilter == null"
+              @sort="onTabSort" @click="(item: any) => openSingleTab(item.tab.url)"
+              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)">
               <template #extra="{ item }">
                 <div v-if="(item as any).tab.tags && (item as any).tab.tags.length" class="tab-tags">
-                  <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain" :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                  <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain"
+                    :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
                 </div>
-                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull((item as any).tab.addedAt)">{{ formatAddedAt((item as any).tab.addedAt) }}</span>
+                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull((item as any).tab.addedAt)">{{
+                  formatAddedAt((item as any).tab.addedAt) }}</span>
               </template>
               <template #context-menu>
                 <TabDropdownMenu />
               </template>
               <template #actions="{ item }">
-                <el-dropdown
-                  trigger="click"
+                <el-dropdown trigger="click"
                   @command="(cmd: string) => onTabMenuCommand(cmd, (item as any).workspaceId, (item as any).tab)"
-                  @click.stop
-                >
+                  @click.stop>
                   <el-button size="small" text class="tab-more-btn" @click.stop>
-                    <el-icon class="dots-vertical"><MoreFilled /></el-icon>
+                    <el-icon class="dots-vertical">
+                      <MoreFilled />
+                    </el-icon>
                   </el-button>
                   <template #dropdown>
                     <TabDropdownMenu />
@@ -207,12 +202,7 @@
     </div>
 
     <!-- 创建/编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEditing ? '编辑工作组' : '新建工作组'"
-      width="600px"
-      destroy-on-close
-    >
+    <el-dialog v-model="dialogVisible" :title="isEditing ? '编辑工作组' : '新建工作组'" width="600px" destroy-on-close>
       <el-form label-width="90px" label-position="left">
         <el-form-item label="名称" required>
           <el-input v-model="formData.name" placeholder="例如: 项目A开发" />
@@ -228,17 +218,12 @@
           </div>
         </el-form-item>
         <el-form-item label="标识色">
-          <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors" @active-change="onColorActiveChange" />
+          <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors"
+            @active-change="onColorActiveChange" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input
-            v-model="formData.description"
-            type="textarea"
-            :rows="3"
-            maxlength="500"
-            show-word-limit
-            placeholder="为该工作组填写一段描述（选填）"
-          />
+          <el-input v-model="formData.description" type="textarea" :rows="3" maxlength="500" show-word-limit
+            placeholder="为该工作组填写一段描述（选填）" />
         </el-form-item>
       </el-form>
       <div v-if="!isEditing" class="dialog-hint">
@@ -257,13 +242,8 @@
     <el-dialog v-model="timeDialogVisible" title="修改添加时间" width="420px" destroy-on-close>
       <el-form label-width="90px" label-position="left">
         <el-form-item label="添加时间">
-          <el-date-picker
-            v-model="timeValue"
-            type="datetime"
-            placeholder="选择日期时间"
-            :clearable="false"
-            style="width: 100%"
-          />
+          <el-date-picker v-model="timeValue" type="datetime" placeholder="选择日期时间" :clearable="false"
+            style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -276,14 +256,8 @@
     <el-dialog v-model="renameDialogVisible" title="重命名标签页" width="420px" destroy-on-close>
       <el-form label-width="80px" label-position="left">
         <el-form-item label="名称">
-          <el-input
-            v-model="renameValue"
-            placeholder="输入新的显示名称（留空则恢复原始标题）"
-            maxlength="500"
-            show-word-limit
-            clearable
-            @keyup.enter="handleSaveRename"
-          />
+          <el-input v-model="renameValue" placeholder="输入新的显示名称（留空则恢复原始标题）" maxlength="500" show-word-limit clearable
+            @keyup.enter="handleSaveRename" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -296,26 +270,17 @@
     <el-dialog v-model="editUrlDialogVisible" title="编辑链接" width="520px" destroy-on-close>
       <el-form label-width="70px" label-position="left">
         <el-form-item label="链接" required>
-          <el-input
-            v-model="editUrlValue"
-            placeholder="https://example.com"
-            clearable
-            @keyup.enter="handleSaveEditUrl"
-          >
+          <el-input v-model="editUrlValue" placeholder="https://example.com" clearable @keyup.enter="handleSaveEditUrl">
             <template #prepend>
-              <el-icon><Link /></el-icon>
+              <el-icon>
+                <Link />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
         <el-form-item label="标题">
-          <el-input
-            v-model="editUrlTitleValue"
-            placeholder="留空则使用链接作为标题"
-            maxlength="500"
-            show-word-limit
-            clearable
-            @keyup.enter="handleSaveEditUrl"
-          />
+          <el-input v-model="editUrlTitleValue" placeholder="留空则使用链接作为标题" maxlength="500" show-word-limit clearable
+            @keyup.enter="handleSaveEditUrl" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -330,16 +295,8 @@
     <el-dialog v-model="editDescDialogVisible" title="编辑描述" width="520px" destroy-on-close>
       <el-form label-width="70px" label-position="left">
         <el-form-item label="描述">
-          <el-input
-            v-model="editDescValue"
-            type="textarea"
-            :rows="4"
-            maxlength="500"
-            show-word-limit
-            placeholder="可选，仅当你填写时才会保存；清空则移除描述"
-            clearable
-            @keyup.ctrl.enter="handleSaveEditDesc"
-          />
+          <el-input v-model="editDescValue" type="textarea" :rows="4" maxlength="500" show-word-limit
+            placeholder="可选，仅当你填写时才会保存；清空则移除描述" clearable @keyup.ctrl.enter="handleSaveEditDesc" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -349,41 +306,26 @@
     </el-dialog>
 
     <!-- 标签编辑对话框 -->
-    <TagEditorDialog
-      v-model="tagEditorVisible"
-      :scope="tagEditorScope"
-      :selected-ids="tagEditorSelectedIds"
-      @confirm="onTagEditorConfirm"
-    />
+    <TagEditorDialog v-model="tagEditorVisible" :scope="tagEditorScope" :selected-ids="tagEditorSelectedIds"
+      @confirm="onTagEditorConfirm" />
 
     <!-- 移动到其他工作组 -->
-    <WorkspacePickerDialog
-      v-model="movePickerVisible"
-      title="移动到工作组"
-      :disabled-ids="moveDisabledIds"
-      @select="handleMoveToWorkspace"
-    />
+    <WorkspacePickerDialog v-model="movePickerVisible" title="移动到工作组" :disabled-ids="moveDisabledIds"
+      @select="handleMoveToWorkspace" />
 
     <!-- 选择父工作组 -->
-    <WorkspacePickerDialog
-      v-model="parentPickerVisible"
-      title="选择父工作组"
-      :disabled-ids="parentDisabledIds"
-      @select="onSelectParent"
-    />
+    <WorkspacePickerDialog v-model="parentPickerVisible" title="选择父工作组" :disabled-ids="parentDisabledIds"
+      @select="onSelectParent" />
 
     <!-- 通过 URL 添加标签页 -->
     <el-dialog v-model="addUrlDialogVisible" title="通过 URL 添加标签页" width="500px" destroy-on-close>
       <el-form label-width="70px" label-position="left">
         <el-form-item label="URL" required>
-          <el-input
-            v-model="newTabUrl"
-            placeholder="https://example.com"
-            clearable
-            @keyup.enter="handleAddTabByUrl"
-          >
+          <el-input v-model="newTabUrl" placeholder="https://example.com" clearable @keyup.enter="handleAddTabByUrl">
             <template #prepend>
-              <el-icon><Link /></el-icon>
+              <el-icon>
+                <Link />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
