@@ -507,21 +507,32 @@ function filterNode(value: string, data: Record<string, unknown>) {
   return String((data as unknown as WorkspaceTreeNode).name).toLowerCase().includes(value.toLowerCase())
 }
 
-onMounted(() => {
-  loadWorkspaces()
+onMounted(async () => {
   void loadTabTags()
-  void loadDefaultWorkspaceId()
+  // 先读取默认分组，保证首次加载即可选中默认分组
+  await loadDefaultWorkspaceId()
+  await loadWorkspaces()
 })
 
 async function loadDefaultWorkspaceId() {
   defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
 }
 
+/** 是否已完成首次加载：首次加载选中默认分组，刷新/后续加载保持当前选中 */
+let initialized = false
+
 async function loadWorkspaces() {
   loading.value = true
   const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
   if (res.success && res.data) {
     workspaces.value = res.data.workspaces
+    // 首次进入页面：若设置了默认分组则选中它（刷新等后续加载保持当前选中）
+    if (!initialized) {
+      initialized = true
+      if (defaultWorkspaceId.value && workspaces.value.some((w) => w.id === defaultWorkspaceId.value)) {
+        selectedId.value = defaultWorkspaceId.value
+      }
+    }
     // 保持/初始化选中项
     if (!selectedId.value || !workspaces.value.some((w) => w.id === selectedId.value)) {
       selectedId.value = workspaces.value[0]?.id ?? ''
