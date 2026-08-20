@@ -109,7 +109,9 @@
           <el-button size="small" @click="openShortcutsPage">打开 Chrome 快捷键设置页</el-button>
           <div class="form-tip">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
           <div class="form-tip" v-if="true/* Chrome 浏览器 */">
-            Chrome 修改快捷键后，需重新加载扩展后生效
+            Chrome 修改快捷键后，需<el-link type="primary" size="small" style="font-size: inherit; vertical-align: baseline;" :underline="false" @click="reloadExtension">
+              重新加载扩展
+            </el-link>后生效
           </div>
         </el-form-item>
       </el-form>
