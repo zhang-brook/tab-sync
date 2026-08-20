@@ -1,4 +1,5 @@
 import { handleMessage } from './message-handler'
+import type { AddTabsToWorkspaceMessage, MessageResponse } from '../shared/types'
 import { logger } from '../shared/utils/logger'
 import { openTabAfterActive } from '../shared/utils/tab-utils'
 import { DASHBOARD_URL, PICKER_URL } from '../shared/utils/pages'
@@ -476,9 +477,63 @@ chrome.runtime.onStartup.addListener(async () => {
   await tryRegisterDevice(deviceId)
 })
 
+/**
+ * 分组选择器弹窗的收藏流程（payload 带 closeAfterAdd 标记）：
+ * 加入成功后由 background 统一弹桌面通知；closeAfterAdd 为 true 时一并关闭原标签页。
+ * 与右键菜单「保存到默认/未分组并关闭」保持同一行为：关闭与通知都不放在弹窗页面上下文里做
+ * （弹窗页面里 chrome.tabs.remove 可能静默失败，且桌面通知本应由 background 发出）。
+ */
+async function savePickerTabsToWorkspace(
+  payload: AddTabsToWorkspaceMessage['payload'],
+): Promise<MessageResponse> {
+  const res = await handleMessage({
+    action: 'ADD_TABS_TO_WORKSPACE',
+    payload: { workspaceId: payload.workspaceId, tabs: payload.tabs },
+  })
+
+  if (res.success) {
+    let closed = false
+    if (payload.closeAfterAdd) {
+      const ids = payload.tabs.map((t) => t.chromeTabId).filter((id) => id > 0)
+      if (ids.length > 0) {
+        try {
+          await chrome.tabs.remove(ids)
+          closed = true
+        } catch (err) {
+          // 标签可能已关闭：记录日志但不影响整体成功结果
+          logger.warn('关闭已收藏标签页失败:', err)
+        }
+      }
+    }
+    const count = payload.tabs.length
+    const detail = closed
+      ? count > 1
+        ? `已收藏 ${count} 个标签页并关闭，点击查看`
+        : '当前标签页已收藏并关闭，点击查看'
+      : count > 1
+        ? `已收藏 ${count} 个标签页，点击查看`
+        : '当前标签页已收藏，点击查看'
+    await notify('已加入工作组', detail, NOTIFICATION_SAVE_TAB_SUCCESS)
+  }
+  return res
+}
+
 // 监听来自 popup/sidepanel/dashboard 的消息
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   logger.debug('Received message:', message.action)
+  // 选择器弹窗的收藏请求（带 closeAfterAdd 标记）单独处理：由 background 负责关闭原标签页与通知
+  if (
+    message.action === 'ADD_TABS_TO_WORKSPACE' &&
+    (message as AddTabsToWorkspaceMessage).payload?.closeAfterAdd !== undefined
+  ) {
+    savePickerTabsToWorkspace((message as AddTabsToWorkspaceMessage).payload)
+      .then(sendResponse)
+      .catch((err) => {
+        logger.error('Message handler error:', err)
+        sendResponse({ success: false, error: String(err) })
+      })
+    return true
+  }
   // handleMessage 是异步的，需要返回 true 保持消息通道
   // 必须添加 .catch 确保 sendResponse 始终被调用，否则前端收到 undefined
   handleMessage(message)

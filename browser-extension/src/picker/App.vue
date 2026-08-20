@@ -64,7 +64,7 @@ onMounted(async () => {
   })
 })
 
-/** 用户选中某个分组：加入工作组，成功后再关闭原页面 */
+/** 用户选中某个分组：加入工作组；关闭原页面与桌面通知由 background 统一处理 */
 async function onSelect(node: WorkspaceTreeNode) {
   if (tabs.value.length === 0 || tabIds.value.length === 0) {
     ElMessage.error('标签页信息缺失')
@@ -82,18 +82,13 @@ async function onSelect(node: WorkspaceTreeNode) {
           title: tab.title ?? '',
           favIconUrl: tab.favIconUrl ?? '',
         })),
+        // 按「加入后关闭该页面」开关告诉 background 是否关闭原页面（background 同时负责弹通知）
+        closeAfterAdd: closeTab.value,
       },
     })
 
+    // 注意，当前页面中没有 chrome 对象，所以要借助 background 处理关闭原页面和弹通知的逻辑
     if (res.success) {
-      // 按「加入后关闭该页面」开关决定是否关闭原页面
-      if (closeTab.value) {
-        try {
-          await chrome.tabs.remove(tabIds.value)
-        } catch {
-          /* 标签可能已关闭，忽略 */
-        }
-      }
       window.close()
     } else if (res.authError) {
       ElMessage.error('未登录或连接已失效，请先在侧边栏登录')

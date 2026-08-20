@@ -9,6 +9,7 @@ export type {
   WorkspacesData,
   DevicesData,
   WorkspaceTabPayload,
+  AddTabsToWorkspaceMessage,
   WorkspaceTabsSummaryData,
   TagsData,
   TagTabsData,

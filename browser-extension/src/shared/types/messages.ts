@@ -121,7 +121,16 @@ export interface GetWorkspaceTabsSummaryMessage {
 /** 将选中的标签页加入现有工作组 */
 export interface AddTabsToWorkspaceMessage {
   action: 'ADD_TABS_TO_WORKSPACE'
-  payload: { workspaceId: string; tabs: WorkspaceTabPayload[] }
+  payload: {
+    workspaceId: string
+    tabs: WorkspaceTabPayload[]
+    /**
+     * 分组选择器弹窗专用标记（存在即表示来自选择器）：
+     * 由 background 统一在加入成功后弹桌面通知；为 true 时一并关闭原标签页（chromeTabId）。
+     * 弹窗页面上下文里自行 chrome.tabs.remove 不可靠且无法弹通知，故收敛到 background
+     */
+    closeAfterAdd?: boolean
+  }
 }
 
 /** 通过 URL 向工作组添加标签页 */
