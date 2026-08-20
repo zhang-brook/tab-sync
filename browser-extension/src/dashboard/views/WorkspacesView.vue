@@ -175,6 +175,10 @@
                   <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain"
                     :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
                 </div>
+                <div v-if="(item as any).tab.description"
+                  class="tab-description" :title="(item as any).tab.description">
+                  {{ (item as any).tab.description }}
+                </div>
                 <span class="tab-added" :title="'添加于 ' + formatAddedAtFull((item as any).tab.addedAt)">{{
                   formatAddedAt((item as any).tab.addedAt) }}</span>
               </template>
@@ -1288,6 +1292,22 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   color: #909399;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.tab-description {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #606266;
+  background: #f4f4f5;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .dialog-hint {
