@@ -272,11 +272,10 @@
     </el-dialog>
 
     <!-- 编辑链接对话框 -->
-    <el-dialog v-model="editUrlDialogVisible" title="编辑标题/链接" width="520px" destroy-on-close>
+    <el-dialog v-model="editUrlDialogVisible" title="编辑链接" width="520px" destroy-on-close>
       <el-form label-width="70px" label-position="left">
-        <el-form-item label="标题" required>
-          <el-input v-model="editUrlTitleValue" placeholder="留空则使用链接作为标题" maxlength="500" show-word-limit clearable
-            @keyup.enter="handleSaveEditUrl" />
+        <el-form-item label="标题">
+          {{ editUrlTitleValue }}
         </el-form-item>
         <el-form-item label="链接" required>
           <el-input v-model="editUrlValue" placeholder="https://example.com" clearable @keyup.enter="handleSaveEditUrl">
@@ -937,20 +936,12 @@ async function handleSaveEditUrl() {
     return
   }
   editUrlSaving.value = true
-  // 仅当用户修改了标题框（与当前显示名/标题不同）时才回写标题，
-  // 否则保持服务端既有标题，避免误覆盖。
-  const cur = workspaces.value
-    .find((w) => w.id === target.workspaceId)
-    ?.tabs.find((t) => t.tabId === target.tabId)
-  const originalTitle = cur?.displayName || cur?.title || ''
-  const title = editUrlTitleValue.value.trim()
   const res = await sendMessage({
     action: 'UPDATE_WORKSPACE_TAB',
     payload: {
       workspaceId: target.workspaceId,
       tabId: target.tabId,
       url,
-      title: title !== originalTitle ? title : undefined,
     },
   })
   editUrlSaving.value = false
