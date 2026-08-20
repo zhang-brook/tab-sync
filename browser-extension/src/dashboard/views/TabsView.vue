@@ -181,6 +181,7 @@ import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd, Plus, 
 import { sendMessage } from '@/shared/composables/useMessage'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
+import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import type { WorkspaceTabsSummaryData, WorkspacesData } from '@/shared/types'
 
@@ -220,8 +221,8 @@ const groupExpanded = reactive<Record<number, boolean>>({})
 const selectedTabIds = reactive(new Set<number>())
 const pickerVisible = ref(false)
 const createWorkspaceDialogVisible = ref(false)
-const newWorkspace = reactive({ name: '', color: '#409EFF', icon: '' })
-const colorPalette = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#16A085', '#E84393']
+const newWorkspace = reactive({ name: '', color: DEFAULT_WORKSPACE_COLOR, icon: '' })
+const colorPalette = [...TAG_COLOR_PALETTE]
 const workspacesSummary = ref<WorkspaceTabsSummaryData['summaries']>([])
 
 // 按 URL 建立「该标签页所属工作组」索引，用于在树中展示标签并支持点击跳转
@@ -251,7 +252,7 @@ function openWorkspace(_id: string) {
 function resetNewWorkspace() {
   newWorkspace.name = ''
   newWorkspace.icon = ''
-  newWorkspace.color = '#409EFF'
+  newWorkspace.color = DEFAULT_WORKSPACE_COLOR
 }
 
 function showCreateWorkspace() {
@@ -618,7 +619,7 @@ async function getDefaultWorkspace(): Promise<{ id: string; name: string } | nul
   }
   const createRes = await sendMessage({
     action: 'CREATE_WORKSPACE',
-    payload: { name: '默认', color: '#409EFF' },
+    payload: { name: '默认', color: DEFAULT_WORKSPACE_COLOR },
   })
   if (!createRes.success || !createRes.data) {
     ElMessage.warning('尚未创建工作组，且自动创建失败')

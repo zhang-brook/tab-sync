@@ -362,6 +362,7 @@ import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
+import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '@/shared/types'
@@ -405,15 +406,12 @@ const editingId = ref('')
 
 const formData = ref({
   name: '',
-  color: '#409EFF',
+  color: DEFAULT_WORKSPACE_COLOR,
   description: '',
   parentId: '' as string,
 })
 
-const presetColors = [
-  '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
-  '#909399', '#00BCD4', '#9C27B0', '#FF5722',
-]
+const presetColors = [...TAG_COLOR_PALETTE]
 
 /** 左侧树数据 */
 const treeData = computed<WorkspaceTreeNode[]>(() => {
@@ -674,7 +672,7 @@ function onColorActiveChange(color: string | null) {
 function showCreateDialog(parentId: string) {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: '#409EFF', description: '', parentId }
+  formData.value = { name: '', color: DEFAULT_WORKSPACE_COLOR, description: '', parentId }
   dialogVisible.value = true
 }
 

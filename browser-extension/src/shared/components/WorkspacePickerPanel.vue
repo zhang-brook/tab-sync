@@ -106,6 +106,7 @@ import { sendMessage } from '../composables/useMessage'
 import { useWorkspaceActions } from '../composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '../storage'
 import { buildWorkspaceTree, findWorkspaceTreeNode, flattenWorkspaces, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import { DEFAULT_WORKSPACE_COLOR } from '../constants/theme'
 import ContextMenu from './ContextMenu.vue'
 import type { WorkspacesData } from '../types'
 import { DASHBOARD_URL } from '../utils/pages'
@@ -230,7 +231,7 @@ async function onCreate() {
   }).catch(() => null)
   if (!result) return
   const name = String(result.value).trim()
-  const res = await sendMessage({ action: 'CREATE_WORKSPACE', payload: { name, color: '#409EFF' } })
+  const res = await sendMessage({ action: 'CREATE_WORKSPACE', payload: { name, color: DEFAULT_WORKSPACE_COLOR } })
   if (res.success) {
     ElMessage.success('工作组已创建')
     await reload()
@@ -250,7 +251,7 @@ async function onCreateChild(node: WorkspaceTreeNode) {
   const name = String(result.value).trim()
   const res = await sendMessage({
     action: 'CREATE_WORKSPACE',
-    payload: { name, color: '#409EFF', parentId: node.id },
+    payload: { name, color: DEFAULT_WORKSPACE_COLOR, parentId: node.id },
   })
   if (res.success) {
     ElMessage.success('子工作组已创建')

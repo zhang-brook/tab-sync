@@ -132,6 +132,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Loading, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { DEFAULT_WORKSPACE_COLOR } from '@/shared/constants/theme'
 import type { TagInfo } from '@/shared/types/workspace'
 import type { TagTabItem, TagsData, TagTabsData } from '@/shared/types/messages'
 
@@ -161,7 +162,7 @@ const listItems = computed<TagListItem[]>(() =>
 const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const editingTag = ref<TagInfo | null>(null)
-const tagForm = reactive({ name: '', color: '#409EFF', description: '' })
+const tagForm = reactive({ name: '', color: DEFAULT_WORKSPACE_COLOR, description: '' })
 
 // 颜色面板失焦关闭时会回退到关闭前的值，实时同步预览色使选色直接生效
 function onColorActiveChange(color: string | null) {
