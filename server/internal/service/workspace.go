@@ -76,8 +76,8 @@ type TabReference struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
 	// DisplayName 用户重命名后的显示名（可选，为空时前端应使用 Title）
-	DisplayName string        `json:"displayName,omitempty"`
-	FavIconURL  string        `json:"favIconUrl"`
+	DisplayName string `json:"displayName,omitempty"`
+	FavIconURL  string `json:"favIconUrl"`
 	// Description 标签页描述（可选，仅用户主动设置时存在）
 	Description string        `json:"description,omitempty"`
 	SortOrder   int           `json:"sortOrder"`
@@ -206,7 +206,10 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 				}
 				if tab.ID == 0 {
 					// 新增标签页
-					tab = model.WorkspaceTab{WorkspaceID: id, AddedAt: time.Now()}
+					tab = model.WorkspaceTab{
+						WorkspaceID: id,
+						AddedAt:     time.Now(),
+					}
 				}
 				tab.URL = sanitizeString(tabData.URL, 2048)
 				tab.Title = sanitizeString(tabData.Title, 500)
@@ -551,7 +554,8 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 		if perr != nil {
 			return errors.New("addedAt 格式无效，应为 RFC3339")
 		}
-		updates["added_at"] = t
+		// 转换为本地时区后再入库，保持与其他自动生成时间一致的 +08:00 样式
+		updates["added_at"] = t.Local()
 	}
 	if payload.DisplayName != nil {
 		updates["display_name"] = sanitizeString(*payload.DisplayName, 500)
