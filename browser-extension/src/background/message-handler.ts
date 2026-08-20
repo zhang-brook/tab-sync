@@ -563,6 +563,7 @@ async function handleUpdateWorkspaceTab(
       url: payload.url,
       title: payload.title,
       favIconUrl: payload.favIconUrl,
+      description: payload.description,
     })
     if (res.ok) {
       logger.info(`Tab updated: ${payload.tabId} in workspace=${payload.workspaceId}`)
