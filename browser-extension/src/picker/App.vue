@@ -1,48 +1,59 @@
 <template>
   <div class="picker-page">
-    <WorkspacePickerPanel
-      ref="panelRef"
-      confirmable
-      fill-height
-      v-model:close-tab="closeTab"
-      :close-tab-label="closeTabLabel"
-      @select="onSelect"
+    <!-- 新建工作组并保存模式（多选/组保存 → 创建新工作组并保存） -->
+    <CreateWorkspacePanel
+      v-if="isCreateMode"
+      :tabs="tabs"
+      :default-name="createDefaultName"
+      :color="createColor"
+      @success="onSuccess"
+      @cancel="onCancel"
+    />
+    <!-- 选择已有分组模式 -->
+    <SelectWorkspacePanel
+      v-else
+      :tabs="tabs"
+      @success="onSuccess"
       @cancel="onCancel"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import WorkspacePickerPanel from '@/shared/components/WorkspacePickerPanel.vue'
-import { sendMessage } from '@/shared/composables/useMessage'
-import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import CreateWorkspacePanel from '@/shared/components/CreateWorkspacePanel.vue'
+import SelectWorkspacePanel from '@/shared/components/SelectWorkspacePanel.vue'
+import { DEFAULT_WORKSPACE_COLOR } from '@/shared/constants/theme'
 
-const panelRef = ref<InstanceType<typeof WorkspacePickerPanel>>()
-const tabIds = ref<number[]>([])
+// 入口：同步解析 URL 参数，决定渲染模式与各模式默认值
+const params = new URLSearchParams(location.search)
+const isCreateMode = params.get('mode') === 'create'
+const createDefaultName = params.get('defaultName') ?? defaultWorkspaceName()
+const createColor = params.get('color') ?? DEFAULT_WORKSPACE_COLOR
+const tabIds = (params.get('tabIds') ?? '')
+  .split(',')
+  .map((s) => Number(s))
+  .filter((n) => Number.isInteger(n) && n > 0)
+
+/** 待保存的标签页信息（异步获取） */
 const tabs = ref<chrome.tabs.Tab[]>([])
-/** 「加入后关闭该页面」开关（底部复选框），默认勾选 */
-const closeTab = ref(true)
-/** 复选框文案：标签组批量收藏时提示关闭对象不同 */
-const closeTabLabel = computed(() => (tabs.value.length > 1 ? '加入后关闭这些标签页' : '加入后关闭该页面'))
-// 标记是否处于「已选中、正在提交」状态，避免提交过程中被取消关闭
-let selecting = false
+
+/** 默认工作组名称：未命名工作组-YYYYMMDD_HHMM（如 未命名工作组-20260821_0359） */
+function defaultWorkspaceName(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `未命名工作组-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`
+}
 
 onMounted(async () => {
-  const params = new URLSearchParams(location.search)
-  const ids = (params.get('tabIds') ?? '')
-    .split(',')
-    .map((s) => Number(s))
-    .filter((n) => Number.isInteger(n) && n > 0)
-  if (ids.length === 0) {
+  if (tabIds.length === 0) {
     window.close()
     return
   }
-  tabIds.value = ids
   // 逐个获取标签页信息（可能已被关闭，失败的跳过）
   const results = await Promise.all(
-    ids.map(async (id) => {
+    tabIds.map(async (id) => {
       try {
         return await chrome.tabs.get(id)
       } catch {
@@ -54,9 +65,8 @@ onMounted(async () => {
   if (tabs.value.length === 0) {
     ElMessage.error('无法获取标签页信息')
   }
-  panelRef.value?.reload()
 
-  // 本窗口本身是 popup 弹窗，最小化后无意义且容易在任务栏留下残留，直接关闭
+  // 本窗口本身是 popup 弹窗，最小化后无意义且容易在任务栏留下残留，直接关闭（两种模式都需要）
   chrome.windows.onFocusChanged.addListener(async (windowId) => {
     if (windowId !== chrome.windows.WINDOW_ID_NONE) return
     const win = await chrome.windows.getCurrent()
@@ -64,48 +74,13 @@ onMounted(async () => {
   })
 })
 
-/** 用户选中某个分组：加入工作组；关闭原页面与桌面通知由 background 统一处理 */
-async function onSelect(node: WorkspaceTreeNode) {
-  if (tabs.value.length === 0 || tabIds.value.length === 0) {
-    ElMessage.error('标签页信息缺失')
-    return
-  }
-  selecting = true
-  try {
-    const res = await sendMessage<{ added: number; skipped: number }>({
-      action: 'ADD_TABS_TO_WORKSPACE',
-      payload: {
-        workspaceId: node.id,
-        tabs: tabs.value.map((tab) => ({
-          chromeTabId: tab.id ?? 0,
-          url: tab.url ?? '',
-          title: tab.title ?? '',
-          favIconUrl: tab.favIconUrl ?? '',
-        })),
-        // 按「加入后关闭该页面」开关告诉 background 是否关闭原页面（background 同时负责弹通知）
-        closeAfterAdd: closeTab.value,
-      },
-    })
-
-    // 注意，当前页面中没有 chrome 对象，所以要借助 background 处理关闭原页面和弹通知的逻辑
-    if (res.success) {
-      window.close()
-    } else if (res.authError) {
-      ElMessage.error('未登录或连接已失效，请先在侧边栏登录')
-      selecting = false
-    } else {
-      ElMessage.error(res.error || '加入工作组失败')
-      selecting = false
-    }
-  } catch {
-    ElMessage.error('加入工作组失败，请重试')
-    selecting = false
-  }
+/** 保存成功：关闭选择器窗口（关闭原页面与桌面通知已由 background 处理） */
+function onSuccess() {
+  window.close()
 }
 
 /** 用户点击「取消」：不关闭原页面，关闭选择器窗口 */
 function onCancel() {
-  if (selecting) return
   window.close()
 }
 </script>
