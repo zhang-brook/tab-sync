@@ -12,6 +12,12 @@ import (
 	"github.com/spidermemos/tab-sync-server/internal/model"
 )
 
+// 工作组相关错误
+var (
+	// ErrWorkspaceNotFound 工作组不存在或已被删除
+	ErrWorkspaceNotFound = errors.New("工作组不存在")
+)
+
 // WorkspaceService 工作组管理服务
 type WorkspaceService struct {
 	db         *database.DB
@@ -102,29 +108,51 @@ type CreateResult struct {
 
 // List 获取所有工作组
 // includeSystem=true 时包含系统工作组（如「未分组」），否则仅返回用户可管理的普通工作组。
-func (s *WorkspaceService) List(includeSystem bool) ([]WorkspaceResponse, error) {
+// includeTabs=false 时仅返回工作组元信息（不含标签页），用于管理页面左侧工作组树，避免全量拉取标签页。
+func (s *WorkspaceService) List(includeSystem, includeTabs bool) ([]WorkspaceResponse, error) {
 	query := s.db.Where("is_deleted = ?", false)
 	if !includeSystem {
 		query = query.Where("is_system = ?", false)
 	}
 
-	var workspaces []model.Workspace
-	err := query.
-		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
-			return db.Preload("Tags.Tag").Order("sort_order ASC")
-		}).
+	query = query.
 		Preload("Tags.Tag").
-		Order("sort_order ASC, created_at DESC").
-		Find(&workspaces).Error
-	if err != nil {
+		Order("sort_order ASC, created_at DESC")
+
+	// 仅在需要时预加载标签页，降低左侧树场景的数据体积
+	if includeTabs {
+		query = query.Preload("Tabs", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Tags.Tag").Order("sort_order ASC")
+		})
+	}
+
+	var workspaces []model.Workspace
+	if err := query.Find(&workspaces).Error; err != nil {
 		return nil, err
 	}
 
 	responses := make([]WorkspaceResponse, len(workspaces))
 	for i, ws := range workspaces {
-		responses[i] = toWorkspaceResponse(ws)
+		responses[i] = toWorkspaceResponse(ws, includeTabs)
 	}
 	return responses, nil
+}
+
+// GetTabs 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回）
+func (s *WorkspaceService) GetTabs(id string) ([]TabReference, error) {
+	var workspace model.Workspace
+	if err := s.db.
+		Where("workspace_id = ? AND is_deleted = ?", id, false).
+		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Tags.Tag").Order("sort_order ASC")
+		}).
+		First(&workspace).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrWorkspaceNotFound
+		}
+		return nil, err
+	}
+	return toTabReferences(workspace.Tabs), nil
 }
 
 // Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
@@ -150,7 +178,7 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 	}
 
 	return &CreateResult{
-		Workspace: toWorkspaceResponse(workspace),
+		Workspace: toWorkspaceResponse(workspace, true),
 	}, nil
 }
 
@@ -255,7 +283,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 			First(&workspace)
 	}
 
-	resp := toWorkspaceResponse(workspace)
+	resp := toWorkspaceResponse(workspace, true)
 
 	// 记录同步事件（预留：未来用于推送到织个网上游）
 	if s.syncSvc != nil {
@@ -593,20 +621,10 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 
 // ===================== 辅助函数 =====================
 
-func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
-	tabs := make([]TabReference, len(ws.Tabs))
-	for i, tab := range ws.Tabs {
-		tabs[i] = TabReference{
-			TabID:       strconv.FormatUint(uint64(tab.ID), 10),
-			URL:         tab.URL,
-			Title:       tab.Title,
-			DisplayName: tab.DisplayName,
-			FavIconURL:  tab.FavIconURL,
-			Description: tab.Description,
-			SortOrder:   tab.SortOrder,
-			AddedAt:     tab.AddedAt.Format(time.RFC3339),
-			Tags:        tabTagsToResponses(tab.Tags),
-		}
+func toWorkspaceResponse(ws model.Workspace, includeTabs bool) WorkspaceResponse {
+	tabs := make([]TabReference, 0)
+	if includeTabs {
+		tabs = toTabReferences(ws.Tabs)
 	}
 	return WorkspaceResponse{
 		ID:          ws.WorkspaceID,
@@ -621,6 +639,24 @@ func toWorkspaceResponse(ws model.Workspace) WorkspaceResponse {
 		CreatedAt:   ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   ws.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+func toTabReferences(tabs []model.WorkspaceTab) []TabReference {
+	refs := make([]TabReference, len(tabs))
+	for i, tab := range tabs {
+		refs[i] = TabReference{
+			TabID:       strconv.FormatUint(uint64(tab.ID), 10),
+			URL:         tab.URL,
+			Title:       tab.Title,
+			DisplayName: tab.DisplayName,
+			FavIconURL:  tab.FavIconURL,
+			Description: tab.Description,
+			SortOrder:   tab.SortOrder,
+			AddedAt:     tab.AddedAt.Format(time.RFC3339),
+			Tags:        tabTagsToResponses(tab.Tags),
+		}
+	}
+	return refs
 }
 
 func tagToResponse(t model.Tag) TagResponse {

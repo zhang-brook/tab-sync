@@ -1,4 +1,4 @@
-﻿import type { Workspace, TagInfo } from './workspace'
+﻿import type { Workspace, TabReference, TagInfo } from './workspace'
 import type { Device } from './device'
 import type { AuthState } from './auth'
 
@@ -10,6 +10,7 @@ export type MessageAction =
   | 'LOGIN_WITH_TOKEN'
   | 'LOGOUT'
   | 'GET_WORKSPACES'
+  | 'GET_WORKSPACE_TABS'
   | 'CREATE_WORKSPACE'
   | 'UPDATE_WORKSPACE'
   | 'DELETE_WORKSPACE'
@@ -65,8 +66,15 @@ export interface SetConnectionModeMessage {
 
 export interface GetWorkspacesMessage {
   action: 'GET_WORKSPACES'
-  /** 传入 { includeSystem: true } 可包含系统工作组（如「未分组」） */
-  payload?: { includeSystem?: boolean }
+  /** 传入 { includeSystem: true } 可包含系统工作组（如「未分组」）；
+   * 传入 { includeTabs: false } 则仅返回工作组元信息（不含标签页），用于左侧工作组树，避免全量拉取标签页 */
+  payload?: { includeSystem?: boolean; includeTabs?: boolean }
+}
+
+/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
+export interface GetWorkspaceTabsMessage {
+  action: 'GET_WORKSPACE_TABS'
+  payload: { workspaceId: string }
 }
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
@@ -293,6 +301,7 @@ export type ExtensionMessage =
   | CheckVersionMessage
   | SetConnectionModeMessage
   | GetWorkspacesMessage
+  | GetWorkspaceTabsMessage
   | CreateWorkspaceMessage
   | UpdateWorkspaceMessage
   | DeleteWorkspaceMessage
@@ -344,6 +353,11 @@ export interface StateData {
 /** GET_WORKSPACES 响应数据 */
 export interface WorkspacesData {
   workspaces: Workspace[]
+}
+
+/** GET_WORKSPACE_TABS 响应数据（单个工作组的标签页列表） */
+export interface WorkspaceTabsData {
+  tabs: TabReference[]
 }
 
 /** GET_DEVICES 响应数据 */

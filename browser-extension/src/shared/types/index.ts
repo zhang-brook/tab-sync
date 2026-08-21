@@ -7,6 +7,7 @@ export type {
   MessageResponse,
   StateData,
   WorkspacesData,
+  WorkspaceTabsData,
   DevicesData,
   WorkspaceTabPayload,
   AddTabsToWorkspaceMessage,

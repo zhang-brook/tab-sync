@@ -13,7 +13,7 @@
     </div>
 
     <!-- 双栏：左树 + 右标签页 -->
-    <div v-loading="loading" class="split-pane">
+    <div v-loading="loading || loadingTabs" class="split-pane">
       <!-- 左侧：工作组树 -->
       <div class="tree-pane">
         <div class="pane-title-row">
@@ -352,7 +352,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
@@ -365,13 +365,56 @@ import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
-import type { Workspace, WorkspacesData, TabReference, TagInfo, TagsData } from '@/shared/types'
+import type { Workspace, WorkspacesData, WorkspaceTabsData, TabReference, TagInfo, TagsData } from '@/shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
 const searchKeyword = ref('')
+
+// 标签页按需缓存：workspaceId -> 该工作组本层级的标签页列表。
+// 管理页面左侧选择工作组后，右侧先从缓存立即展示，再强制调接口刷新最新数据（多设备可能并发修改）。
+const tabsCache = reactive(new Map<string, TabReference[]>())
+// 正在加载右侧标签页列表（无缓存时的首次加载）
+const loadingTabs = ref(false)
+
+// 拉取单个工作组的标签页并写入缓存
+async function fetchWorkspaceTabs(id: string, force = false): Promise<TabReference[]> {
+  if (!force && tabsCache.has(id)) return tabsCache.get(id)!
+  const res = await sendMessage<WorkspaceTabsData>({ action: 'GET_WORKSPACE_TABS', payload: { workspaceId: id } })
+  if (res.success && res.data) {
+    tabsCache.set(id, res.data.tabs)
+    return res.data.tabs
+  }
+  tabsCache.delete(id)
+  throw new Error(res.error || '加载标签页失败')
+}
+
+// 确保给定工作组均已加载标签页（仅用于读取场景，命中缓存即跳过）
+async function ensureTabsLoaded(ids: string[]) {
+  const pending = ids.filter((id) => !tabsCache.has(id))
+  if (pending.length === 0) return
+  loadingTabs.value = true
+  try {
+    await Promise.all(pending.map((id) => fetchWorkspaceTabs(id).catch(() => null)))
+  } finally {
+    loadingTabs.value = false
+  }
+}
+
+// 刷新指定工作组的标签页：有缓存时先展示旧数据，再强制从后端获取最新数据覆盖缓存；
+// 无缓存时显示加载态。用于左侧切换、写操作后刷新右侧列表。
+async function refreshTabs(ids: string[]) {
+  const hasCache = ids.some((id) => tabsCache.has(id))
+  if (!hasCache) loadingTabs.value = true
+  try {
+    await Promise.all(ids.map((id) => fetchWorkspaceTabs(id, true).catch(() => null)))
+  } finally {
+    loadingTabs.value = false
+  }
+}
+
 const selectedId = ref('')
 const tabScope = ref<'current' | 'all'>('current')
 
@@ -451,28 +494,29 @@ interface RightTabItem {
   workspaceColor: string
 }
 
-/** 右侧标签页列表：根据层级范围聚合，两种范围均支持按标签筛选 */
+/** 右侧标签页列表：根据层级范围聚合，两种范围均支持按标签筛选。
+ * 标签页不再随工作组树全量返回，而是选中工作组后从后端按需拉取（见 tabsCache）。 */
 const rightTabs = computed<RightTabItem[]>(() => {
   const ws = selectedWorkspace.value
   if (!ws) return []
 
-  const collect = (w: Workspace): RightTabItem[] =>
-    w.tabs.map((tab) => ({
+  const collect = (id: string, name: string, color: string): RightTabItem[] =>
+    (tabsCache.get(id) ?? []).map((tab) => ({
       tab,
-      workspaceId: w.id,
-      workspaceName: w.name,
-      workspaceColor: w.color,
+      workspaceId: id,
+      workspaceName: name,
+      workspaceColor: color,
     }))
 
   let result: RightTabItem[]
   if (tabScope.value === 'current') {
-    result = collect(ws)
+    result = collect(ws.id, ws.name, ws.color)
   } else {
     const ids = [ws.id, ...collectDescendantIds(workspaces.value, ws.id)]
     result = []
     for (const id of ids) {
       const w = workspaces.value.find((x) => x.id === id)
-      if (w) result.push(...collect(w))
+      if (w) result.push(...collect(w.id, w.name, w.color))
     }
   }
   if (tagFilter.value != null) {
@@ -511,6 +555,13 @@ watch(searchKeyword, (val) => {
   treeRef.value?.filter(val)
 })
 
+// 选中工作组或切换层级范围后，右侧先展示缓存，再强制从后端拉取最新标签页列表
+watch([selectedId, tabScope], ([id]) => {
+  if (!id) return
+  const ids = tabScope.value === 'all' ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
+  void refreshTabs(ids)
+})
+
 function filterNode(value: string, data: Record<string, unknown>) {
   if (!value) return true
   return String((data as unknown as WorkspaceTreeNode).name).toLowerCase().includes(value.toLowerCase())
@@ -532,7 +583,7 @@ let initialized = false
 
 async function loadWorkspaces() {
   loading.value = true
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
+  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true, includeTabs: false } })
   if (res.success && res.data) {
     workspaces.value = res.data.workspaces
     // 首次进入页面：若设置了默认分组则选中它（刷新等后续加载保持当前选中）
@@ -548,6 +599,14 @@ async function loadWorkspaces() {
     }
     await nextTick()
     if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
+    // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
+    if (selectedId.value) {
+      const ids =
+        tabScope.value === 'all'
+          ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)]
+          : [selectedId.value]
+      void refreshTabs(ids)
+    }
   }
   loading.value = false
 }
@@ -579,9 +638,11 @@ async function onTagEditorConfirm(ids: number[]) {
   const target = tagEditorTarget.value
   if (!target) return
   const isTab = !!target.tabId
+  // 标签页现在按需从后端拉取，需先确保目标工作组标签页已加载再读取现有标签
+  await ensureTabsLoaded([target.workspaceId])
   const ws = workspaces.value.find((w) => w.id === target.workspaceId)
   const existingIds = isTab
-    ? (ws?.tabs.find((t) => t.tabId === target.tabId)?.tags ?? []).map((t) => t.id)
+    ? (tabsCache.get(target.workspaceId)?.find((t) => t.tabId === target.tabId)?.tags ?? []).map((t) => t.id)
     : (ws?.tags ?? []).map((t) => t.id)
   const toAdd = ids.filter((id) => !existingIds.includes(id))
   const toRemove = existingIds.filter((id) => !ids.includes(id))
@@ -605,12 +666,15 @@ async function onTagEditorConfirm(ids: number[]) {
 
 function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
+  // 选中工作组后，先展示缓存、再强制从后端拉取最新标签页（而非随工作组树全量返回）
+  void refreshTabs([node.id])
 }
 
 /** 右键节点：选中该节点，由 ContextMenu 负责打开操作菜单 */
 function onNodeContextMenu(data: WorkspaceTreeNode) {
   selectedId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
+  void refreshTabs([data.id])
 }
 
 /** 标签页操作菜单命令分发 */
@@ -1005,8 +1069,8 @@ function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
   const newRelIndex = items.findIndex((i) => i.id === moved.id)
   if (newRelIndex < 0) return
   // 未筛选时本地同步展示顺序，避免依赖父数据重渲染导致拖拽后顺序回退
-  if (tagFilter.value == null) {
-    ws.tabs = items.map((i) => (i as WsTabListItem).tab)
+  if (tagFilter.value == null && tabScope.value === 'current') {
+    tabsCache.set(ws.id, items.map((i) => (i as WsTabListItem).tab))
   }
   // newRelIndex 为被拖拽项在新列表中的位置；服务端 MoveTab 会先移除该项再插入到
   // 剩余列表的 newIndex 处，二者语义一致，故直接以新位置作为目标索引。
@@ -1067,14 +1131,18 @@ function openMoveDialog(workspaceId: string, tabId: string) {
 async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   const src = moveSource.value
   if (!src) return
+  // 确保目标工作组的标签页已加载，以计算追加位置（标签页按需拉取，node.workspace.tabs 不再全量包含）
+  await ensureTabsLoaded([node.id])
   // 追加到目标分组的最后一项（源分组已在选择器中 disabled，不会选到同组）
-  const newIndex = node.workspace.tabs?.length ?? 0
+  const newIndex = tabsCache.get(node.id)?.length ?? 0
   const res = await sendMessage({
     action: 'MOVE_WORKSPACE_TAB',
     payload: { workspaceId: node.id, tabId: src.tabId, newIndex },
   })
   if (res.success) {
     ElMessage.success(`已移动到「${node.name}」`)
+    // 先展示旧缓存，再强制刷新源分组与目标分组的最新标签页数据（多设备可能并发修改）
+    await refreshTabs([src.workspaceId, node.id].filter(Boolean) as string[])
     await loadWorkspaces()
   } else if (res.authError) {
     ElMessage.warning('未连接后端，无法移动')

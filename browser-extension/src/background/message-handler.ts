@@ -1,9 +1,9 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, getWorkspaceTabs, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -39,6 +39,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'GET_WORKSPACES':
       return handleGetWorkspaces(message.payload)
+
+    case 'GET_WORKSPACE_TABS':
+      return handleGetWorkspaceTabs(message.payload)
 
     case 'CREATE_WORKSPACE':
       return handleCreateWorkspace(message.payload)
@@ -272,13 +275,27 @@ function compareVersions(a: string, b: string): number {
 // ============ 工作组操作 ============
 
 /** 获取所有工作组（从后端 API 获取） */
-async function handleGetWorkspaces(payload?: { includeSystem?: boolean }): Promise<MessageResponse<WorkspacesData>> {
-  const res = await getWorkspaces(payload?.includeSystem ?? false)
+async function handleGetWorkspaces(payload?: { includeSystem?: boolean; includeTabs?: boolean }): Promise<MessageResponse<WorkspacesData>> {
+  // 默认不拉取标签页，工作组树仅需要元信息；右侧列表按需调用 GET_WORKSPACE_TABS
+  const res = await getWorkspaces(payload?.includeSystem ?? false, payload?.includeTabs ?? false)
   if (res.ok && res.data) {
     return { success: true, data: { workspaces: res.data.workspaces } }
   }
   logger.warn('getWorkspaces API failed:', res.error)
   return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
+}
+
+/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
+async function handleGetWorkspaceTabs(payload: { workspaceId: string }): Promise<MessageResponse<WorkspaceTabsData>> {
+  if (!payload?.workspaceId) {
+    return { success: false, error: '缺少工作组 ID' }
+  }
+  const res = await getWorkspaceTabs(payload.workspaceId)
+  if (res.ok && res.data) {
+    return { success: true, data: { tabs: res.data.tabs } }
+  }
+  logger.warn('getWorkspaceTabs API failed:', res.error)
+  return { success: false, error: res.error || '获取工作组标签页失败', authError: res.status === 401 }
 }
 
 /** 创建工作组（通过后端 API，不含标签页） */

@@ -1,11 +1,22 @@
 import { apiClient } from './client'
-import type { Workspace } from '../types'
+import type { Workspace, TabReference } from '../types'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
-/** 获取所有工作组。includeSystem=true 时包含系统工作组（如「未分组」） */
-export function getWorkspaces(includeSystem = false) {
+/** 获取所有工作组。
+ * includeSystem=true 时包含系统工作组（如「未分组」）。
+ * includeTabs=false 时仅返回工作组元信息（不含标签页），用于管理页面左侧工作组树，避免全量拉取标签页。 */
+export function getWorkspaces(includeSystem = false, includeTabs = true) {
+  const params = new URLSearchParams({ includeSystem: String(includeSystem) })
+  if (!includeTabs) params.set('includeTabs', 'false')
   return apiClient.get<{ workspaces: Workspace[] }>(
-    `/v1/tab-sync/workspaces?includeSystem=${includeSystem}`,
+    `/v1/tab-sync/workspaces?${params.toString()}`,
+  )
+}
+
+/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
+export function getWorkspaceTabs(id: string) {
+  return apiClient.get<{ tabs: TabReference[] }>(
+    `/v1/tab-sync/workspaces/${encodeURIComponent(id)}/tabs`,
   )
 }
 

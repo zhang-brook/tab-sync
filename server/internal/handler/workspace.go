@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,13 +22,36 @@ func NewWorkspaceHandler(svc *service.WorkspaceService) *WorkspaceHandler {
 
 // List 获取工作组列表
 // 查询参数 includeSystem=true 时包含系统工作组（如「未分组」），默认仅返回用户可管理的普通工作组
+// 查询参数 includeTabs=true 时同时返回每个工作组的标签页，默认仅返回工作组元信息（不含标签页）。
+// 管理页面左侧工作组树使用 includeTabs=false 以避免全量拉取标签页，右侧列表按需调用 GetTabs。
 func (h *WorkspaceHandler) List(c *gin.Context) {
-	workspaces, err := h.svc.List(c.Query("includeSystem") == "true")
+	includeSystem := c.Query("includeSystem") == "true"
+	includeTabs := c.Query("includeTabs") != "false"
+	workspaces, err := h.svc.List(includeSystem, includeTabs)
 	if err != nil {
 		InternalError(c, "获取工作组列表失败")
 		return
 	}
 	Success(c, gin.H{"workspaces": workspaces})
+}
+
+// GetTabs 获取单个工作组的标签页列表（管理页面右侧列表按需拉取）
+func (h *WorkspaceHandler) GetTabs(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		BadRequest(c, "请提供工作区 ID")
+		return
+	}
+	tabs, err := h.svc.GetTabs(id)
+	if err != nil {
+		if errors.Is(err, service.ErrWorkspaceNotFound) {
+			NotFound(c, "工作组不存在")
+			return
+		}
+		InternalError(c, "获取工作组标签页失败")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tabs": tabs})
 }
 
 // Create 创建工作区

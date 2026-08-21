@@ -46,7 +46,7 @@ func TestWorkspaceService_List(t *testing.T) {
 	svc.Create(CreateWorkspacePayload{Name: "工作组 B"})
 	svc.Create(CreateWorkspacePayload{Name: "工作组 C"})
 
-	workspaces, err := svc.List(false)
+	workspaces, err := svc.List(false, true)
 	if err != nil {
 		t.Fatalf("列出工作组失败: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestWorkspaceService_Delete(t *testing.T) {
 		t.Fatalf("删除工作组失败: %v", err)
 	}
 
-	workspaces, _ := svc.List(false)
+	workspaces, _ := svc.List(false, true)
 	if len(workspaces) != 0 {
 		t.Errorf("删除后工作组数量不匹配: got %d, want 0", len(workspaces))
 	}

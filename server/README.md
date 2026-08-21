@@ -183,7 +183,8 @@ docker compose start
 | `PATCH` | `/v1/tab-sync/devices/:deviceId` | 更新设备 |
 | `DELETE` | `/v1/tab-sync/devices/:deviceId` | 注销设备 |
 | `POST` | `/v1/tab-sync/devices/:deviceId/heartbeat` | 心跳上报 |
-| `GET` | `/v1/tab-sync/workspaces` | 工作组列表 |
+| `GET` | `/v1/tab-sync/workspaces` | 工作组列表（`includeSystem` / `includeTabs` 查询参数控制是否含系统分组与标签页明细，默认 `includeTabs=true`） |
+| `GET` | `/v1/tab-sync/workspaces/:id/tabs` | 单个工作组的标签页列表（左侧选择后按需拉取） |
 | `POST` | `/v1/tab-sync/workspaces` | 创建工作组 |
 | `PUT` | `/v1/tab-sync/workspaces/:id` | 更新工作组 |
 | `DELETE` | `/v1/tab-sync/workspaces/:id` | 删除工作组 |
