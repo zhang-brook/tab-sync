@@ -8,6 +8,8 @@ export type {
   StateData,
   WorkspacesData,
   WorkspaceTabsData,
+  WorkspaceTabsGroup,
+  WorkspaceTabsGroupsData,
   DevicesData,
   WorkspaceTabPayload,
   AddTabsToWorkspaceMessage,

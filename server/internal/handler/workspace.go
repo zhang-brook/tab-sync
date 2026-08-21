@@ -35,11 +35,26 @@ func (h *WorkspaceHandler) List(c *gin.Context) {
 	Success(c, gin.H{"workspaces": workspaces})
 }
 
-// GetTabs 获取单个工作组的标签页列表（管理页面右侧列表按需拉取）
+// GetTabs 获取工作组的标签页列表（管理页面右侧列表按需拉取）
+// 查询参数 recursive=true 时返回该工作组自身及整棵子树的标签页（按工作区分组，一次请求），
+// 用于「包含子工作组」模式，避免前端逐个工作组批量请求。
 func (h *WorkspaceHandler) GetTabs(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		BadRequest(c, "请提供工作区 ID")
+		return
+	}
+	if c.Query("recursive") == "true" {
+		groups, err := h.svc.GetTabsTree(id)
+		if err != nil {
+			if errors.Is(err, service.ErrWorkspaceNotFound) {
+				NotFound(c, "工作组不存在")
+				return
+			}
+			InternalError(c, "获取工作组标签页失败")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"groups": groups})
 		return
 	}
 	tabs, err := h.svc.GetTabs(id)

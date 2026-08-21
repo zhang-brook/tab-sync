@@ -155,6 +155,72 @@ func (s *WorkspaceService) GetTabs(id string) ([]TabReference, error) {
 	return toTabReferences(workspace.Tabs), nil
 }
 
+// GetTabsTree 获取某个工作组自身及整棵子树的标签页，按工作区分组返回。
+// 用于管理页面「包含子工作组」模式：一次接口调用即可拿到所有相关分组的数据，
+// 避免前端逐个工作组批量请求。返回的分组按根到叶的后序遍历顺序排列。
+func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) {
+	// 先确认根工作组存在
+	var root model.Workspace
+	if err := s.db.
+		Where("workspace_id = ? AND is_deleted = ?", id, false).
+		First(&root).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrWorkspaceNotFound
+		}
+		return nil, err
+	}
+
+	// 加载全部未删除工作组，构建 parentId -> 子级 映射
+	var all []model.Workspace
+	if err := s.db.Where("is_deleted = ?", false).Find(&all).Error; err != nil {
+		return nil, err
+	}
+	childrenMap := make(map[string][]string)
+	meta := make(map[string]model.Workspace, len(all))
+	for _, w := range all {
+		childrenMap[w.ParentID] = append(childrenMap[w.ParentID], w.WorkspaceID)
+		meta[w.WorkspaceID] = w
+	}
+
+	// 后序遍历收集子树内全部工作组 ID（叶子在前，根最后）
+	var subtree []string
+	var visit func(wid string)
+	visit = func(wid string) {
+		for _, c := range childrenMap[wid] {
+			visit(c)
+		}
+		subtree = append(subtree, wid)
+	}
+	visit(id)
+
+	// 批量预加载子树内所有工作组的标签页（一次查询，避免 N+1）
+	var tabs []model.WorkspaceTab
+	if err := s.db.
+		Preload("Tags.Tag").
+		Where("workspace_id IN ?", subtree).
+		Order("sort_order ASC, id ASC").
+		Find(&tabs).Error; err != nil {
+		return nil, err
+	}
+	tabsByWorkspace := make(map[string][]model.WorkspaceTab, len(subtree))
+	for _, t := range tabs {
+		tabsByWorkspace[t.WorkspaceID] = append(tabsByWorkspace[t.WorkspaceID], t)
+	}
+
+	// 按后序遍历顺序组装分组，保证根在其子树之前返回（顺序稳定、便于前端缓存合并）
+	groups := make([]WorkspaceTabsGroup, 0, len(subtree))
+	for _, wid := range subtree {
+		ws := meta[wid]
+		groups = append(groups, WorkspaceTabsGroup{
+			WorkspaceID: ws.WorkspaceID,
+			Name:        ws.Name,
+			Color:       ws.Color,
+			Tabs:        toTabReferences(tabsByWorkspace[wid]),
+		})
+	}
+	return groups, nil
+}
+
 // Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
 func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult, error) {
 	wsID := uuid.New().String()
@@ -694,6 +760,14 @@ func sanitizeFavIconURL(url string) string {
 }
 
 // ===================== 响应类型 =====================
+
+// WorkspaceTabsGroup 某个工作组及其标签页的分组（用于「包含子工作组」批量接口）
+type WorkspaceTabsGroup struct {
+	WorkspaceID string         `json:"workspaceId"`
+	Name        string         `json:"name"`
+	Color       string         `json:"color"`
+	Tabs        []TabReference `json:"tabs"`
+}
 
 // WorkspaceTabSummary 工作组标签页摘要
 type WorkspaceTabSummary struct {

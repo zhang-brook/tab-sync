@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Workspace, TabReference } from '../types'
+import type { Workspace, TabReference, WorkspaceTabsGroup } from '../types'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
 /** 获取所有工作组。
@@ -13,10 +13,12 @@ export function getWorkspaces(includeSystem = false, includeTabs = true) {
   )
 }
 
-/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
-export function getWorkspaceTabs(id: string) {
-  return apiClient.get<{ tabs: TabReference[] }>(
-    `/v1/tab-sync/workspaces/${encodeURIComponent(id)}/tabs`,
+/** 获取工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回）。
+ * recursive=true 时一次返回该工作组自身及整棵子树的标签页（按工作区分组），用于「包含子工作组」模式。 */
+export function getWorkspaceTabs(id: string, recursive = false) {
+  const query = recursive ? '?recursive=true' : ''
+  return apiClient.get<{ tabs: TabReference[] } | { groups: WorkspaceTabsGroup[] }>(
+    `/v1/tab-sync/workspaces/${encodeURIComponent(id)}/tabs${query}`,
   )
 }
 

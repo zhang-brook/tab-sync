@@ -365,7 +365,7 @@ import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
-import type { Workspace, WorkspacesData, WorkspaceTabsData, TabReference, TagInfo, TagsData } from '@/shared/types'
+import type { Workspace, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, TabReference, TagInfo, TagsData } from '@/shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 
@@ -391,28 +391,56 @@ async function fetchWorkspaceTabs(id: string, force = false): Promise<TabReferen
   throw new Error(res.error || '加载标签页失败')
 }
 
-// 确保给定工作组均已加载标签页（仅用于读取场景，命中缓存即跳过）
-async function ensureTabsLoaded(ids: string[]) {
-  const pending = ids.filter((id) => !tabsCache.has(id))
-  if (pending.length === 0) return
+// 以根工作组 id 一次拉取该组及整棵子树的标签页（recursive=true），并分别写入每个工作组的缓存。
+// 用于「包含子工作组」模式，避免逐个工作组批量请求。
+async function fetchWorkspaceTabsTree(rootId: string, force = false): Promise<void> {
+  if (!force && rootId && tabsCache.has(rootId)) return
+  const res = await sendMessage<WorkspaceTabsGroupsData>({
+    action: 'GET_WORKSPACE_TABS',
+    payload: { workspaceId: rootId, recursive: true },
+  })
+  if (res.success && res.data && 'groups' in res.data) {
+    for (const g of res.data.groups) {
+      tabsCache.set(g.workspaceId, g.tabs)
+    }
+    return
+  }
+  throw new Error(res.error || '加载标签页失败')
+}
+
+/**
+ * 按需加载/刷新标签页缓存。
+ * @param ids 需要加载的工作组 id 列表
+ * @param recursiveRoot 当传入时表示「包含子工作组」模式：仅以该根 id 调一次批量接口，
+ *   由后端一次返回子树内全部工作组的标签页，覆盖 ids 中所有缓存的 key。
+ * @param force true 时无视缓存强制刷新；false 时（仅读取场景）命中缓存即跳过。
+ */
+async function loadTabs(ids: string[], recursiveRoot?: string, force = false) {
   loadingTabs.value = true
   try {
-    await Promise.all(pending.map((id) => fetchWorkspaceTabs(id).catch(() => null)))
+    if (recursiveRoot) {
+      await fetchWorkspaceTabsTree(recursiveRoot, force).catch(() => null)
+      return
+    }
+    await Promise.all(ids.map((id) => fetchWorkspaceTabs(id, force).catch(() => null)))
   } finally {
     loadingTabs.value = false
   }
 }
 
+// 确保给定工作组均已加载标签页（仅用于读取场景，命中缓存即跳过）
+async function ensureTabsLoaded(ids: string[], recursiveRoot?: string) {
+  const pending = recursiveRoot
+    ? [recursiveRoot]
+    : ids.filter((id) => !tabsCache.has(id))
+  if (pending.length === 0) return
+  await loadTabs(pending, recursiveRoot, false)
+}
+
 // 刷新指定工作组的标签页：有缓存时先展示旧数据，再强制从后端获取最新数据覆盖缓存；
 // 无缓存时显示加载态。用于左侧切换、写操作后刷新右侧列表。
-async function refreshTabs(ids: string[]) {
-  const hasCache = ids.some((id) => tabsCache.has(id))
-  if (!hasCache) loadingTabs.value = true
-  try {
-    await Promise.all(ids.map((id) => fetchWorkspaceTabs(id, true).catch(() => null)))
-  } finally {
-    loadingTabs.value = false
-  }
+async function refreshTabs(ids: string[], recursiveRoot?: string) {
+  await loadTabs(ids, recursiveRoot, true)
 }
 
 const selectedId = ref('')
@@ -555,11 +583,13 @@ watch(searchKeyword, (val) => {
   treeRef.value?.filter(val)
 })
 
-// 选中工作组或切换层级范围后，右侧先展示缓存，再强制从后端拉取最新标签页列表
+// 选中工作组或切换层级范围后，右侧先展示缓存，再强制从后端拉取最新标签页列表。
+// 「包含子工作组」模式以根 id 调一次批量接口返回整棵子树，避免逐个工作组请求。
 watch([selectedId, tabScope], ([id]) => {
   if (!id) return
-  const ids = tabScope.value === 'all' ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
-  void refreshTabs(ids)
+  const isAll = tabScope.value === 'all'
+  const ids = isAll ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
+  void refreshTabs(ids, isAll ? id : undefined)
 })
 
 function filterNode(value: string, data: Record<string, unknown>) {
@@ -601,11 +631,9 @@ async function loadWorkspaces() {
     if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
     // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
     if (selectedId.value) {
-      const ids =
-        tabScope.value === 'all'
-          ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)]
-          : [selectedId.value]
-      void refreshTabs(ids)
+      const isAll = tabScope.value === 'all'
+      const ids = isAll ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)] : [selectedId.value]
+      void refreshTabs(ids, isAll ? selectedId.value : undefined)
     }
   }
   loading.value = false
@@ -666,15 +694,18 @@ async function onTagEditorConfirm(ids: number[]) {
 
 function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
-  // 选中工作组后，先展示缓存、再强制从后端拉取最新标签页（而非随工作组树全量返回）
-  void refreshTabs([node.id])
+  // 选中工作组后，先展示缓存、再强制从后端拉取最新标签页（而非随工作组树全量返回）。
+  // 「包含子工作组」模式下以根 id 一次拉取整棵子树，避免逐个工作组请求。
+  const isAll = tabScope.value === 'all'
+  void refreshTabs([node.id], isAll ? node.id : undefined)
 }
 
 /** 右键节点：选中该节点，由 ContextMenu 负责打开操作菜单 */
 function onNodeContextMenu(data: WorkspaceTreeNode) {
   selectedId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
-  void refreshTabs([data.id])
+  const isAll = tabScope.value === 'all'
+  void refreshTabs([data.id], isAll ? data.id : undefined)
 }
 
 /** 标签页操作菜单命令分发 */

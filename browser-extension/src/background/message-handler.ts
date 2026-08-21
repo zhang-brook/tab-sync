@@ -1,4 +1,4 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
@@ -285,14 +285,20 @@ async function handleGetWorkspaces(payload?: { includeSystem?: boolean; includeT
   return { success: false, error: res.error || '获取工作组失败', authError: res.status === 401 }
 }
 
-/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
-async function handleGetWorkspaceTabs(payload: { workspaceId: string }): Promise<MessageResponse<WorkspaceTabsData>> {
+/** 获取工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回）。
+ * recursive=true 时一次返回该工作组自身及整棵子树的标签页（按工作区分组）。 */
+async function handleGetWorkspaceTabs(payload: { workspaceId: string; recursive?: boolean }): Promise<MessageResponse<WorkspaceTabsData | WorkspaceTabsGroupsData>> {
   if (!payload?.workspaceId) {
     return { success: false, error: '缺少工作组 ID' }
   }
-  const res = await getWorkspaceTabs(payload.workspaceId)
+  const res = await getWorkspaceTabs(payload.workspaceId, payload.recursive)
   if (res.ok && res.data) {
-    return { success: true, data: { tabs: res.data.tabs } }
+    if ('groups' in res.data) {
+      return { success: true, data: { groups: res.data.groups } }
+    }
+    if ('tabs' in res.data) {
+      return { success: true, data: { tabs: res.data.tabs } }
+    }
   }
   logger.warn('getWorkspaceTabs API failed:', res.error)
   return { success: false, error: res.error || '获取工作组标签页失败', authError: res.status === 401 }

@@ -71,10 +71,11 @@ export interface GetWorkspacesMessage {
   payload?: { includeSystem?: boolean; includeTabs?: boolean }
 }
 
-/** 获取单个工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回） */
+/** 获取工作组的标签页列表（管理页面右侧列表按需拉取，而非随工作组树全量返回）。
+ * recursive=true 时一次返回该工作组自身及整棵子树的标签页（按工作区分组），用于「包含子工作组」模式。 */
 export interface GetWorkspaceTabsMessage {
   action: 'GET_WORKSPACE_TABS'
-  payload: { workspaceId: string }
+  payload: { workspaceId: string; recursive?: boolean }
 }
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
@@ -358,6 +359,19 @@ export interface WorkspacesData {
 /** GET_WORKSPACE_TABS 响应数据（单个工作组的标签页列表） */
 export interface WorkspaceTabsData {
   tabs: TabReference[]
+}
+
+/** GET_WORKSPACE_TABS?recursive=true 响应数据（该工作组自身及整棵子树的标签页，按工作区分组） */
+export interface WorkspaceTabsGroup {
+  workspaceId: string
+  name: string
+  color: string
+  tabs: TabReference[]
+}
+
+/** GET_WORKSPACE_TABS?recursive=true 响应数据 */
+export interface WorkspaceTabsGroupsData {
+  groups: WorkspaceTabsGroup[]
 }
 
 /** GET_DEVICES 响应数据 */
