@@ -925,9 +925,21 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 		}
 
 		// 更新工作组归属和排序
+		oldWorkspaceID := tab.WorkspaceID
 		tab.WorkspaceID = workspaceID
 		if err := tx.Save(&tab).Error; err != nil {
 			return err
+		}
+
+		// 同步更新标签页标签关联的工作组归属：tab_tags.workspace_id 以 workspace_tabs 为准。
+		// 若不更新，移动标签页后其标签关联仍指向旧工作组，导致「按组移除标签」删不掉、
+		// 「按标签联查工作组」显示在旧工作组下（旧工作组删除后标签页还会在标签视图中丢失）。
+		if oldWorkspaceID != workspaceID {
+			if err := tx.Model(&model.TabTag{}).
+				Where("workspace_tab_id = ?", tab.ID).
+				Update("workspace_id", workspaceID).Error; err != nil {
+				return err
+			}
 		}
 
 		// 重整目标工作组的 sortOrder

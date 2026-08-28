@@ -12,6 +12,10 @@ All notable changes to Tab Sync Server will be documented in this file.
 - **Workspace Sort Order Migration**: one-time startup backfill (`workspace_sort_order_v1`) that assigns dense `sort_order` per sibling level to existing workspaces, which previously all had `0`. Ordering follows name (Chinese via GB18030 byte order, which approximates pinyin) so the initial result matches the previous frontend display order. Runs once and never overwrites manual sorting afterwards
 - **Workspace Duplicate**: `POST /v1/tab-sync/workspaces/:id/duplicate` recursively copies a workspace and its entire subtree (all child/grandchild workspaces, tabs, tab tags and workspace tags) in one transaction. The copy is named `源名称 (副本)`, appended as the last sibling of the source, keeps the original tab `added_at`, always becomes a normal (non-system) workspace, and is created with fresh UUIDs; system workspaces cannot be duplicated
 
+### Fixed
+
+- **Tab Tag Workspace Sync**: `MoveTab` now keeps `tab_tags.workspace_id` in sync when a tab is moved between workspaces. Previously the relation kept the old workspace, which broke tag removal by workspace and made tag-tab lookups (`GetTabsByTag`) show the wrong workspace (or lose the tab entirely once the old workspace was deleted). A one-time startup migration (`tab_tag_workspace_id_fix_v1`) repairs existing inconsistent rows using `workspace_tabs` as the source of truth
+
 ## [1.0.0] - 2026-07-23
 
 ### Added

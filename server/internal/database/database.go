@@ -75,6 +75,10 @@ func AutoMigrate(db *DB) error {
 		return err
 	}
 
+	if err := FixTabTagWorkspaceID(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -142,4 +146,49 @@ func nameSortKey(name string) string {
 		return string(b)
 	}
 	return name
+}
+
+// tabTagWorkspaceIDMetaKey 标记「修复 tab_tags.workspace_id」已完成，只需执行一次
+const tabTagWorkspaceIDMetaKey = "tab_tag_workspace_id_fix_v1"
+
+// FixTabTagWorkspaceID 一次性修复存量 tab_tags.workspace_id 与实际归属不一致的数据。
+//
+// 背景：早期 MoveTab 只更新 workspace_tabs.workspace_id，未同步 tab_tags.workspace_id，
+// 导致标签页被移动后其标签关联仍指向旧工作组，进而引发：
+//   - RemoveFromTab 按「标签页 + 工作组」删除时找不到行（在新工作组下去不掉标签）；
+//   - GetTabsByTag 按 tab_tags.workspace_id 联查工作组时显示在旧工作组下，
+//     旧工作组被删除后该标签页还会在标签视图中直接丢失。
+//
+// 修复以 workspace_tabs 表为唯一权威，将每行 tab_tags 的 workspace_id 校正为
+// 对应标签页的实际归属；只更新确实不一致的行，避免全表写入。
+// 仅在首次执行（标记不存在）时运行。
+func FixTabTagWorkspaceID(db *DB) error {
+	var meta model.SchemaMeta
+	err := db.Where("meta_key = ?", tabTagWorkspaceIDMetaKey).First(&meta).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Exec(`
+			UPDATE tab_tags
+			SET workspace_id = (
+				SELECT workspace_tabs.workspace_id
+				FROM workspace_tabs
+				WHERE workspace_tabs.id = tab_tags.workspace_tab_id
+			)
+			WHERE EXISTS (
+				SELECT 1
+				FROM workspace_tabs
+				WHERE workspace_tabs.id = tab_tags.workspace_tab_id
+				  AND workspace_tabs.workspace_id <> tab_tags.workspace_id
+			)`)
+		if res.Error != nil {
+			return res.Error
+		}
+		return tx.Create(&model.SchemaMeta{MetaKey: tabTagWorkspaceIDMetaKey, MetaValue: "done"}).Error
+	})
 }

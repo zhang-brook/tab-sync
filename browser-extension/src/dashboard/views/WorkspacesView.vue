@@ -125,7 +125,7 @@
                   <span>编辑组</span>
                 </el-button>
               </el-tooltip>
-              <el-tooltip :content="selectedWorkspace?.isSystem ? '系统分组不可复制' : '复制工作组（含子工作组与标签页）'" placement="top">
+              <el-tooltip :content="selectedWorkspace?.isSystem ? '系统分组不可复制' : '创建副本'" placement="top">
                 <el-button size="small" text type="primary" :disabled="selectedWorkspace?.isSystem"
                   @click="handleDuplicate(selectedWorkspace)">
                   <el-icon>

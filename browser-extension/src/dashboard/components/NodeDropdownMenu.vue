@@ -19,7 +19,7 @@
       新建子工作组
     </el-dropdown-item>
     <el-dropdown-item :command="'duplicate'" :icon="Files" :disabled="data.workspace?.isSystem">
-      复制工作组（含子工作组与标签页）
+      创建副本
     </el-dropdown-item>
     <el-dropdown-item :command="'setDefault'" :icon="Star" :disabled="data.id === defaultWorkspaceId">
       设置为默认分组
