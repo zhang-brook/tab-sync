@@ -14,7 +14,6 @@
       </el-input>
       <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
       <div class="toolbar-spacer" />
-      <span class="total-count">共 {{ total }} 个已同步标签页</span>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
     </div>
 
@@ -46,6 +45,7 @@
     </div>
 
     <div class="pagination">
+      <span class="total-count">共 {{ total }} 个已同步标签页</span>
       <el-pagination
         layout="prev, pager, next, jumper"
         :total="total"
@@ -231,7 +231,12 @@ onMounted(load)
 }
 .pagination {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   padding-top: 12px;
+}
+.pagination .total-count {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 </style>
