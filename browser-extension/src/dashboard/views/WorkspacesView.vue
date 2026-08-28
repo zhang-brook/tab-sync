@@ -360,6 +360,9 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 工作组属性对话框 -->
+    <WorkspacePropertiesDialog v-model="propertiesVisible" :workspace="propertiesTarget" :workspaces="workspaces" />
   </div>
 </template>
 
@@ -369,6 +372,7 @@ import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
+import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
@@ -884,7 +888,21 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'copyTitle':
       copyToClipboard(node.name, '标题已复制')
       break
+    case 'properties':
+      openWorkspaceProperties(node)
+      break
   }
+}
+
+// ============ 工作组属性 ============
+
+const propertiesVisible = ref(false)
+const propertiesTarget = ref<Workspace | null>(null)
+
+/** 打开属性弹窗：记录目标工作组并交由 WorkspacePropertiesDialog 组件展示 */
+function openWorkspaceProperties(node: WorkspaceTreeNode) {
+  propertiesTarget.value = node.workspace
+  propertiesVisible.value = true
 }
 
 /** 设置为默认分组：写入本地存储，供「加入并关闭」等快捷操作使用 */

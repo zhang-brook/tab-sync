@@ -30,11 +30,14 @@
     <el-dropdown-item :command="'delete'" :icon="Delete" divided class="danger-dropdown-item" :disabled="data.workspace?.isSystem || data.id === defaultWorkspaceId">
       彻底删除（不经过回收站）
     </el-dropdown-item>
+    <el-dropdown-item :command="'properties'" :icon="InfoFilled" divided>
+      属性
+    </el-dropdown-item>
   </el-dropdown-menu>
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files, InfoFilled } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{
