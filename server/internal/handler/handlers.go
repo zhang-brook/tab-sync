@@ -1,6 +1,6 @@
 package handler
 
-import "github.com/spidermemos/tab-sync-server/internal/service"
+import "github.com/spidermemos/tab-sync/server/internal/service"
 
 // Handlers 聚合所有 HTTP 处理器
 type Handlers struct {

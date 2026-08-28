@@ -1,4 +1,4 @@
-module github.com/spidermemos/tab-sync-server
+module github.com/spidermemos/tab-sync/server
 
 go 1.22
 

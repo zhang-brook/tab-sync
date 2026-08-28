@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 )
 
 // 工作组相关错误

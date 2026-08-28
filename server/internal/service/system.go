@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"os"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 )
 
 // SystemService 系统服务

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/database"
 )
 
 // setupTestDB 创建测试用内存数据库

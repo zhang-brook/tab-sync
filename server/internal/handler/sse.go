@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // ToolCallRequest AI 远程查询请求（预留协议）

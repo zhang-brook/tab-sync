@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/config"
 )
 
 // SSEService SSE 服务

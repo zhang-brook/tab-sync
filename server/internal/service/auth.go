@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 )
 
 // AuthService 认证服务

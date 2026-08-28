@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // AuthHandler 认证处理器

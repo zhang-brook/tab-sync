@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // RecycleBinHandler 回收站相关接口

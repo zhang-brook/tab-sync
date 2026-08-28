@@ -3,8 +3,8 @@ package service
 import (
 	"time"
 
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 )
 
 // DeviceService 设备管理服务

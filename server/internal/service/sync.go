@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 	"gorm.io/gorm"
 )
 

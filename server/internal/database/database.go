@@ -5,8 +5,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 )
 
 // DB 数据库连接（接口类型，方便未来切换数据源）

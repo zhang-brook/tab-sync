@@ -9,12 +9,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/spidermemos/tab-sync-server/internal/config"
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/handler"
-	"github.com/spidermemos/tab-sync-server/internal/logger"
-	"github.com/spidermemos/tab-sync-server/internal/middleware"
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/config"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/handler"
+	"github.com/spidermemos/tab-sync/server/internal/logger"
+	"github.com/spidermemos/tab-sync/server/internal/middleware"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )

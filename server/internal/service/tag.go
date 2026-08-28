@@ -3,8 +3,8 @@ package service
 import (
 	"errors"
 
-	"github.com/spidermemos/tab-sync-server/internal/database"
-	"github.com/spidermemos/tab-sync-server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/database"
+	"github.com/spidermemos/tab-sync/server/internal/model"
 	"gorm.io/gorm"
 )
 

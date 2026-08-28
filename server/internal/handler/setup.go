@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // SetupHandler 首次设置向导处理器

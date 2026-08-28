@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"github.com/spidermemos/tab-sync-server/internal/middleware"
+	"github.com/spidermemos/tab-sync/server/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

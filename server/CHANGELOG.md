@@ -31,4 +31,4 @@ All notable changes to Tab Sync Server will be documented in this file.
 - Embedded web pages (setup, docs)
 - Environment-variable-driven configuration
 
-[1.0.0]: https://github.com/spidermemos/tab-sync-server/releases/tag/v1.0.0
+[1.0.0]: https://github.com/spidermemos/tab-sync/releases/tag/v1.0.0

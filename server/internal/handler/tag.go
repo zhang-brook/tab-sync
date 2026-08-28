@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // TagHandler 标签处理器
@@ -65,8 +65,8 @@ func (h *TagHandler) Update(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name        string `json:"name"`
-		Color       string `json:"color"`
+		Name        string  `json:"name"`
+		Color       string  `json:"color"`
 		Description *string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {

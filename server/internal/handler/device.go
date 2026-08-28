@@ -3,8 +3,8 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/spidermemos/tab-sync-server/internal/model"
-	"github.com/spidermemos/tab-sync-server/internal/service"
+	"github.com/spidermemos/tab-sync/server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/service"
 )
 
 // DeviceHandler 设备处理器
