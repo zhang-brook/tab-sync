@@ -267,9 +267,13 @@ html, body, #app {
 }
 
 .aside-menu :deep(.el-menu-item.is-active) {
-  color: #fff;
-  background: linear-gradient(135deg, #4c8dff 0%, #6a5cff 100%);
-  box-shadow: 0 4px 12px rgba(76, 141, 255, 0.35);
+  color: #6aa6ff;
+  background-color: rgba(91, 155, 255, 0.18);
+  font-weight: 600;
+}
+
+.aside-menu :deep(.el-menu-item.is-active .el-icon) {
+  color: #6aa6ff;
 }
 
 .aside-menu :deep(.el-menu-item.is-active::before) {
@@ -278,10 +282,10 @@ html, body, #app {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
+  width: 3.5px;
+  height: 24px;
   border-radius: 0 3px 3px 0;
-  background: #fff;
+  background: linear-gradient(180deg, #4c8dff 0%, #6a5cff 100%);
 }
 
 .aside-divider {
