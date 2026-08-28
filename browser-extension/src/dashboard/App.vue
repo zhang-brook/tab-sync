@@ -17,22 +17,34 @@
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
         </el-menu-item>
-        <el-divider style="margin: 0; opacity: 0.4;" />
+        <!-- <el-divider style="margin: 0; opacity: 0.4;" /> -->
         <el-menu-item index="/synced">
           <el-icon><Files /></el-icon>
-          <span>已同步标签页</span>
+          <span>标签页</span>
+          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
+            云端
+          </el-tag>
         </el-menu-item>
         <el-menu-item index="/workspaces">
           <el-icon><FolderOpened /></el-icon>
           <span>工作组</span>
+          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
+            云端
+          </el-tag>
         </el-menu-item>
         <el-menu-item index="/tags">
           <el-icon><PriceTag /></el-icon>
           <span>标签</span>
+          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
+            云端
+          </el-tag>
         </el-menu-item>
         <el-menu-item index="/recyclebin">
           <el-icon><Delete /></el-icon>
           <span>回收站</span>
+          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
+            云端
+          </el-tag>
         </el-menu-item>
         <el-divider style="margin: 0; opacity: 0.4;" />
         <el-menu-item index="/devices">
