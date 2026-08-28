@@ -19,6 +19,17 @@ type ServerConfig struct {
 	UpdatedAt     time.Time
 }
 
+// SchemaMeta 数据库迁移标记（key-value，每个键一条记录）。
+// 用于记录「一次性数据迁移」是否已执行，避免服务每次启动都重复跑而覆盖用户数据。
+// 列名刻意避开 key / value 等保留字，便于未来切换到 MySQL / PostgreSQL
+type SchemaMeta struct {
+	ID        uint   `gorm:"primaryKey"`
+	MetaKey   string `gorm:"uniqueIndex;size:64;not null"`
+	MetaValue string `gorm:"size:128"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // ===================== 认证 Token =====================
 
 // AuthToken 认证 Token（类似 API Key）

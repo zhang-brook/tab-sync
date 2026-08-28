@@ -132,6 +132,44 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	Success(c, gin.H{"success": true})
 }
 
+// MoveWorkspaceRequest 移动/排序工作组请求体
+type MoveWorkspaceRequest struct {
+	// TargetID 落点参照的工作组 UUID
+	TargetID string `json:"targetId" binding:"required"`
+	// Position 落点位置：before（参照节点同级的前面）/ after（后面）/ inner（成为其子级）
+	Position string `json:"position" binding:"required"`
+}
+
+// Move 移动工作组到参照节点的指定落点（管理页面左侧工作组树拖拽调整层级/顺序）。
+// 最终顺序由后端基于服务端当前数据推算，保证多设备并发时以服务端为准。
+func (h *WorkspaceHandler) Move(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		BadRequest(c, "请提供工作区 ID")
+		return
+	}
+
+	var req MoveWorkspaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请提供 targetId 和 position")
+		return
+	}
+
+	if err := h.svc.MoveWorkspace(id, service.MoveWorkspacePayload{
+		TargetID: req.TargetID,
+		Position: req.Position,
+	}); err != nil {
+		if errors.Is(err, service.ErrWorkspaceNotFound) {
+			NotFound(c, err.Error())
+			return
+		}
+		BadRequest(c, err.Error())
+		return
+	}
+
+	Success(c, gin.H{"success": true})
+}
+
 // DeleteTab 删除工作组中的单个标签页（统一进入回收站）
 func (h *WorkspaceHandler) DeleteTab(c *gin.Context) {
 	workspaceID := c.Param("id")

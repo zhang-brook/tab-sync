@@ -388,6 +388,23 @@
 
       <div class="endpoint">
         <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id/move</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>移动工作组到参照节点的指定落点（左侧工作组树拖拽）。<code>position</code> 为 <code>before</code> / <code>after</code> / <code>inner</code>，分别表示与参照节点同级并排在其前、排在其后、成为其子级（追加到子级末尾）。最终顺序由后端基于服务端当前数据推算，多设备并发时以服务端为准；后端会递归校验新父级不在被拖子树内，系统工作组不可移动。</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"targetId"</span>: <span class="str">"uuid"</span>,
+  <span class="key">"position"</span>: <span class="str">"after"</span>
+}</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
           <span class="method delete">DELETE</span>
           <span class="ep-path">/v1/tab-sync/workspaces/:id</span>
           <span class="ep-auth token">Token</span>

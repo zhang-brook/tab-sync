@@ -187,7 +187,8 @@ docker compose start
 | `GET` | `/v1/tab-sync/workspaces/:id/tabs` | 工作组的标签页列表（`recursive=true` 一次返回该组及整棵子树的标签页，按工作区分组，用于「包含子工作组」模式） |
 | `GET` | `/v1/tab-sync/tabs` | 「已同步标签页」聚合分页（`page`/`pageSize`/`keyword`/`includeSystem`，直接跨所有工作组扁平返回，无需经工作组树拍平） |
 | `POST` | `/v1/tab-sync/workspaces` | 创建工作组 |
-| `PUT` | `/v1/tab-sync/workspaces/:id` | 更新工作组 |
+| `PUT` | `/v1/tab-sync/workspaces/:id` | 更新工作组（改 `parentId` 时自动追加到新同级末尾） |
+| `POST` | `/v1/tab-sync/workspaces/:id/move` | 移动工作组到参照节点的落点（`targetId` + `position: before/after/inner`，用于左侧树拖拽；顺序由后端计算） |
 | `DELETE` | `/v1/tab-sync/workspaces/:id` | 删除工作组 |
 | `GET` | `/v1/tab-sync/workspaces/tabs-summary` | 标签页摘要 |
 | `POST` | `/v1/tab-sync/workspaces/:id/tabs/move` | 移动标签页 |

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"sort"
 	"strconv"
 	"time"
 
@@ -16,6 +17,12 @@ import (
 var (
 	// ErrWorkspaceNotFound 工作组不存在或已被删除
 	ErrWorkspaceNotFound = errors.New("工作组不存在")
+	// ErrWorkspaceMoveTarget 移动落点的参照工作组不存在（可能已被其他设备删除）
+	ErrWorkspaceMoveTarget = errors.New("落点位置的工作组不存在，请刷新后重试")
+	// ErrWorkspaceMoveCycle 不能把工作组移动到它自身或它的子工作组下
+	ErrWorkspaceMoveCycle = errors.New("不能移动到该工作组自身或其子工作组下")
+	// ErrWorkspaceMoveInvalid 落点位置参数不合法
+	ErrWorkspaceMoveInvalid = errors.New("落点位置不合法")
 )
 
 // WorkspaceService 工作组管理服务
@@ -61,6 +68,26 @@ type UpdateWorkspacePayload struct {
 	Tabs        []WorkspaceTabData `json:"tabs,omitempty"`
 }
 
+// 工作组拖拽落点相对目标工作组的位置
+const (
+	// MoveBefore 放到目标工作组同级的前面
+	MoveBefore = "before"
+	// MoveAfter 放到目标工作组同级的后面
+	MoveAfter = "after"
+	// MoveInner 成为目标工作组的子级，追加到其子级末尾
+	MoveInner = "inner"
+)
+
+// MoveWorkspacePayload 移动/排序工作组请求体。
+// 落点只表达「相对哪个节点、放在它的前/后/内部」，最终顺序完全由后端基于服务端当前数据计算。
+// 这样在多设备并发场景下顺序始终以服务端为准，前端不参与任何顺序推算。
+type MoveWorkspacePayload struct {
+	// TargetID 落点参照的工作组 UUID
+	TargetID string `json:"targetId"`
+	// Position 落点位置：before / after / inner
+	Position string `json:"position"`
+}
+
 // WorkspaceResponse 工作组响应（给前端）
 type WorkspaceResponse struct {
 	ID          string         `json:"id"`
@@ -70,6 +97,8 @@ type WorkspaceResponse struct {
 	Icon        string         `json:"icon"`
 	Description string         `json:"description"`
 	IsSystem    bool           `json:"isSystem"`
+	// SortOrder 同级排序序号（前端按 sortOrder 排序，同值时按名称回退）
+	SortOrder   int            `json:"sortOrder"`
 	Tabs        []TabReference `json:"tabs"`
 	Tags        []TagResponse  `json:"tags"`
 	CreatedAt   string         `json:"createdAt"`
@@ -115,9 +144,10 @@ func (s *WorkspaceService) List(includeSystem, includeTabs bool) ([]WorkspaceRes
 		query = query.Where("is_system = ?", false)
 	}
 
+	// 与前端展示顺序一致：先按手动排序号，再按名称回退（历史数据 sort_order 全为 0）
 	query = query.
 		Preload("Tags.Tag").
-		Order("sort_order ASC, created_at DESC")
+		Order("sort_order ASC, name ASC")
 
 	// 仅在需要时预加载标签页，降低左侧树场景的数据体积
 	if includeTabs {
@@ -282,6 +312,7 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, pa
 func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult, error) {
 	wsID := uuid.New().String()
 
+	// 新工作组追加到同级末尾：默认 0 会让它插到已手动排序的同级最前面
 	workspace := model.Workspace{
 		WorkspaceID: wsID,
 		ParentID:    payload.ParentID,
@@ -289,6 +320,7 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		Color:       payload.Color,
 		Icon:        payload.Icon,
 		Description: payload.Description,
+		SortOrder:   s.nextSiblingSortOrder(payload.ParentID),
 	}
 
 	if err := s.db.Create(&workspace).Error; err != nil {
@@ -331,6 +363,10 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	}
 	if payload.ParentID != nil {
 		updates["parent_id"] = *payload.ParentID
+		// 换父级时追加到新同级的末尾，避免沿用旧序号挤到中间或插到队首
+		if *payload.ParentID != workspace.ParentID {
+			updates["sort_order"] = s.nextSiblingSortOrder(*payload.ParentID)
+		}
 	}
 	if len(updates) > 0 {
 		s.db.Model(&workspace).Updates(updates)
@@ -467,6 +503,136 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 	// 记录同步事件（预留：未来用于推送到织个网上游）
 	if s.syncSvc != nil {
 		s.syncSvc.RecordEvent("removed", "workspace", id, map[string]string{"workspaceId": id})
+	}
+
+	return nil
+}
+
+// MoveWorkspace 把工作组移动到参照节点的指定落点（前 / 后 / 内部），并按落点重整相关同级顺序。
+//
+// 同级顺序完全由后端基于服务端当前数据推算，前端只提供「参照节点 + 落点位置」：
+// 多设备并发时各端看到的顺序可能不同，若由前端下发顺序就会出现互相覆盖，
+// 因此这里统一以服务端数据为准，前端提交后重新拉取即可。
+//
+// 校验要点（前端数据可能已过期，故后端必须独立复核）：
+//  1. 被移动工作组与参照节点均存在且未被删除；
+//  2. 新父级不能是它自身，也不能是它子树内的任何节点（递归检测，避免父级同时又是子级）；
+//  3. 系统工作组（如「未分组」）位置固定，不允许移动。
+func (s *WorkspaceService) MoveWorkspace(id string, payload MoveWorkspacePayload) error {
+	if id == "" {
+		return ErrWorkspaceNotFound
+	}
+	if payload.TargetID == "" || payload.TargetID == id {
+		return ErrWorkspaceMoveCycle
+	}
+	switch payload.Position {
+	case MoveBefore, MoveAfter, MoveInner:
+	default:
+		return ErrWorkspaceMoveInvalid
+	}
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var all []model.Workspace
+		if err := tx.Where("is_deleted = ?", false).
+			Select("workspace_id", "parent_id", "sort_order", "is_system", "name").
+			Find(&all).Error; err != nil {
+			return err
+		}
+
+		byID := make(map[string]model.Workspace, len(all))
+		childrenOf := make(map[string][]model.Workspace, len(all))
+		for _, w := range all {
+			byID[w.WorkspaceID] = w
+			childrenOf[w.ParentID] = append(childrenOf[w.ParentID], w)
+		}
+
+		moved, ok := byID[id]
+		if !ok {
+			return ErrWorkspaceNotFound
+		}
+		if moved.IsSystem {
+			return errors.New("系统工作组位置固定，不可移动")
+		}
+		target, ok := byID[payload.TargetID]
+		if !ok {
+			return ErrWorkspaceMoveTarget
+		}
+
+		// 拖入内部即以参照节点为新父级，否则与参照节点同级
+		newParentID := target.ParentID
+		if payload.Position == MoveInner {
+			newParentID = target.WorkspaceID
+		}
+		// 递归成环检测：新父级不能是自身，也不能位于自身子树内
+		if newParentID == id || subtreeContains(childrenOf, id, newParentID) {
+			return ErrWorkspaceMoveCycle
+		}
+
+		// 目标同级的当前顺序（服务端为准），先剔除被移动节点本身
+		siblings := sortedSiblings(childrenOf[newParentID], id)
+
+		index := len(siblings)
+		if payload.Position != MoveInner {
+			at := -1
+			for i, w := range siblings {
+				if w.WorkspaceID == payload.TargetID {
+					at = i
+					break
+				}
+			}
+			// 参照节点已被其他设备移走或删除，交由前端刷新后重试
+			if at < 0 {
+				return ErrWorkspaceMoveTarget
+			}
+			index = at
+			if payload.Position == MoveAfter {
+				index = at + 1
+			}
+		}
+
+		ordered := make([]string, 0, len(siblings)+1)
+		for _, w := range siblings[:index] {
+			ordered = append(ordered, w.WorkspaceID)
+		}
+		ordered = append(ordered, id)
+		for _, w := range siblings[index:] {
+			ordered = append(ordered, w.WorkspaceID)
+		}
+
+		// 新同级重新编号（始终保持 0..n-1 稠密）
+		for i, sid := range ordered {
+			if err := tx.Model(&model.Workspace{}).
+				Where("workspace_id = ?", sid).
+				Update("sort_order", i).Error; err != nil {
+				return err
+			}
+		}
+
+		if moved.ParentID != newParentID {
+			if err := tx.Model(&model.Workspace{}).
+				Where("workspace_id = ?", id).
+				Update("parent_id", newParentID).Error; err != nil {
+				return err
+			}
+			// 原父级下剩余同级同样重新编号，避免出现 sort_order 空洞
+			for i, w := range sortedSiblings(childrenOf[moved.ParentID], id) {
+				if err := tx.Model(&model.Workspace{}).
+					Where("workspace_id = ?", w.WorkspaceID).
+					Update("sort_order", i).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("moved", "workspace", id, payload)
 	}
 
 	return nil
@@ -757,11 +923,53 @@ func toWorkspaceResponse(ws model.Workspace, includeTabs bool) WorkspaceResponse
 		Icon:        ws.Icon,
 		Description: ws.Description,
 		IsSystem:    ws.IsSystem,
+		SortOrder:   ws.SortOrder,
 		Tabs:        tabs,
 		Tags:        workspaceTagsToResponses(ws.Tags),
 		CreatedAt:   ws.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   ws.UpdatedAt.Format(time.RFC3339),
 	}
+}
+
+// nextSiblingSortOrder 返回 parentID 下同级工作组的下一个排序序号（追加在末尾）。
+// parentID 为空字符串表示根级。
+func (s *WorkspaceService) nextSiblingSortOrder(parentID string) int {
+	var maxOrder int
+	s.db.Model(&model.Workspace{}).
+		Where("parent_id = ? AND is_deleted = ?", parentID, false).
+		Select("COALESCE(MAX(sort_order), -1)").
+		Scan(&maxOrder)
+	return maxOrder + 1
+}
+
+// sortedSiblings 返回 parentID 下同级的当前顺序，并按调用方要求剔除 excludeID。
+// 排序规则为「sort_order 升序、名称升序」，与前端展示顺序保持一致。
+// 返回的是拷贝，不会改动调用方切片。
+func sortedSiblings(nodes []model.Workspace, excludeID string) []model.Workspace {
+	out := make([]model.Workspace, 0, len(nodes))
+	for _, w := range nodes {
+		if w.WorkspaceID == excludeID {
+			continue
+		}
+		out = append(out, w)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].SortOrder != out[j].SortOrder {
+			return out[i].SortOrder < out[j].SortOrder
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+// subtreeContains 判断 candidate 是否位于 rootID 的子树内（不含 rootID 自身）。
+func subtreeContains(childrenOf map[string][]model.Workspace, rootID, candidate string) bool {
+	for _, child := range childrenOf[rootID] {
+		if child.WorkspaceID == candidate || subtreeContains(childrenOf, child.WorkspaceID, candidate) {
+			return true
+		}
+	}
+	return false
 }
 
 func toTabReferences(tabs []model.WorkspaceTab) []TabReference {

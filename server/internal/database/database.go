@@ -1,7 +1,11 @@
 package database
 
 import (
+	"errors"
+	"sort"
+
 	"github.com/glebarez/sqlite"
+	"golang.org/x/text/encoding/simplifiedchinese"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -40,6 +44,7 @@ func Init(cfg *config.Config) (*DB, error) {
 func AutoMigrate(db *DB) error {
 	if err := db.AutoMigrate(
 		&model.ServerConfig{},
+		&model.SchemaMeta{},
 		&model.AuthToken{},
 		&model.Device{},
 		&model.Workspace{},
@@ -66,5 +71,75 @@ func AutoMigrate(db *DB) error {
 		}
 	}
 
+	if err := InitWorkspaceSortOrder(db); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// workspaceSortOrderMetaKey 标记「工作组 sort_order 初始化」已完成，只需执行一次
+const workspaceSortOrderMetaKey = "workspace_sort_order_v1"
+
+// InitWorkspaceSortOrder 一次性初始化存量工作组的 sort_order。
+//
+// 背景：sort_order 字段早期就存在，但从未被写入，所有存量数据的该字段恒为 0。
+// 开启「工作组树拖拽排序」后，同级之间必须有确定且稠密的序号，否则排序无从谈起。
+//
+// 初始化顺序按名称（中文按 GB18030 编码，其一级汉字按拼音排列，可贴近前端
+// localeCompare('zh-Hans-CN') 的效果），与开启拖拽排序前前端的展示顺序基本一致。
+//
+// 仅在首次执行（标记不存在）时运行，避免覆盖用户之后的手动排序。
+func InitWorkspaceSortOrder(db *DB) error {
+	var meta model.SchemaMeta
+	err := db.Where("meta_key = ?", workspaceSortOrderMetaKey).First(&meta).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	var workspaces []model.Workspace
+	if err := db.Where("is_deleted = ?", false).
+		Select("workspace_id", "parent_id", "name", "created_at").
+		Find(&workspaces).Error; err != nil {
+		return err
+	}
+
+	childrenOf := make(map[string][]model.Workspace)
+	for _, w := range workspaces {
+		childrenOf[w.ParentID] = append(childrenOf[w.ParentID], w)
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		// 系统工作组（如「未分组」）固定置顶展示，与同级普通工作组一同编号即可，
+		// 编号只表达相对顺序，置顶由前端按 isSystem 决定。
+		for _, siblings := range childrenOf {
+			sort.SliceStable(siblings, func(i, j int) bool {
+				if ki, kj := nameSortKey(siblings[i].Name), nameSortKey(siblings[j].Name); ki != kj {
+					return ki < kj
+				}
+				return siblings[i].CreatedAt.Before(siblings[j].CreatedAt)
+			})
+			for i, w := range siblings {
+				if err := tx.Model(&model.Workspace{}).
+					Where("workspace_id = ?", w.WorkspaceID).
+					Update("sort_order", i).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return tx.Create(&model.SchemaMeta{MetaKey: workspaceSortOrderMetaKey, MetaValue: "done"}).Error
+	})
+}
+
+// nameSortKey 生成名称的排序键：优先返回 GB18030 编码后的字节串。
+// GB18030 的一级汉字按拼音排列，用它比较可让中文名称的初始化顺序贴近前端的拼音序；
+// 无法编码时（如含超出生僻字范围的字符）回退为原始名称。
+func nameSortKey(name string) string {
+	if b, err := simplifiedchinese.GB18030.NewEncoder().Bytes([]byte(name)); err == nil {
+		return string(b)
+	}
+	return name
 }
