@@ -366,7 +366,7 @@ import { sendMessage } from '@/shared/composables/useMessage'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
-import { buildWorkspaceTree, collectDescendantIds, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import { buildWorkspaceTree, collectDescendantIds, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { Workspace, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, TabReference, TagInfo, TagsData } from '@/shared/types'
 import TagEditorDialog from '../components/TagEditorDialog.vue'
@@ -488,13 +488,7 @@ const formData = ref({
 const presetColors = [...TAG_COLOR_PALETTE]
 
 /** 左侧树数据 */
-const treeData = computed<WorkspaceTreeNode[]>(() => {
-  const nodes = buildWorkspaceTree(workspaces.value)
-  // 「未分组」等系统工作组固定置顶，避免混入普通分组排序
-  const system = nodes.filter((n) => n.workspace.isSystem)
-  const rest = nodes.filter((n) => !n.workspace.isSystem)
-  return [...system, ...rest]
-})
+const treeData = computed<WorkspaceTreeNode[]>(() => pinSystemGroups(buildWorkspaceTree(workspaces.value)))
 
 /** 父工作组选择器：编辑时禁用自身及后代，避免形成环 */
 const parentPickerVisible = ref(false)

@@ -105,7 +105,7 @@ import { Search, Plus, Edit, Delete, FolderAdd, Open } from '@element-plus/icons
 import { sendMessage } from '../composables/useMessage'
 import { useWorkspaceActions } from '../composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '../storage'
-import { buildWorkspaceTree, findWorkspaceTreeNode, flattenWorkspaces, type WorkspaceTreeNode } from '../utils/workspace-tree'
+import { buildWorkspaceTree, findWorkspaceTreeNode, flattenWorkspaces, pinSystemGroups, type WorkspaceTreeNode } from '../utils/workspace-tree'
 import { DEFAULT_WORKSPACE_COLOR } from '../constants/theme'
 import ContextMenu from './ContextMenu.vue'
 import type { WorkspacesData } from '../types'
@@ -181,7 +181,8 @@ async function reload() {
     loading.value = false
     return
   }
-  treeData.value = buildWorkspaceTree(res.data.workspaces)
+  // 与管理面板左侧树一致：系统工作组固定置顶，避免混入普通分组的 sortOrder 排序
+  treeData.value = pinSystemGroups(buildWorkspaceTree(res.data.workspaces))
   // 先结束 loading 让 el-tree 完成渲染，否则下一帧 treeRef 尚未挂载，高亮会被静默跳过
   loading.value = false
   // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）

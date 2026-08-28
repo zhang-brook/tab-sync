@@ -61,6 +61,17 @@ export function buildWorkspaceTree(workspaces: Workspace[]): WorkspaceTreeNode[]
   return roots
 }
 
+/**
+ * 将系统工作组（如「未分组」）固定到根级最前。
+ * 系统工作组位置固定、不可拖拽，单独置顶可避免它们混入普通分组的 sortOrder 排序中，
+ * 保证管理面板与各选择器（右键「添加到选定分组」等）的树展示顺序一致。
+ */
+export function pinSystemGroups(nodes: WorkspaceTreeNode[]): WorkspaceTreeNode[] {
+  const system = nodes.filter((n) => n.workspace.isSystem)
+  const rest = nodes.filter((n) => !n.workspace.isSystem)
+  return [...system, ...rest]
+}
+
 /** 在树中查找指定 id 的节点（含各级子节点），找不到返回 null */
 export function findWorkspaceTreeNode(nodes: WorkspaceTreeNode[], id: string): WorkspaceTreeNode | null {
   for (const node of nodes) {
