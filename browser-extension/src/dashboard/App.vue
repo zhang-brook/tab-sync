@@ -2,9 +2,7 @@
   <el-container class="dashboard-layout">
     <el-aside width="220px" class="dashboard-aside">
       <div class="aside-logo">
-        <div class="aside-logo-badge">
-          <el-icon :size="22"><Connection /></el-icon>
-        </div>
+        <img class="aside-logo-img" src="/icons/icon.png" alt="Tab Sync" />
         <div class="aside-logo-text">
           <span class="aside-logo-title">Tab Sync</span>
           <span class="aside-logo-sub">多端标签页同步</span>
@@ -99,7 +97,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete, Connection } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { STORAGE_KEYS } from '@/shared/storage'
 import type { StateData } from '@/shared/types'
@@ -211,17 +209,13 @@ html, body, #app {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.aside-logo-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.aside-logo-img {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  color: #fff;
-  background: linear-gradient(135deg, #4c8dff 0%, #6a5cff 100%);
-  box-shadow: 0 4px 12px rgba(76, 141, 255, 0.4);
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  user-select: none;
 }
 
 .aside-logo-text {
