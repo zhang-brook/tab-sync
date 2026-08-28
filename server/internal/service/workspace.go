@@ -221,6 +221,63 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) 
 	return groups, nil
 }
 
+// ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页与关键字搜索。
+// 直接聚合数据，无需先取工作组树再拍平。
+func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, page, pageSize int) (*SyncedTabPage, error) {
+	q := s.db.Model(&model.WorkspaceTab{}).
+		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+		Where("workspaces.is_deleted = ?", false)
+	if !includeSystem {
+		q = q.Where("workspaces.is_system = ?", false)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		q = q.Where("workspace_tabs.title LIKE ? OR workspace_tabs.url LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	var tabs []model.WorkspaceTab
+	offset := (page - 1) * pageSize
+	if err := q.Offset(offset).Limit(pageSize).
+		Order("workspace_tabs.added_at DESC, workspace_tabs.id DESC").
+		Preload("Tags.Tag").
+		Find(&tabs).Error; err != nil {
+		return nil, err
+	}
+
+	// 构建 workspaceId -> 名称/颜色 映射
+	wsIDs := make([]string, 0, len(tabs))
+	for _, t := range tabs {
+		wsIDs = append(wsIDs, t.WorkspaceID)
+	}
+	nameColor := make(map[string]model.Workspace, len(wsIDs))
+	if len(wsIDs) > 0 {
+		var wsList []model.Workspace
+		if err := s.db.Where("workspace_id IN ?", wsIDs).Find(&wsList).Error; err != nil {
+			return nil, err
+		}
+		for _, w := range wsList {
+			nameColor[w.WorkspaceID] = w
+		}
+	}
+
+	items := make([]SyncedTabItem, 0, len(tabs))
+	for _, t := range tabs {
+		w := nameColor[t.WorkspaceID]
+		items = append(items, SyncedTabItem{
+			WorkspaceID: w.WorkspaceID,
+			Name:        w.Name,
+			Color:       w.Color,
+			Tab:         toTabReferences([]model.WorkspaceTab{t})[0],
+		})
+	}
+	return &SyncedTabPage{Items: items, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
 // Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
 func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult, error) {
 	wsID := uuid.New().String()
@@ -775,6 +832,22 @@ type WorkspaceTabSummary struct {
 	WorkspaceName  string       `json:"workspaceName"`
 	WorkspaceColor string       `json:"workspaceColor"`
 	Tabs           []TabURLPair `json:"tabs"`
+}
+
+// SyncedTabItem 已同步标签页聚合项（跨所有工作组扁平化，每项附带所属工作组信息）
+type SyncedTabItem struct {
+	WorkspaceID string       `json:"workspaceId"`
+	Name        string       `json:"name"`
+	Color       string       `json:"color"`
+	Tab         TabReference `json:"tab"`
+}
+
+// SyncedTabPage 「已同步标签页」页面的分页结果
+type SyncedTabPage struct {
+	Items    []SyncedTabItem `json:"items"`
+	Total    int64           `json:"total"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"pageSize"`
 }
 
 // TabURLPair 标签页 URL 对

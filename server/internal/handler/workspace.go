@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -154,6 +155,28 @@ func (h *WorkspaceHandler) TabsSummary(c *gin.Context) {
 		return
 	}
 	Success(c, gin.H{"summaries": summaries})
+}
+
+// ListSyncedTabs 「已同步标签页」页面：跨所有工作组扁平化分页返回标签页。
+// 查询参数：page/pageSize（默认 1/50）、keyword（标题/URL 模糊搜索）、includeSystem（默认 true）。
+func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 50
+	}
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	includeSystem := c.Query("includeSystem") != "false"
+
+	page_, err := h.svc.ListSyncedTabs(keyword, includeSystem, page, pageSize)
+	if err != nil {
+		InternalError(c, "获取已同步标签页失败")
+		return
+	}
+	Success(c, page_)
 }
 
 // MoveTabRequest 移动标签页请求

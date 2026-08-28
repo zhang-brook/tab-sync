@@ -6,14 +6,14 @@
         placeholder="搜索标题或网址"
         clearable
         class="search-input"
-        @input="applySearch"
+        @input="onSearchInput"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
       <div class="toolbar-spacer" />
-      <span class="total-count">共 {{ filtered.length }} 个已同步标签页</span>
+      <span class="total-count">共 {{ total }} 个已同步标签页</span>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
     </div>
 
@@ -21,7 +21,7 @@
       <el-icon class="is-loading"><Loading /></el-icon>
       <span>加载中…</span>
     </div>
-    <div v-else-if="filtered.length === 0" class="empty-state">
+    <div v-else-if="items.length === 0" class="empty-state">
       <el-empty :description="searchKeyword ? '没有匹配的标签页' : '云端还没有同步的标签页'" />
     </div>
 
@@ -43,6 +43,17 @@
         </template>
       </TabList>
     </div>
+
+    <div class="pagination">
+      <el-pagination
+        layout="prev, pager, next, jumper"
+        :total="total"
+        :page-size="pageSize"
+        :current-page="page"
+        @current-change="onPageChange"
+        :disabled="total <= pageSize"
+      />
+    </div>
   </div>
 </template>
 
@@ -55,7 +66,7 @@ import { Search, Refresh, Delete, Loading } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import type { TabReference } from '@/shared/types/workspace'
-import type { WorkspacesData } from '@/shared/types/messages'
+import type { SyncedTabPageData } from '@/shared/types/messages'
 
 interface SyncedItem {
   workspaceId: string
@@ -70,15 +81,18 @@ const router = useRouter()
 const loading = ref(false)
 const searchKeyword = ref('')
 const items = ref<SyncedItem[]>([])
-const filtered = ref<SyncedItem[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
 
 interface SyncedListItem extends TabListItem {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   source: SyncedItem
 }
 
 /** 已同步标签页 → 公共列表组件数据 */
 const listItems = computed<SyncedListItem[]>(() =>
-  filtered.value.map((i) => ({
+  items.value.map((i) => ({
     id: `${i.workspaceId}-${i.tab.tabId}`,
     title: i.tab.title || i.tab.url,
     url: i.tab.url,
@@ -89,22 +103,41 @@ const listItems = computed<SyncedListItem[]>(() =>
   })),
 )
 
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+function onSearchInput() {
+  // 服务端搜索：防抖后回到第一页重新拉取
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    void load()
+  }, 300)
+}
+
 async function load() {
   loading.value = true
   try {
-    const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
+    // 「已同步标签页」页改用专门的聚合分页接口（GET_SYNCED_TABS），直接跨所有工作组扁平返回，
+    // 无需先取工作组树再拍平；搜索与分页均在服务端完成。
+    const res = await sendMessage<SyncedTabPageData>({
+      action: 'GET_SYNCED_TABS',
+      payload: {
+        page: page.value,
+        pageSize: pageSize.value,
+        keyword: searchKeyword.value.trim(),
+        includeSystem: true,
+      },
+    })
     if (res.success && res.data) {
-      const list: SyncedItem[] = []
-      for (const ws of res.data.workspaces) {
-        for (const tab of ws.tabs) {
-          list.push({ workspaceId: ws.id, name: ws.name, color: ws.color, tab })
-        }
-      }
-      items.value = list
-      applySearch()
+      items.value = res.data.items.map((it) => ({
+        workspaceId: it.workspaceId,
+        name: it.name,
+        color: it.color,
+        tab: it.tab,
+      }))
+      total.value = res.data.total
     } else if (res.authError) {
       items.value = []
-      filtered.value = []
+      total.value = 0
     } else {
       ElMessage.error(res.error || '获取已同步标签页失败')
     }
@@ -113,16 +146,9 @@ async function load() {
   }
 }
 
-function applySearch() {
-  const kw = searchKeyword.value.trim().toLowerCase()
-  if (!kw) {
-    filtered.value = items.value
-    return
-  }
-  filtered.value = items.value.filter(
-    (i) =>
-      i.tab.title?.toLowerCase().includes(kw) || i.tab.url?.toLowerCase().includes(kw),
-  )
+function onPageChange(p: number) {
+  page.value = p
+  void load()
 }
 
 async function openTab(url?: string) {
@@ -205,5 +231,10 @@ onMounted(load)
 .tab-scroll {
   flex: 1;
   overflow-y: auto;
+}
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
 }
 </style>

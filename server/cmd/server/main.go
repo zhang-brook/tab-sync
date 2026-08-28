@@ -113,6 +113,7 @@ func main() {
 			// 工作组管理
 			auth.GET("/workspaces", handlers.Workspace.List)
 			auth.GET("/workspaces/:id/tabs", handlers.Workspace.GetTabs)
+			auth.GET("/tabs", handlers.Workspace.ListSyncedTabs)
 			auth.POST("/workspaces", handlers.Workspace.Create)
 			auth.PUT("/workspaces/:id", handlers.Workspace.Update)
 			auth.DELETE("/workspaces/:id", handlers.Workspace.Delete)

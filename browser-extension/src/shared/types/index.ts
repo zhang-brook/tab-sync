@@ -10,6 +10,8 @@ export type {
   WorkspaceTabsData,
   WorkspaceTabsGroup,
   WorkspaceTabsGroupsData,
+  SyncedTabItem,
+  SyncedTabPageData,
   DevicesData,
   WorkspaceTabPayload,
   AddTabsToWorkspaceMessage,

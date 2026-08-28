@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Workspace, TabReference, WorkspaceTabsGroup } from '../types'
+import type { Workspace, TabReference, WorkspaceTabsGroup, SyncedTabPageData } from '../types'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
 /** 获取所有工作组。
@@ -51,6 +51,18 @@ export function deleteWorkspace(id: string, defaultWorkspaceId?: string) {
 /** 获取所有工作组标签页摘要（用于 TabsView 交叉比对打 tag） */
 export function getWorkspaceTabsSummary() {
   return apiClient.get<WorkspaceTabsSummaryData>('/v1/tab-sync/workspaces/tabs-summary')
+}
+
+/** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平）
+ * params: page/pageSize/keyword/includeSystem */
+export function getSyncedTabs(params: { page?: number; pageSize?: number; keyword?: string; includeSystem?: boolean }) {
+  const query = new URLSearchParams()
+  if (params.page != null) query.set('page', String(params.page))
+  if (params.pageSize != null) query.set('pageSize', String(params.pageSize))
+  if (params.keyword) query.set('keyword', params.keyword)
+  if (params.includeSystem != null) query.set('includeSystem', String(params.includeSystem))
+  const qs = query.toString()
+  return apiClient.get<SyncedTabPageData>(`/v1/tab-sync/tabs${qs ? `?${qs}` : ''}`)
 }
 
 /** 移动标签页到指定工作组的目标位置（支持同组排序和跨组移动） */

@@ -75,7 +75,13 @@ export interface GetWorkspacesMessage {
  * recursive=true 时一次返回该工作组自身及整棵子树的标签页（按工作区分组），用于「包含子工作组」模式。 */
 export interface GetWorkspaceTabsMessage {
   action: 'GET_WORKSPACE_TABS'
-  payload: { workspaceId: string; recursive?: boolean }
+  payload: { workspaceId: string;  recursive?: boolean }
+}
+
+/** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平） */
+export interface GetSyncedTabsMessage {
+  action: 'GET_SYNCED_TABS'
+  payload: { page?: number; pageSize?: number; keyword?: string; includeSystem?: boolean }
 }
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
@@ -303,6 +309,7 @@ export type ExtensionMessage =
   | SetConnectionModeMessage
   | GetWorkspacesMessage
   | GetWorkspaceTabsMessage
+  | GetSyncedTabsMessage
   | CreateWorkspaceMessage
   | UpdateWorkspaceMessage
   | DeleteWorkspaceMessage
@@ -372,6 +379,22 @@ export interface WorkspaceTabsGroup {
 /** GET_WORKSPACE_TABS?recursive=true 响应数据 */
 export interface WorkspaceTabsGroupsData {
   groups: WorkspaceTabsGroup[]
+}
+
+/** 已同步标签页聚合项（跨所有工作组扁平化，附带所属工作组信息） */
+export interface SyncedTabItem {
+  workspaceId: string
+  name: string
+  color: string
+  tab: TabReference
+}
+
+/** GET_SYNCED_TABS 响应数据 */
+export interface SyncedTabPageData {
+  items: SyncedTabItem[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 /** GET_DEVICES 响应数据 */
