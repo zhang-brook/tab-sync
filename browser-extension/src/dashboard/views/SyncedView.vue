@@ -6,12 +6,13 @@
         placeholder="搜索标题或网址"
         clearable
         class="search-input"
-        @input="onSearchInput"
+        @keyup.enter="onSearch"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
+      <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
       <div class="toolbar-spacer" />
       <span class="total-count">共 {{ total }} 个已同步标签页</span>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
@@ -103,14 +104,10 @@ const listItems = computed<SyncedListItem[]>(() =>
   })),
 )
 
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-function onSearchInput() {
-  // 服务端搜索：防抖后回到第一页重新拉取
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    page.value = 1
-    void load()
-  }, 300)
+// 点击「查询」或回车：回到第一页后重新拉取（服务端搜索）
+function onSearch() {
+  page.value = 1
+  void load()
 }
 
 async function load() {
