@@ -1,52 +1,51 @@
 <template>
   <el-container class="dashboard-layout">
-    <el-aside width="200px" class="dashboard-aside">
+    <el-aside width="220px" class="dashboard-aside">
       <div class="aside-logo">
-        <h3>Tab Sync</h3>
+        <div class="aside-logo-badge">
+          <el-icon :size="22"><Connection /></el-icon>
+        </div>
+        <div class="aside-logo-text">
+          <span class="aside-logo-title">Tab Sync</span>
+          <span class="aside-logo-sub">多端标签页同步</span>
+        </div>
       </div>
       <el-menu
         :default-active="activeMenu"
         router
+        class="aside-menu"
       >
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
-        <el-divider style="margin: 0; opacity: 0.4;" />
+        <el-divider class="aside-divider" />
         <el-menu-item index="/tabs">
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
         </el-menu-item>
-        <!-- <el-divider style="margin: 0; opacity: 0.4;" /> -->
+        <!-- <el-divider class="aside-divider" /> -->
         <el-menu-item index="/synced">
           <el-icon><Files /></el-icon>
           <span>标签页</span>
-          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
-            云端
-          </el-tag>
+          <span class="cloud-badge">云端</span>
         </el-menu-item>
         <el-menu-item index="/workspaces">
           <el-icon><FolderOpened /></el-icon>
           <span>工作组</span>
-          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
-            云端
-          </el-tag>
+          <span class="cloud-badge">云端</span>
         </el-menu-item>
         <el-menu-item index="/tags">
           <el-icon><PriceTag /></el-icon>
           <span>标签</span>
-          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
-            云端
-          </el-tag>
+          <span class="cloud-badge">云端</span>
         </el-menu-item>
         <el-menu-item index="/recyclebin">
           <el-icon><Delete /></el-icon>
           <span>回收站</span>
-          <el-tag size="small" effect="plain" type="success" style="transform: scale(0.8); opacity: 0.9;">
-            云端
-          </el-tag>
+          <span class="cloud-badge">云端</span>
         </el-menu-item>
-        <el-divider style="margin: 0; opacity: 0.4;" />
+        <el-divider class="aside-divider" />
         <el-menu-item index="/devices">
           <el-icon><Monitor /></el-icon>
           <span>设备</span>
@@ -61,11 +60,12 @@
       <el-header class="dashboard-header">
         <div class="header-left">
           <span class="header-title">{{ pageTitle }}</span>
+          <el-divider direction="vertical" class="header-divider" />
           <template v-if="dataSource">
-            <el-tag size="small" effect="plain" :type="dataSource.type">
+            <el-tag size="small" effect="plain" :type="dataSource.type" class="header-source-tag">
               {{ dataSource.label }}
             </el-tag>
-            <el-text size="small" v-if="dataSource.desc">
+            <el-text size="small" v-if="dataSource.desc" class="header-source-desc">
               {{ dataSource.desc }}
             </el-text>
           </template>
@@ -99,7 +99,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete, Connection } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { STORAGE_KEYS } from '@/shared/storage'
 import type { StateData } from '@/shared/types'
@@ -196,59 +196,151 @@ html, body, #app {
   height: 100vh;
 }
 
+/* ===== 侧边栏 ===== */
 .dashboard-aside {
-  background-color: #001529;
+  background: linear-gradient(180deg, #1f2a44 0%, #141b2e 100%);
   overflow-y: auto;
+  box-shadow: 2px 0 12px rgba(20, 27, 46, 0.18);
 }
 
 .aside-logo {
-  padding: 16px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.aside-logo h3 {
+.aside-logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #4c8dff 0%, #6a5cff 100%);
+  box-shadow: 0 4px 12px rgba(76, 141, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.aside-logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.aside-logo-title {
   color: #fff;
   font-size: 16px;
-  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
-.dashboard-aside .el-menu {
+.aside-logo-sub {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+.aside-menu {
   border-right: none;
-  background-color: #001529;
+  background-color: transparent !important;
+  padding: 8px;
 }
 
-.dashboard-aside .el-menu-item {
-  color: rgba(255, 255, 255, 0.65);
-  padding-left: 0px;
-  padding-right: 0px;
+.aside-menu :deep(.el-menu-item) {
+  position: relative;
+  height: 46px;
+  margin: 4px 0;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
-.dashboard-aside .el-menu-item:hover,
-.dashboard-aside .el-menu-item.is-active {
+.aside-menu :deep(.el-menu-item .el-icon) {
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.aside-menu :deep(.el-menu-item:hover) {
   color: #fff;
-  background-color: #1890ff;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
+.aside-menu :deep(.el-menu-item:hover .el-icon) {
+  transform: scale(1.1);
+}
+
+.aside-menu :deep(.el-menu-item.is-active) {
+  color: #fff;
+  background: linear-gradient(135deg, #4c8dff 0%, #6a5cff 100%);
+  box-shadow: 0 4px 12px rgba(76, 141, 255, 0.35);
+}
+
+.aside-menu :deep(.el-menu-item.is-active::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: #fff;
+}
+
+.aside-divider {
+  margin: 6px 4px !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.cloud-badge {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 9px;
+  color: #7ee0a8;
+  background: rgba(126, 224, 168, 0.14);
+  border: 1px solid rgba(126, 224, 168, 0.3);
+}
+
+/* ===== 顶部 header ===== */
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 60px;
   background-color: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  padding: 0 24px;
+  border-bottom: 1px solid #eef0f4;
+  box-shadow: 0 2px 8px rgba(31, 42, 68, 0.05);
+  padding: 0 28px;
 }
 
 .header-title {
   font-size: 18px;
-  font-weight: 500;
-  color: #303133;
+  font-weight: 600;
+  color: #1f2a44;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-divider {
+  height: 18px;
+  border-color: #e4e7ed;
+}
+
+.header-source-tag {
+  font-weight: 500;
+}
+
+.header-source-desc {
+  color: #909399;
 }
 
 .header-right {
@@ -265,7 +357,7 @@ html, body, #app {
 .auth-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.55);
+  background-color: rgba(20, 27, 46, 0.55);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -274,17 +366,17 @@ html, body, #app {
 
 .auth-overlay-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 48px;
   text-align: center;
   max-width: 400px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 40px rgba(20, 27, 46, 0.25);
 }
 
 .auth-overlay-card h2 {
   margin: 16px 0 8px;
   font-size: 20px;
-  color: #303133;
+  color: #1f2a44;
 }
 
 .auth-overlay-card p {
