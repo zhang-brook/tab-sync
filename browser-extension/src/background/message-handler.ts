@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -51,6 +51,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'UPDATE_WORKSPACE':
       return handleUpdateWorkspace(message.payload)
+
+    case 'MOVE_WORKSPACE':
+      return handleMoveWorkspace(message.payload)
 
     case 'DELETE_WORKSPACE':
       return handleDeleteWorkspace(message.payload.id, message.payload.defaultWorkspaceId)
@@ -347,6 +350,22 @@ async function handleUpdateWorkspace(
   }
   logger.warn('updateWorkspace API failed:', res.error)
   return { success: false, error: res.error || '更新工作组失败', authError: res.status === 401 }
+}
+
+/** 移动工作组到参照节点的指定落点（左侧工作组树拖拽，顺序由后端计算） */
+async function handleMoveWorkspace(
+  payload: { id: string; targetId: string; position: 'before' | 'after' | 'inner' },
+): Promise<MessageResponse> {
+  if (!payload?.id || !payload?.targetId) {
+    return { success: false, error: '缺少工作组 ID 或落点位置' }
+  }
+  const res = await moveWorkspace(payload.id, payload.targetId, payload.position)
+  if (res.ok) {
+    logger.info('Workspace moved:', payload.id)
+    return { success: true }
+  }
+  logger.warn('moveWorkspace API failed:', res.error)
+  return { success: false, error: res.error || '调整工作组顺序失败', authError: res.status === 401 }
 }
 
 /** 删除工作组（通过后端 API） */

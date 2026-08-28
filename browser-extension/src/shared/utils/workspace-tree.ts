@@ -9,6 +9,8 @@ export interface WorkspaceTreeNode {
   icon?: string
   /** 当前工作组直接包含的标签页数量 */
   tabCount: number
+  /** 同级排序序号（与 Workspace.sortOrder 一致） */
+  sortOrder: number
   /** 原始工作组对象 */
   workspace: Workspace
   children: WorkspaceTreeNode[]
@@ -29,6 +31,7 @@ export function buildWorkspaceTree(workspaces: Workspace[]): WorkspaceTreeNode[]
       color: ws.color,
       icon: ws.icon,
       tabCount: ws.tabs?.length ?? 0,
+      sortOrder: ws.sortOrder ?? 0,
       workspace: ws,
       children: [],
     })
@@ -40,13 +43,17 @@ export function buildWorkspaceTree(workspaces: Workspace[]): WorkspaceTreeNode[]
     if (parent) {
       parent.children.push(node)
     } else {
+      // 父级不存在（如已被删除）时按根级渲染，parentId 同步归零以保持与树结构自洽
+      node.parentId = ''
       roots.push(node)
     }
   }
 
-  // 按名称稳定排序
+  // 按手动排序号排序，名称仅作兜底：
+  // 同级 sortOrder 由后端保证稠密且唯一（存量数据已在服务启动时初始化），
+  // 名称回退只在极端并发情况下才会生效。
   const sortNodes = (nodes: WorkspaceTreeNode[]) => {
-    nodes.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    nodes.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-Hans-CN'))
     nodes.forEach((n) => sortNodes(n.children))
   }
   sortNodes(roots)

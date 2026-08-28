@@ -48,6 +48,20 @@ export function deleteWorkspace(id: string, defaultWorkspaceId?: string) {
   return apiClient.delete<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}${query}`)
 }
 
+/**
+ * 移动工作组到参照节点的指定落点（左侧工作组树拖拽调整层级/顺序）。
+ * 只上报「参照节点 + 落点位置」，最终顺序由后端基于服务端当前数据推算，
+ * 避免多设备并发时各端顺序视图不一致而互相覆盖。
+ * @param targetId 落点参照的工作组 ID
+ * @param position 落点位置：before（与参照节点同级并排在其前）/ after（排在其后）/ inner（成为其子级）
+ */
+export function moveWorkspace(id: string, targetId: string, position: 'before' | 'after' | 'inner') {
+  return apiClient.post<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}/move`, {
+    targetId,
+    position,
+  })
+}
+
 /** 获取所有工作组标签页摘要（用于 TabsView 交叉比对打 tag） */
 export function getWorkspaceTabsSummary() {
   return apiClient.get<WorkspaceTabsSummaryData>('/v1/tab-sync/workspaces/tabs-summary')

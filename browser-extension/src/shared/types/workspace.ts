@@ -23,6 +23,8 @@ export interface Workspace {
   icon?: string
   /** 工作组描述 (可选) */
   description?: string
+  /** 同级排序序号（拖拽排序后由后端下发；历史数据为 0，此时前端按名称回退排序） */
+  sortOrder?: number
   /** 工作组内的标签页引用 */
   tabs: TabReference[]
   /** 工作组标签 */

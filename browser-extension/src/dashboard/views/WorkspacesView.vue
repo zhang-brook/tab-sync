@@ -18,6 +18,7 @@
       <div class="tree-pane">
         <div class="pane-title-row">
           <span class="pane-title">工作组</span>
+          <span v-if="searchKeyword" class="tree-hint">搜索中暂不可拖拽</span>
           <div class="pane-title-actions">
             <el-tooltip content="新建工作组" placement="top">
               <el-button size="small" text type="primary" @click="showCreateDialog('')">
@@ -31,7 +32,9 @@
         </div>
         <el-empty v-if="treeData.length === 0 && !loading" :image-size="60" description="暂无工作组" />
         <el-tree v-else ref="treeRef" :data="treeData" node-key="id" :props="treeProps" :filter-node-method="filterNode"
-          :expand-on-click-node="false" highlight-current default-expand-all @node-click="onSelectNode">
+          :expand-on-click-node="false" highlight-current default-expand-all
+          :draggable="!searchKeyword" :allow-drag="allowDragNode" :allow-drop="allowDropNode"
+          @node-click="onSelectNode" @node-drop="onNodeDrop">
           <template #default="{ data }">
             <ContextMenu @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @open="() => onNodeContextMenu(data)">
               <span class="tree-node">
@@ -708,6 +711,65 @@ function onNodeContextMenu(data: WorkspaceTreeNode) {
   void refreshTabs([data.id], isAll ? data.id : undefined)
 }
 
+// ============ 工作组树拖拽（调整层级 / 同级顺序） ============
+
+/**
+ * el-tree 拖拽回调传入的节点：内部 Node 实例，data 为对应的工作组树节点。
+ * data 在组件侧声明为通用的 TreeNodeData，故此处保持 unknown，由 nodeData() 收敛断言。
+ */
+interface TreeDragNode {
+  data: unknown
+}
+/** allow-drop 的落点位置 */
+type TreeDropPosition = 'prev' | 'inner' | 'next'
+/** node-drop 事件的落点位置（none 表示未落在可放置区域，不会触发 node-drop） */
+type TreeDropType = 'before' | 'after' | 'inner' | 'none'
+
+/** 取出拖拽节点对应的工作组树节点 */
+function nodeData(node: TreeDragNode): WorkspaceTreeNode {
+  return node.data as WorkspaceTreeNode
+}
+
+/** 是否允许拖动该节点：搜索过滤态下索引不可靠故禁用；系统工作组（如「未分组」）固定置顶不可移动 */
+function allowDragNode(node: TreeDragNode): boolean {
+  return !searchKeyword.value && !nodeData(node).workspace.isSystem
+}
+
+/**
+ * 是否允许把被拖节点放到目标节点的指定位置。
+ * el-tree 内部已拦截「拖到自身或其子孙」，这里再判一次是为了在悬停阶段就给出禁止样式。
+ */
+function allowDropNode(dragging: TreeDragNode, drop: TreeDragNode, type: TreeDropPosition): boolean {
+  const drag = nodeData(dragging)
+  const target = nodeData(drop)
+  // 系统工作组（如「未分组」）固定置顶：
+  // 「排在其后」= 排到普通同级的最前面，落点与渲染结果一致，保留它作为移回根级的唯一入口；
+  // 「排在其前」会渲染到它下面，落点与结果不一致，故禁用；「拖入其内部」则照常允许。
+  if (target.workspace.isSystem && type === 'prev') return false
+  if (target.id === drag.id) return false
+  // 放到自身子孙的前后同样会成环（其父级位于被拖子树内）
+  return !collectDescendantIds(workspaces.value, drag.id).includes(target.id)
+}
+
+/**
+ * 提交拖拽落点。只上报「参照节点 + 落点位置」，落点对应的最终顺序由后端按服务端数据计算，
+ * 前端不参与顺序推算（多设备并发时各端顺序视图可能不同，必须以服务端为准）。
+ * 后端还会递归校验新父级不在被拖子树内，避免父级同时又是子级。
+ */
+async function onNodeDrop(dragging: TreeDragNode, drop: TreeDragNode, type: TreeDropType) {
+  if (type === 'none') return
+  const res = await sendMessage({
+    action: 'MOVE_WORKSPACE',
+    payload: { id: nodeData(dragging).id, targetId: nodeData(drop).id, position: type },
+  })
+  if (!res.success) {
+    if (res.authError) ElMessage.warning('未连接后端，无法调整顺序')
+    else ElMessage.error(res.error || '调整顺序失败')
+  }
+  // el-tree 内部已按拖拽结果重排，无论成败都要重新拉取，以服务端数据为准确认或复原
+  await loadWorkspaces()
+}
+
 /** 标签页操作菜单命令分发 */
 function onTabMenuCommand(command: string, workspaceId: string, tab: TabReference) {
   switch (command) {
@@ -1245,6 +1307,13 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   font-size: 13px;
   font-weight: 600;
   color: #909399;
+}
+
+/* 搜索过滤态下的提示（此时索引不可靠，已禁用拖拽） */
+.tree-hint {
+  font-size: 12px;
+  color: #c0c4cc;
+  margin-right: auto;
 }
 
 .pane-title-actions {

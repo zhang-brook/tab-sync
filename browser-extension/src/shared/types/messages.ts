@@ -13,6 +13,7 @@ export type MessageAction =
   | 'GET_WORKSPACE_TABS'
   | 'CREATE_WORKSPACE'
   | 'UPDATE_WORKSPACE'
+  | 'MOVE_WORKSPACE'
   | 'DELETE_WORKSPACE'
   | 'OPEN_WORKSPACE'
   | 'ADD_TABS_TO_WORKSPACE'
@@ -104,6 +105,19 @@ export interface CreateWorkspaceMessage {
 export interface UpdateWorkspaceMessage {
   action: 'UPDATE_WORKSPACE'
   payload: { id: string; name?: string; color?: string; icon?: string; description?: string; parentId?: string; tabs?: WorkspaceTabPayload[] }
+}
+
+/** 移动工作组到参照节点的指定落点（左侧工作组树拖拽调整层级/顺序） */
+export interface MoveWorkspaceMessage {
+  action: 'MOVE_WORKSPACE'
+  payload: {
+    /** 被移动的工作组 UUID */
+    id: string
+    /** 落点参照的工作组 UUID */
+    targetId: string
+    /** 落点位置：before（与参照节点同级并排在其前）/ after（排在其后）/ inner（成为其子级） */
+    position: 'before' | 'after' | 'inner'
+  }
 }
 
 export interface DeleteWorkspaceMessage {
@@ -312,6 +326,7 @@ export type ExtensionMessage =
   | GetSyncedTabsMessage
   | CreateWorkspaceMessage
   | UpdateWorkspaceMessage
+  | MoveWorkspaceMessage
   | DeleteWorkspaceMessage
   | OpenWorkspaceMessage
   | AddTabsToWorkspaceMessage
