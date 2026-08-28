@@ -132,6 +132,28 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	Success(c, gin.H{"success": true})
 }
 
+// Duplicate 复制工作组及其整棵子树（递归复制所有子/孙工作组与标签页）。
+// 副本作为源工作组的同级节点追加到末尾，返回新建的根副本。
+func (h *WorkspaceHandler) Duplicate(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		BadRequest(c, "请提供工作区 ID")
+		return
+	}
+
+	result, err := h.svc.Duplicate(id)
+	if err != nil {
+		if errors.Is(err, service.ErrWorkspaceNotFound) {
+			NotFound(c, "工作组不存在")
+			return
+		}
+		BadRequest(c, err.Error())
+		return
+	}
+
+	Created(c, result)
+}
+
 // MoveWorkspaceRequest 移动/排序工作组请求体
 type MoveWorkspaceRequest struct {
 	// TargetID 落点参照的工作组 UUID

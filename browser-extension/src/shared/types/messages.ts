@@ -12,6 +12,7 @@ export type MessageAction =
   | 'GET_WORKSPACES'
   | 'GET_WORKSPACE_TABS'
   | 'CREATE_WORKSPACE'
+  | 'DUPLICATE_WORKSPACE'
   | 'UPDATE_WORKSPACE'
   | 'MOVE_WORKSPACE'
   | 'DELETE_WORKSPACE'
@@ -123,6 +124,12 @@ export interface MoveWorkspaceMessage {
 export interface DeleteWorkspaceMessage {
   action: 'DELETE_WORKSPACE'
   payload: { id: string; defaultWorkspaceId?: string }
+}
+
+/** 复制工作组：递归复制其整棵子树（所有子/孙工作组与标签页），副本作为同级节点追加到末尾 */
+export interface DuplicateWorkspaceMessage {
+  action: 'DUPLICATE_WORKSPACE'
+  payload: { id: string }
 }
 
 export interface OpenWorkspaceMessage {
@@ -325,6 +332,7 @@ export type ExtensionMessage =
   | GetWorkspaceTabsMessage
   | GetSyncedTabsMessage
   | CreateWorkspaceMessage
+  | DuplicateWorkspaceMessage
   | UpdateWorkspaceMessage
   | MoveWorkspaceMessage
   | DeleteWorkspaceMessage

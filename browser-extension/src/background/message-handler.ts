@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -57,6 +57,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'DELETE_WORKSPACE':
       return handleDeleteWorkspace(message.payload.id, message.payload.defaultWorkspaceId)
+
+    case 'DUPLICATE_WORKSPACE':
+      return handleDuplicateWorkspace(message.payload.id)
 
     case 'OPEN_WORKSPACE':
       return handleOpenWorkspace(message.payload)
@@ -377,6 +380,20 @@ async function handleDeleteWorkspace(id: string, defaultWorkspaceId?: string): P
   }
   logger.warn('deleteWorkspace API failed:', res.error)
   return { success: false, error: res.error || '删除工作组失败', authError: res.status === 401 }
+}
+
+/** 复制工作组（后端递归复制整棵子树，返回新建的根副本） */
+async function handleDuplicateWorkspace(id: string): Promise<MessageResponse> {
+  if (!id) {
+    return { success: false, error: '缺少工作组 ID' }
+  }
+  const res = await duplicateWorkspace(id)
+  if (res.ok && res.data) {
+    logger.info('Workspace duplicated:', id, '->', res.data.workspace.id)
+    return { success: true, data: { workspace: res.data.workspace } }
+  }
+  logger.warn('duplicateWorkspace API failed:', res.error)
+  return { success: false, error: res.error || '复制工作组失败', authError: res.status === 401 }
 }
 
 /** 将选中的标签页加入现有工作组（去重后合并） */

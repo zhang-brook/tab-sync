@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -506,6 +507,198 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 	}
 
 	return nil
+}
+
+// Duplicate 复制工作组及其整棵子树（递归复制所有子/孙工作组与它们的标签页）。
+// 副本命名为「源名称 (副本)」并作为源工作组的同级节点追加到末尾；
+// 子/孙工作组保持原名称与层级关系，各工作组的标签页、标签关联一并复制（全部使用新主键）。
+// 标签页的添加时间（added_at）原样保留，便于忠实还原源工作组的内容。
+// 系统工作组（如「未分组」）不可复制。
+func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
+	if id == "" {
+		return nil, ErrWorkspaceNotFound
+	}
+
+	var result *CreateResult
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// 1. 加载全部未删除工作组，构建 parentId -> 子级 映射与元信息
+		var all []model.Workspace
+		if err := tx.Where("is_deleted = ?", false).Find(&all).Error; err != nil {
+			return err
+		}
+		meta := make(map[string]model.Workspace, len(all))
+		childrenMap := make(map[string][]string, len(all))
+		for _, w := range all {
+			meta[w.WorkspaceID] = w
+			childrenMap[w.ParentID] = append(childrenMap[w.ParentID], w.WorkspaceID)
+		}
+		src, ok := meta[id]
+		if !ok {
+			return ErrWorkspaceNotFound
+		}
+		if src.IsSystem {
+			return errors.New("系统工作组不可复制")
+		}
+
+		// 2. 后序遍历收集子树（叶子在前、根在后），逆序即为「父先于子」的创建顺序
+		var subtree []string
+		var visit func(wid string)
+		visit = func(wid string) {
+			for _, c := range childrenMap[wid] {
+				visit(c)
+			}
+			subtree = append(subtree, wid)
+		}
+		visit(id)
+
+		// 3. 批量加载子树内全部标签页与标签关联（一次查询，避免 N+1）
+		var allTabs []model.WorkspaceTab
+		if err := tx.Where("workspace_id IN ?", subtree).
+			Order("sort_order ASC, id ASC").
+			Find(&allTabs).Error; err != nil {
+			return err
+		}
+		tabsByWorkspace := make(map[string][]model.WorkspaceTab, len(subtree))
+		tabWorkspace := make(map[uint]string, len(allTabs))
+		for _, t := range allTabs {
+			tabsByWorkspace[t.WorkspaceID] = append(tabsByWorkspace[t.WorkspaceID], t)
+			tabWorkspace[t.ID] = t.WorkspaceID
+		}
+
+		// 标签页的标签关联按标签页主键加载（而非 workspace_id）：
+		// 标签页被移动到其他工作组后 tab_tags.workspace_id 可能未同步更新（既有隐患），
+		// 按主键关联可保证复制时标签关联不遗漏。
+		srcTabIDs := make([]uint, 0, len(allTabs))
+		for _, t := range allTabs {
+			srcTabIDs = append(srcTabIDs, t.ID)
+		}
+		var tabTagRels []model.TabTag
+		if err := tx.Where("workspace_tab_id IN ?", srcTabIDs).Find(&tabTagRels).Error; err != nil {
+			return err
+		}
+		var wsTagRels []model.WorkspaceTag
+		if err := tx.Where("workspace_id IN ?", subtree).Find(&wsTagRels).Error; err != nil {
+			return err
+		}
+
+		// 4. 父先于子逐个创建副本，并建立 oldID -> newID 映射
+		newID := make(map[string]string, len(subtree))
+		newTabID := make(map[uint]uint, len(allTabs))
+		for i := len(subtree) - 1; i >= 0; i-- {
+			wid := subtree[i]
+			srcWS := meta[wid]
+			newWSID := uuid.New().String()
+			newID[wid] = newWSID
+
+			name := srcWS.Name
+			if wid == id {
+				name = duplicateWorkspaceName(srcWS.Name)
+			}
+			parentID := ""
+			if srcWS.ParentID != "" {
+				parentID = newID[srcWS.ParentID] // 父级已先创建（父先于子）
+			}
+			ws := model.Workspace{
+				WorkspaceID: newWSID,
+				ParentID:    parentID,
+				Name:        name,
+				Color:       srcWS.Color,
+				Icon:        srcWS.Icon,
+				Description: srcWS.Description,
+				SortOrder:   srcWS.SortOrder,
+				IsSystem:    false, // 副本始终是普通工作组
+			}
+			if wid == id {
+				// 根副本作为源的同级节点追加到末尾（事务内计算，避免并发创建互相覆盖）
+				var maxOrder int
+				if err := tx.Model(&model.Workspace{}).
+					Where("parent_id = ? AND is_deleted = ?", srcWS.ParentID, false).
+					Select("COALESCE(MAX(sort_order), -1)").
+					Scan(&maxOrder).Error; err != nil {
+					return err
+				}
+				ws.SortOrder = maxOrder + 1
+			}
+			if err := tx.Create(&ws).Error; err != nil {
+				return err
+			}
+
+			// 复制标签页：标题/图标/显示名/描述/排序/添加时间原样保留
+			for _, srcTab := range tabsByWorkspace[wid] {
+				tab := model.WorkspaceTab{
+					WorkspaceID: newWSID,
+					URL:         srcTab.URL,
+					Title:       srcTab.Title,
+					DisplayName: srcTab.DisplayName,
+					FavIconURL:  srcTab.FavIconURL,
+					SortOrder:   srcTab.SortOrder,
+					AddedAt:     srcTab.AddedAt,
+					Description: srcTab.Description,
+				}
+				if err := tx.Create(&tab).Error; err != nil {
+					return err
+				}
+				newTabID[srcTab.ID] = tab.ID
+			}
+
+			// 复制标签页的标签关联（全局标签共享，仅重建关联行并指向新标签页主键。
+			// 归属判断基于 workspace_tabs 表推导的 tabWorkspace，而非 tab_tags.workspace_id，
+			// 避免标签页被移动后关联行的旧 workspace_id 造成遗漏或重复）
+			for _, rel := range tabTagRels {
+				if tabWorkspace[rel.WorkspaceTabID] != wid {
+					continue
+				}
+				newTab, ok := newTabID[rel.WorkspaceTabID]
+				if !ok {
+					continue
+				}
+				if err := tx.Create(&model.TabTag{
+					WorkspaceTabID: newTab,
+					WorkspaceID:    newWSID,
+					TagID:          rel.TagID,
+				}).Error; err != nil {
+					return err
+				}
+			}
+
+			// 复制工作组的标签关联
+			for _, rel := range wsTagRels {
+				if rel.WorkspaceID != wid {
+					continue
+				}
+				if err := tx.Create(&model.WorkspaceTag{
+					WorkspaceID: newWSID,
+					TagID:       rel.TagID,
+				}).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		// 5. 返回根副本（含标签页与标签，供前端复制后直接选中）
+		var created model.Workspace
+		if err := tx.Where("workspace_id = ? AND is_deleted = ?", newID[id], false).
+			Preload("Tabs", func(db *gorm.DB) *gorm.DB {
+				return db.Preload("Tags.Tag").Order("sort_order ASC")
+			}).
+			Preload("Tags.Tag").
+			First(&created).Error; err != nil {
+			return err
+		}
+		resp := toWorkspaceResponse(created, true)
+		result = &CreateResult{Workspace: resp}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 记录同步事件（预留：未来用于推送到织个网上游）
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("created", "workspace", result.Workspace.ID, result.Workspace)
+	}
+
+	return result, nil
 }
 
 // MoveWorkspace 把工作组移动到参照节点的指定落点（前 / 后 / 内部），并按落点重整相关同级顺序。
@@ -1022,6 +1215,23 @@ func sanitizeFavIconURL(url string) string {
 		return ""
 	}
 	return url
+}
+
+// duplicateWorkspaceName 为副本生成名称：源名称 + " (副本)"。
+// workspaces.name 字段上限为 200 字符（size:200），超出时按字符截断源名称，
+// 避免字节截断切碎多字节字符，保证后缀完整。
+func duplicateWorkspaceName(name string) string {
+	const suffix = " (副本)"
+	const maxChars = 200
+	if utf8.RuneCountInString(name)+utf8.RuneCountInString(suffix) <= maxChars {
+		return name + suffix
+	}
+	trimmed := name
+	for utf8.RuneCountInString(trimmed)+utf8.RuneCountInString(suffix) > maxChars && trimmed != "" {
+		_, size := utf8.DecodeLastRuneInString(trimmed)
+		trimmed = trimmed[:len(trimmed)-size]
+	}
+	return trimmed + suffix
 }
 
 // ===================== 响应类型 =====================

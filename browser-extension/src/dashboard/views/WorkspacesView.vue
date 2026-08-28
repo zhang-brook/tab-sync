@@ -125,6 +125,15 @@
                   <span>编辑组</span>
                 </el-button>
               </el-tooltip>
+              <el-tooltip :content="selectedWorkspace?.isSystem ? '系统分组不可复制' : '复制工作组（含子工作组与标签页）'" placement="top">
+                <el-button size="small" text type="primary" :disabled="selectedWorkspace?.isSystem"
+                  @click="handleDuplicate(selectedWorkspace)">
+                  <el-icon>
+                    <Files />
+                  </el-icon>
+                  <span>复制组</span>
+                </el-button>
+              </el-tooltip>
               <el-tooltip :content="selectedWorkspace?.isSystem ? '系统分组不可删除' : (selectedWorkspace?.id === defaultWorkspaceId ? '默认分组不可删除' : '删除')" placement="top">
                 <el-button size="small" text type="danger" :disabled="selectedWorkspace?.isSystem || selectedWorkspace?.id === defaultWorkspaceId"
                   @click="handleDelete(selectedWorkspace)">
@@ -360,7 +369,7 @@ import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import TabDropdownMenu from '../components/TabDropdownMenu.vue'
-import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo } from '@element-plus/icons-vue'
+import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
@@ -842,9 +851,9 @@ function showEditDialog(ws: Workspace) {
 /** 树中每个工作组项的「⋮」菜单：对对应工作组执行操作 */
 function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
   const ws = node.workspace
-  // 系统工作组（如「未分组」）不允许删除或改名，但允许新建子分组
-  if (ws.isSystem && (command === 'edit' || command === 'delete')) {
-    ElMessage.warning('系统分组不可删除或改名')
+  // 系统工作组（如「未分组」）不允许删除、改名或复制，但允许新建子分组
+  if (ws.isSystem && (command === 'edit' || command === 'delete' || command === 'duplicate')) {
+    ElMessage.warning('系统分组不可删除、改名或复制')
     return
   }
   switch (command) {
@@ -859,6 +868,9 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
       break
     case 'createChild':
       showCreateDialog(ws.id)
+      break
+    case 'duplicate':
+      handleDuplicate(ws)
       break
     case 'setDefault':
       handleSetDefaultWorkspace(ws)
@@ -933,6 +945,27 @@ async function handleDelete(ws: Workspace) {
   if (ok) {
     if (selectedId.value === ws.id) selectedId.value = ''
     await loadWorkspaces()
+  }
+}
+
+/** 复制工作组：后端递归复制整棵子树，成功后刷新并选中副本 */
+async function handleDuplicate(ws: Workspace) {
+  if (ws.isSystem) {
+    ElMessage.warning('系统分组不可复制')
+    return
+  }
+  const res = await sendMessage<{ workspace: Workspace }>({
+    action: 'DUPLICATE_WORKSPACE',
+    payload: { id: ws.id },
+  })
+  if (res.success && res.data?.workspace) {
+    ElMessage.success(`已创建副本「${res.data.workspace.name}」`)
+    selectedId.value = res.data.workspace.id
+    await loadWorkspaces()
+  } else if (res.authError) {
+    ElMessage.warning('未连接后端，无法复制工作组')
+  } else {
+    ElMessage.error(res.error || '复制工作组失败')
   }
 }
 

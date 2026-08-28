@@ -18,6 +18,9 @@
     <el-dropdown-item :command="'createChild'" :icon="FolderAdd">
       新建子工作组
     </el-dropdown-item>
+    <el-dropdown-item :command="'duplicate'" :icon="Files" :disabled="data.workspace?.isSystem">
+      复制工作组（含子工作组与标签页）
+    </el-dropdown-item>
     <el-dropdown-item :command="'setDefault'" :icon="Star" :disabled="data.id === defaultWorkspaceId">
       设置为默认分组
     </el-dropdown-item>
@@ -31,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{

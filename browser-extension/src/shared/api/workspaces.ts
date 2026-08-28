@@ -33,6 +33,12 @@ export function createWorkspace(payload: {
   return apiClient.post<{ workspace: Workspace }>('/v1/tab-sync/workspaces', payload)
 }
 
+/** 复制工作组：后端递归复制整棵子树（所有子/孙工作组与标签页、标签关联），
+ * 副本作为源工作组的同级节点追加到末尾，返回新建的根副本。 */
+export function duplicateWorkspace(id: string) {
+  return apiClient.post<{ workspace: Workspace }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}/duplicate`)
+}
+
 /** 更新工作区 */
 export function updateWorkspace(
   id: string,

@@ -376,6 +376,18 @@
 
       <div class="endpoint">
         <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id/duplicate</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>复制工作组（递归复制整棵子树：所有子/孙工作组与标签页，标签页标签、工作组标签关联一并复制）。副本命名为「源名称 (副本)」并作为源工作组的同级节点追加到末尾；标签页的添加时间原样保留；系统工作组（如「未分组」）不可复制。返回新建的根副本（含标签页与标签）。</td></tr></table>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
           <span class="method put">PUT</span>
           <span class="ep-path">/v1/tab-sync/workspaces/:id</span>
           <span class="ep-auth token">Token</span>
