@@ -90,6 +90,11 @@ func main() {
 		c.FileFromFS("/docs.html", http.FS(webSub))
 	})
 
+	// 站点图标（favicon），供 /setup 与 /api/docs 页面引用
+	r.GET("/favicon.svg", func(c *gin.Context) {
+		c.FileFromFS("/public/favicon.svg", http.FS(webSub))
+	})
+
 	// API v1 路由组
 	v1 := r.Group("/v1/tab-sync")
 	{
