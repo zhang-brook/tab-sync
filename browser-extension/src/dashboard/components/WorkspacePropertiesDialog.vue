@@ -11,7 +11,7 @@
             </div>
             <div class="props-path-row">
               <span class="props-path">路径：{{ data.fullPath }}</span>
-              <el-button link type="primary" size="small" :icon="CopyDocument" @click="copyPath">复制</el-button>
+              <el-button link type="info" size="small" :icon="CopyDocument" @click="copyPath">复制</el-button>
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@ interface WorkspaceProperties {
   tabCount: number
   /** 直接子工作组数量 */
   childCount: number
-  /** 子孙工作组标签页总数（不含本组） */
+  /** 本组及子孙工作组标签页总数 */
   descendantTabCount: number
 }
 
@@ -109,7 +109,8 @@ function formatDateTime(iso: string): string {
   if (!iso) return '—'
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  return d.toLocaleString()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 /** 复制完整路径到剪贴板 */
@@ -151,7 +152,8 @@ async function load(ws: Workspace) {
       const total = res.data.groups.reduce((sum, g) => sum + g.tabs.length, 0)
       if (data.value) {
         data.value.tabCount = own
-        data.value.descendantTabCount = total - own
+        // 总数含本组：自己这一层 + 全部子孙层
+        data.value.descendantTabCount = total
       }
     }
   } finally {
