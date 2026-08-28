@@ -34,12 +34,16 @@ export default defineManifest({
     type: 'module',
   },
   action: {
+    // docs: https://developer.chrome.com/docs/extensions/reference/api/action?hl=zh_cn#icon
+    default_icon: 'public/icons/icon.png',
+    /*
     default_icon: {
       16: 'public/icons/icon-16.png',
       32: 'public/icons/icon-32.png',
       48: 'public/icons/icon-48.png',
       128: 'public/icons/icon-128.png',
     },
+    */
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
@@ -48,10 +52,16 @@ export default defineManifest({
     "page": "src/dashboard/index.html",
     "open_in_tab": true,   // 是否在新标签页打开
   },
+  // docs: https://developer.chrome.com/docs/extensions/reference/manifest/icons?hl=zh-cn
   icons: {
+    16: 'public/icons/icon.png',
+    48: 'public/icons/icon.png',
+    128: 'public/icons/icon.png',
+    /*
     16: 'public/icons/icon-16.png',
     48: 'public/icons/icon-48.png',
     128: 'public/icons/icon-128.png',
+    */
   },
 
   // 最多只能定义4个快捷键 超出的需要用户手动注册
