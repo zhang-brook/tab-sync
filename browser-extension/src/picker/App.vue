@@ -66,11 +66,12 @@ onMounted(async () => {
     ElMessage.error('无法获取标签页信息')
   }
 
-  // 本窗口本身是 popup 弹窗，最小化后无意义且容易在任务栏留下残留，直接关闭（两种模式都需要）
+  // 本窗口本身是 popup 弹窗，失焦后无意义且容易在任务栏留下残留，直接关闭（两种模式都需要）
   chrome.windows.onFocusChanged.addListener(async (windowId) => {
-    if (windowId !== chrome.windows.WINDOW_ID_NONE) return
     const win = await chrome.windows.getCurrent()
-    if (win?.state === 'minimized') window.close()
+    if (win?.id == null) return
+    // 焦点离开本弹窗（切换到其他窗口/应用，或最小化）即关闭，避免残留到系统任务栏
+    if (windowId !== win.id) window.close()
   })
 })
 
