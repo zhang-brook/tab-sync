@@ -15,7 +15,7 @@
             </div>
           </div>
         </div>
-        <el-descriptions :column="1" border size="small">
+        <el-descriptions :column="1" border label-width="calc((1 - 0.618) * 100%)">
           <el-descriptions-item label="所在目录">{{ data.parentPath }}</el-descriptions-item>
           <el-descriptions-item label="描述">
             <span :class="{ 'props-muted': !data.description }">{{ data.description || '—' }}</span>
