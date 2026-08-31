@@ -16,6 +16,7 @@ import {
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
   MENU_OPEN_WORKSPACES,
+  MENU_SAVE_AS_NEW,
   MENU_SAVE_DEFAULT,
   MENU_SAVE_PICK,
   MENU_SAVE_UNGROUPED,
@@ -72,6 +73,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await openPickerWindow([tab])
   } else if (id === MENU_TAB_SAVE_PICK) {
     await openPickerWindow(await resolveTabSelection(tab))
+  } else if (id === MENU_SAVE_AS_NEW) {
+    // 页面上下文只作用于当前页面（多选取自标签页高亮集，不适用于页面右键）
+    await openPickerWindow([tab], { mode: 'create' })
   } else if (id === MENU_TAB_SAVE_GROUP_NEW) {
     await handleSaveGroupClick(tab)
   } else if (id === MENU_TAB_SAVE_AS_NEW) {

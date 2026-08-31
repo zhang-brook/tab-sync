@@ -6,6 +6,8 @@ export const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 export const MENU_SAVE_DEFAULT = 'tab-sync-save-default'
 export const MENU_SAVE_UNGROUPED = 'tab-sync-save-ungrouped'
 export const MENU_SAVE_PICK = 'tab-sync-save-pick'
+// 页面右键：新建工作组并保存（与标签页右键的 MENU_TAB_SAVE_AS_NEW 对应）
+export const MENU_SAVE_AS_NEW = 'tab-sync-save-as-new'
 // 标签页右键菜单（标签页菜单的 contexts 与页面不同，需独立菜单项）
 export const MENU_TAB_SAVE_DEFAULT = 'tab-sync-tab-save-default'
 export const MENU_TAB_SAVE_UNGROUPED = 'tab-sync-tab-save-ungrouped'

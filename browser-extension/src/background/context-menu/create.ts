@@ -8,6 +8,7 @@ import {
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
   MENU_OPEN_WORKSPACES,
+  MENU_SAVE_AS_NEW,
   MENU_SAVE_DEFAULT,
   MENU_SAVE_PICK,
   MENU_SAVE_UNGROUPED,
@@ -94,6 +95,12 @@ export async function createContextMenus() {
     chrome.contextMenus.create({
       id: MENU_SAVE_PICK,
       title: `保存到 选定分组…${shortcutHint('save-pick')}`,
+      ...page,
+    })
+    // 页面右键：创建新工作组并保存（与标签页右键的 MENU_TAB_SAVE_AS_NEW 对齐，作用于当前页面）
+    chrome.contextMenus.create({
+      id: MENU_SAVE_AS_NEW,
+      title: '保存到 新工作组…',
       ...page,
     })
     // 标签页右键：静态标题默认单数文案，多选时由 tabs.onHighlighted 预先替换为「保存 x 个选中的标签页…」
