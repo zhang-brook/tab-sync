@@ -174,14 +174,33 @@
             </el-select>
           </div>
 
+          <!-- 批量操作工具条（勾选标签页后出现，操作与行右键菜单一致） -->
+          <div v-if="selectedTabIds.length > 0" class="batch-bar">
+            <span class="batch-count">已选 {{ selectedTabIds.length }} 项</span>
+            <el-button size="small" type="primary" @click="openBatchMoveDialog">移动到工作组</el-button>
+            <el-button size="small" @click="openSelectedTabs">打开</el-button>
+            <el-button size="small" @click="copySelectedLinks">复制链接</el-button>
+            <el-button size="small" type="danger" plain @click="removeSelectedTabs">移除</el-button>
+            <el-button size="small" text @click="toggleSelectAll">{{ allDisplayedSelected ? '取消全选' : '全选本列表' }}</el-button>
+            <el-button size="small" text @click="clearSelection">取消选择</el-button>
+          </div>
+
           <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标） -->
           <div class="detail-body">
             <el-empty v-if="rightTabs.length === 0" :image-size="60"
               :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'" />
 
-            <TabList v-else :items="tabListItems" :sortable="tabScope === 'current' && tagFilter == null"
-              @sort="onTabSort" @click="(item: any) => openSingleTab(item.tab.url)"
-              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)">
+            <TabList
+              v-else
+              :items="tabListItems"
+              :sortable="tabScope === 'current' && tagFilter == null"
+              :selectable="true"
+              :selected="selectedTabIds"
+              @update:selected="onTabSelectionChange"
+              @sort="onTabSort"
+              @click="(item: any) => openSingleTab(item.tab.url)"
+              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
+            >
               <template #extra="{ item }">
                 <div v-if="(item as any).tab.tags && (item as any).tab.tags.length" class="tab-tags">
                   <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain"
@@ -631,6 +650,7 @@ watch(searchKeyword, (val) => {
 // 选中工作组或切换层级范围后，右侧先展示缓存，再强制从后端拉取最新标签页列表。
 // 「包含子工作组」模式以根 id 调一次批量接口返回整棵子树，避免逐个工作组请求。
 watch([selectedId, tabScope], ([id]) => {
+  selectedTabIds.value = []
   if (!id) return
   const isAll = tabScope.value === 'all'
   const ids = isAll ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
@@ -1289,22 +1309,111 @@ async function handleAddTabByUrl() {
   }
 }
 
+// ============ 标签页批量选择 ============
+
+const selectedTabIds = ref<Array<string | number>>([])
+
+/** TabList 回传的选中变化（其 item.id 为 `${workspaceId}-${tabId}`） */
+function onTabSelectionChange(keys: Array<string | number>) {
+  selectedTabIds.value = keys
+}
+function clearSelection() {
+  selectedTabIds.value = []
+}
+/** 当前列表是否已被全选 */
+const allDisplayedSelected = computed(
+  () => tabListItems.value.length > 0 && tabListItems.value.every((i) => selectedTabIds.value.includes(i.id)),
+)
+function toggleSelectAll() {
+  selectedTabIds.value = allDisplayedSelected.value ? [] : tabListItems.value.map((i) => i.id)
+}
+/** 选中项解析为 { workspaceId, tabId }，便于发起后台操作 */
+function selectedTabMeta(): { workspaceId: string; tabId: string }[] {
+  return tabListItems.value
+    .filter((i) => selectedTabIds.value.includes(i.id))
+    .map((i) => ({ workspaceId: i.workspaceId, tabId: i.tab.tabId }))
+}
+
+/** 打开选中的全部标签页 */
+function openSelectedTabs() {
+  for (const m of selectedTabMeta()) {
+    const tab = tabsCache.get(m.workspaceId)?.find((t) => t.tabId === m.tabId)
+    if (tab?.url) window.open(tab.url, '_blank', 'noopener')
+  }
+}
+/** 复制选中标签页的链接（换行分隔） */
+async function copySelectedLinks() {
+  const urls: string[] = []
+  for (const m of selectedTabMeta()) {
+    const tab = tabsCache.get(m.workspaceId)?.find((t) => t.tabId === m.tabId)
+    if (tab?.url) urls.push(tab.url)
+  }
+  try {
+    await navigator.clipboard.writeText(urls.join('\n'))
+    ElMessage.success(`已复制 ${urls.length} 个链接`)
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+/** 批量从工作组移除（移至回收站） */
+async function removeSelectedTabs() {
+  const metas = selectedTabMeta()
+  if (metas.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `确定将选中的 ${metas.length} 个标签页移至回收站吗？`,
+      '批量移除',
+      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  let ok = 0
+  for (const m of metas) {
+    const res = await sendMessage({ action: 'REMOVE_WORKSPACE_TAB', payload: { workspaceId: m.workspaceId, tabId: m.tabId } })
+    if (res.success) ok++
+  }
+  if (ok > 0) {
+    ElMessage.success(`已移除 ${ok} 个标签页`)
+    await refreshTabs([...new Set(metas.map((m) => m.workspaceId))])
+    await loadWorkspaces()
+  }
+  clearSelection()
+}
+
 // ============ 移动到其他工作组 ============
 
 const movePickerVisible = ref(false)
 const moveSource = ref<{ workspaceId: string; tabId: string } | null>(null)
+/** 是否为批量移动模式：决定禁用项来源与提交逻辑 */
+const moveBatchMode = ref(false)
 
-/** 选择目标时仅禁用标签页当前所在工作组（未分组等仍可移动到） */
+/** 选择目标时禁用：单条模式禁用源工作组；批量模式禁用所有源工作组 */
 const moveDisabledIds = computed<string[]>(() => {
+  if (moveBatchMode.value) {
+    return [...new Set(selectedTabMeta().map((m) => m.workspaceId))]
+  }
   return moveSource.value ? [moveSource.value.workspaceId] : []
 })
 
 function openMoveDialog(workspaceId: string, tabId: string) {
+  moveBatchMode.value = false
   moveSource.value = { workspaceId, tabId }
   movePickerVisible.value = true
 }
 
+/** 批量移动到工作组：打开选择弹窗（复用同一弹窗） */
+function openBatchMoveDialog() {
+  if (selectedTabIds.value.length === 0) return
+  moveBatchMode.value = true
+  movePickerVisible.value = true
+}
+
 async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
+  if (moveBatchMode.value) {
+    await handleBatchMoveToWorkspace(node)
+    return
+  }
   const src = moveSource.value
   if (!src) return
   // 确保目标工作组的标签页已加载，以计算追加位置（标签页按需拉取，node.workspace.tabs 不再全量包含）
@@ -1325,6 +1434,33 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   } else {
     ElMessage.error(res.error || '移动失败')
   }
+}
+
+/** 批量移动：依次将选中标签页追加到目标工作组末尾 */
+async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
+  const metas = selectedTabMeta()
+  if (metas.length === 0) return
+  await ensureTabsLoaded([node.id])
+  const base = tabsCache.get(node.id)?.length ?? 0
+  let ok = 0
+  let fail = 0
+  for (const m of metas) {
+    const res = await sendMessage({
+      action: 'MOVE_WORKSPACE_TAB',
+      payload: { workspaceId: node.id, tabId: m.tabId, newIndex: base + ok },
+    })
+    if (res.success) ok++
+    else fail++
+  }
+  if (ok > 0) {
+    ElMessage.success(`已移动 ${ok} 个标签页到「${node.name}」`)
+    const srcIds = [...new Set(metas.map((m) => m.workspaceId))]
+    await refreshTabs([...srcIds, node.id].filter(Boolean) as string[])
+    await loadWorkspaces()
+  }
+  if (fail > 0) ElMessage.error(`有 ${fail} 个标签页移动失败`)
+  moveBatchMode.value = false
+  clearSelection()
 }
 </script>
 
@@ -1526,6 +1662,25 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
 
 .scope-bar {
   padding: 12px 0;
+}
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  border-radius: 8px;
+}
+
+.batch-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4338ca;
+  margin-right: 4px;
 }
 
 .detail-body {
