@@ -51,8 +51,15 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 	return out, nil
 }
 
-// Create 创建标签
+// Create 创建标签；同 scope 下若已存在同名（不区分大小写）标签，则直接复用已有记录，
+// 避免落库时产生重复标签。
 func (s *TagService) Create(name, color, scope, description string) (*TagResponse, error) {
+	var existing model.Tag
+	if err := s.db.Where("scope = ? AND LOWER(name) = LOWER(?)", scope, name).First(&existing).Error; err == nil {
+		return &TagResponse{ID: existing.ID, Name: existing.Name, Color: existing.Color, Scope: existing.Scope, Description: existing.Description}, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 	tag := model.Tag{Name: name, Color: color, Scope: scope, Description: description}
 	if err := s.db.Create(&tag).Error; err != nil {
 		return nil, err
