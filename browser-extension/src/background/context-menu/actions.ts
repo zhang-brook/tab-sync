@@ -235,7 +235,8 @@ export async function saveToDefaultWorkspaceAndClose(tabs: chrome.tabs.Tab[]) {
 export async function notify(title: string, message: string, idPrefix?: string) {
   const options = {
     type: 'basic' as const,
-    iconUrl: 'public/icons/icon-48.png',
+    // iconUrl: 'public/icons/icon-48.png',
+    iconUrl: 'public/icons/icon.png',
     title,
     message,
   }
@@ -246,7 +247,8 @@ export async function notify(title: string, message: string, idPrefix?: string) 
     } else {
       await chrome.notifications.create(options)
     }
-  } catch {
-    /* ignore */
+  } catch (err) {
+    // 图标资源缺失等会让 create 静默失败，记日志便于排查
+    logger.warn('桌面通知创建失败:', err)
   }
 }
