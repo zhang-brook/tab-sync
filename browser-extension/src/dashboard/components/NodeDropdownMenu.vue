@@ -24,6 +24,15 @@
     <el-dropdown-item :command="'setDefault'" :icon="Star" :disabled="data.id === defaultWorkspaceId">
       设置为默认分组
     </el-dropdown-item>
+    <!-- 默认展开/默认折叠：主文案为目标状态，括号小字提示当前状态；点击后切换 -->
+    <el-dropdown-item
+      :command="'toggleCollapsed'"
+      :icon="data.workspace?.collapsed ? Expand : Fold"
+      :disabled="data.workspace?.isSystem"
+    >
+      默认{{ data.workspace?.collapsed ? '展开' : '折叠' }}
+      <el-text type="info" size="small" style="margin-left: 6.18px;">(当前：{{ data.workspace?.collapsed ? '默认折叠' : '默认展开' }})</el-text>
+    </el-dropdown-item>
     <el-dropdown-item :command="'copyTitle'" :icon="DocumentCopy" divided>
       复制标题
     </el-dropdown-item>
@@ -37,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files, InfoFilled } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files, InfoFilled, Expand, Fold } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{

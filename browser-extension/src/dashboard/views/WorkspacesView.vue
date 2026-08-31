@@ -935,6 +935,9 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'setDefault':
       handleSetDefaultWorkspace(ws)
       break
+    case 'toggleCollapsed':
+      handleToggleCollapsed(ws)
+      break
     case 'edit':
       showEditDialog(ws)
       break
@@ -966,6 +969,24 @@ async function handleSetDefaultWorkspace(ws: Workspace) {
   defaultWorkspaceId.value = ws.id
   await storage.set(STORAGE_KEYS.DEFAULT_WORKSPACE_ID, ws.id)
   ElMessage.success(`已将「${ws.name}」设为默认分组`)
+}
+
+/** 右键菜单「默认展开/默认折叠」快捷切换：提交 collapsed 取反并刷新树 */
+async function handleToggleCollapsed(ws: Workspace) {
+  const next = !ws.collapsed
+  const res = await sendMessage({
+    action: 'UPDATE_WORKSPACE',
+    payload: {
+      id: ws.id,
+      collapsed: next,
+    },
+  })
+  if (res.success) {
+    ElMessage.success(`已将该工作组设为「${next ? '默认折叠' : '默认展开'}」`)
+    await loadWorkspaces()
+  } else {
+    ElMessage.error(res.error || '切换失败')
+  }
 }
 
 async function handleSave() {
