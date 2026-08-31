@@ -39,6 +39,7 @@
         @click="showCreateWorkspace"
       >创建工作组</el-button>
       <el-button :icon="Refresh" @click="refresh()">刷新</el-button>
+      <el-button :icon="View" @click="showSavedLocalTabs">查看已保存的本地标签页</el-button>
     </div>
 
     <!-- 批量操作栏 -->
@@ -170,6 +171,50 @@
         <el-button type="primary" @click="handleCreateWorkspace">创建并加入选中标签页</el-button>
       </template>
     </el-dialog>
+
+    <!-- 已保存的本地标签页弹窗 -->
+    <el-dialog
+      v-model="savedTabsDialogVisible"
+      title="已保存的本地标签页"
+      width="640px"
+    >
+      <div v-if="savedLocalTabs.length === 0" class="saved-empty">
+        <el-empty description="当前没有已存在于工作组中的已打开标签页" />
+      </div>
+      <template v-else>
+        <div class="saved-list-header">
+          <el-checkbox
+            :model-value="savedTabsSelection.size === savedLocalTabs.length"
+            :indeterminate="savedTabsSelection.size > 0 && savedTabsSelection.size < savedLocalTabs.length"
+            @change="(val: any) => toggleAllSavedTabs(val)"
+          >全选</el-checkbox>
+          <span class="saved-count">已选 {{ savedTabsSelection.size }} / {{ savedLocalTabs.length }} 个</span>
+        </div>
+        <div class="saved-list">
+          <div v-for="tab in savedLocalTabs" :key="tab.id" class="saved-item">
+            <el-checkbox
+              :model-value="savedTabsSelection.has(tab.id)"
+              @change="(val: any) => toggleSavedTab(tab.id, val)"
+            />
+            <LazyFavicon :favIconUrl="tab.favIconUrl" :size="16" class="favicon" />
+            <span class="saved-title" :title="tab.title">{{ tab.title || tab.url }}</span>
+            <span class="saved-url" :title="tab.url">{{ tab.url }}</span>
+            <span class="tab-ws-tags">
+              <el-tag
+                v-for="ws in workspacesForTab(tab)"
+                :key="ws.workspaceId"
+                size="small"
+                :style="{ backgroundColor: ws.workspaceColor ? mapColor(ws.workspaceColor) : '#909399', color: '#fff' }"
+              >{{ ws.workspaceName }}</el-tag>
+            </span>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <el-button @click="savedTabsDialogVisible = false">取消</el-button>
+        <el-button type="danger" :disabled="savedTabsSelection.size === 0" @click="handleBatchCloseSavedTabs">批量关闭选定标签页</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -177,7 +222,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd, Plus, FolderChecked, FolderOpened } from '@element-plus/icons-vue'
+import { Search, Refresh, Close, Loading, CaretRight, Monitor, FolderAdd, Plus, FolderChecked, FolderOpened, View } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
@@ -225,6 +270,10 @@ const newWorkspace = reactive({ name: '', color: DEFAULT_WORKSPACE_COLOR, icon: 
 const colorPalette = [...TAG_COLOR_PALETTE]
 const workspacesSummary = ref<WorkspaceTabsSummaryData['summaries']>([])
 
+// 已保存到工作组的本地标签页弹窗
+const savedTabsDialogVisible = ref(false)
+const savedTabsSelection = reactive(new Set<number>())
+
 // 按 URL 建立「该标签页所属工作组」索引，用于在树中展示标签并支持点击跳转
 const urlToWorkspaces = computed<Record<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>>>(() => {
   const map: Record<string, Array<{ workspaceId: string; workspaceName: string; workspaceColor: string }>> = {}
@@ -243,6 +292,23 @@ const urlToWorkspaces = computed<Record<string, Array<{ workspaceId: string; wor
 function workspacesForTab(tab: TreeTab) {
   return urlToWorkspaces.value[tab.url] || []
 }
+
+/** 已存在于工作组中的已打开本地标签页（按 URL 交叉比对） */
+const savedLocalTabs = computed<TreeTab[]>(() => {
+  const tabs: TreeTab[] = []
+  for (const win of windows.value) {
+    for (const item of win.items) {
+      if (item.kind === 'tab') {
+        if (workspacesForTab(item.tab).length > 0) tabs.push(item.tab)
+      } else {
+        for (const t of item.group.tabs) {
+          if (workspacesForTab(t).length > 0) tabs.push(t)
+        }
+      }
+    }
+  }
+  return tabs
+})
 
 const router = useRouter()
 function openWorkspace(_id: string) {
@@ -430,6 +496,52 @@ async function handleCloseSelected() {
   try {
     await chrome.tabs.remove(ids)
     clearSelection()
+    await refresh()
+  } catch {
+    /* 忽略 */
+  }
+}
+
+/** 打开「已保存的本地标签页」弹窗，先刷新摘要再默认全选 */
+async function showSavedLocalTabs() {
+  await loadWorkspaceSummary()
+  savedTabsSelection.clear()
+  for (const t of savedLocalTabs.value) savedTabsSelection.add(t.id)
+  savedTabsDialogVisible.value = true
+}
+
+function toggleSavedTab(id: number, val: boolean) {
+  if (val) savedTabsSelection.add(id)
+  else savedTabsSelection.delete(id)
+}
+
+function toggleAllSavedTabs(val: boolean) {
+  if (val) {
+    for (const t of savedLocalTabs.value) savedTabsSelection.add(t.id)
+  } else {
+    savedTabsSelection.clear()
+  }
+}
+
+async function handleBatchCloseSavedTabs() {
+  const ids = Array.from(savedTabsSelection)
+  if (ids.length === 0) {
+    ElMessage.warning('请先选择要关闭的标签页')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要关闭选中的 ${ids.length} 个标签页吗？`,
+      '批量关闭',
+      { confirmButtonText: '关闭', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await chrome.tabs.remove(ids)
+    ElMessage.success(`已关闭 ${ids.length} 个标签页`)
+    savedTabsDialogVisible.value = false
     await refresh()
   } catch {
     /* 忽略 */
@@ -831,5 +943,48 @@ onUnmounted(() => {
 .color-dot.active {
   border-color: var(--el-color-primary);
   box-shadow: 0 0 0 2px var(--el-color-primary-light-5);
+}
+.saved-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.saved-count {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.saved-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.saved-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 4px;
+}
+.saved-item:hover {
+  background: var(--el-fill-color-light);
+}
+.saved-title {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-url {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.saved-empty {
+  padding: 8px 0;
 }
 </style>
