@@ -25,6 +25,8 @@ export interface Workspace {
   description?: string
   /** 同级排序序号（拖拽排序后由后端下发；历史数据为 0，此时前端按名称回退排序） */
   sortOrder?: number
+  /** 默认折叠状态：true=默认折叠，false/缺省=默认展开。用于树形展示的初始展开/收起 */
+  collapsed?: boolean
   /** 工作组内的标签页引用 */
   tabs: TabReference[]
   /** 工作组标签 */

@@ -29,6 +29,7 @@ export function createWorkspace(payload: {
   icon?: string
   description?: string
   parentId?: string
+  collapsed?: boolean
 }) {
   return apiClient.post<{ workspace: Workspace }>('/v1/tab-sync/workspaces', payload)
 }
@@ -42,7 +43,7 @@ export function duplicateWorkspace(id: string) {
 /** 更新工作区 */
 export function updateWorkspace(
   id: string,
-  payload: { name?: string; color?: string; icon?: string; description?: string; parentId?: string; tabs?: WorkspaceTabPayload[] }
+  payload: { name?: string; color?: string; icon?: string; description?: string; parentId?: string; collapsed?: boolean; tabs?: WorkspaceTabPayload[] }
 ) {
   return apiClient.put<{ workspace: Workspace }>(`/v1/tab-sync/workspaces/${encodeURIComponent(id)}`, payload)
 }

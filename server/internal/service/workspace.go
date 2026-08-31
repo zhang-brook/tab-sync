@@ -56,7 +56,8 @@ type CreateWorkspacePayload struct {
 	Color       string `json:"color"`
 	Icon        string `json:"icon"`
 	Description string `json:"description"`
-	ParentID    string `json:"parentId"` // 父工作组 UUID（空表示根级）
+	ParentID    string `json:"parentId"`  // 父工作组 UUID（空表示根级）
+	Collapsed   bool   `json:"collapsed"` // 默认折叠状态：true=默认折叠，false=默认展开（默认）
 }
 
 // UpdateWorkspacePayload 更新工作区请求体
@@ -65,7 +66,8 @@ type UpdateWorkspacePayload struct {
 	Color       *string            `json:"color,omitempty"`
 	Icon        *string            `json:"icon,omitempty"`
 	Description *string            `json:"description,omitempty"`
-	ParentID    *string            `json:"parentId,omitempty"` // 移动到新父工作组（空字符串表示移到根级）
+	ParentID    *string            `json:"parentId,omitempty"`    // 移动到新父工作组（空字符串表示移到根级）
+	Collapsed   *bool              `json:"collapsed,omitempty"`   // 默认折叠状态：true=默认折叠，false=默认展开
 	Tabs        []WorkspaceTabData `json:"tabs,omitempty"`
 }
 
@@ -98,6 +100,8 @@ type WorkspaceResponse struct {
 	Icon        string         `json:"icon"`
 	Description string         `json:"description"`
 	IsSystem    bool           `json:"isSystem"`
+	// Collapsed 默认折叠状态：true=默认折叠，false=默认展开
+	Collapsed   bool           `json:"collapsed"`
 	// SortOrder 同级排序序号（前端按 sortOrder 排序，同值时按名称回退）
 	SortOrder   int            `json:"sortOrder"`
 	Tabs        []TabReference `json:"tabs"`
@@ -321,6 +325,7 @@ func (s *WorkspaceService) Create(payload CreateWorkspacePayload) (*CreateResult
 		Color:       payload.Color,
 		Icon:        payload.Icon,
 		Description: payload.Description,
+		Collapsed:   payload.Collapsed,
 		SortOrder:   s.nextSiblingSortOrder(payload.ParentID),
 	}
 
@@ -361,6 +366,9 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 	}
 	if payload.Description != nil {
 		updates["description"] = *payload.Description
+	}
+	if payload.Collapsed != nil {
+		updates["collapsed"] = *payload.Collapsed
 	}
 	if payload.ParentID != nil {
 		updates["parent_id"] = *payload.ParentID
@@ -605,6 +613,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 				Color:       srcWS.Color,
 				Icon:        srcWS.Icon,
 				Description: srcWS.Description,
+				Collapsed:   srcWS.Collapsed,
 				SortOrder:   srcWS.SortOrder,
 				IsSystem:    false, // 副本始终是普通工作组
 			}
@@ -1128,6 +1137,7 @@ func toWorkspaceResponse(ws model.Workspace, includeTabs bool) WorkspaceResponse
 		Icon:        ws.Icon,
 		Description: ws.Description,
 		IsSystem:    ws.IsSystem,
+		Collapsed:   ws.Collapsed,
 		SortOrder:   ws.SortOrder,
 		Tabs:        tabs,
 		Tags:        workspaceTagsToResponses(ws.Tags),

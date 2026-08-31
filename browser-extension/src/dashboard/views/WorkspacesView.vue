@@ -32,7 +32,7 @@
         </div>
         <el-empty v-if="treeData.length === 0 && !loading" :image-size="60" description="暂无工作组" />
         <el-tree v-else ref="treeRef" :data="treeData" node-key="id" :props="treeProps" :filter-node-method="filterNode"
-          :expand-on-click-node="false" highlight-current default-expand-all
+          :expand-on-click-node="false" highlight-current :default-expanded-keys="defaultExpandedKeys"
           :draggable="!searchKeyword" :allow-drag="allowDragNode" :allow-drop="allowDropNode"
           @node-click="onSelectNode" @node-drop="onNodeDrop">
           <template #default="{ data }">
@@ -236,6 +236,13 @@
         <el-form-item label="标识色">
           <el-color-picker v-model="formData.color" color-format="hex" :predefine="presetColors"
             @active-change="onColorActiveChange" />
+        </el-form-item>
+        <el-form-item label="默认状态">
+          <el-radio-group v-model="formData.collapsed">
+            <el-radio :value="false">默认展开</el-radio>
+            <el-radio :value="true">默认折叠</el-radio>
+          </el-radio-group>
+          <span class="field-tip">决定该工作组在树形目录中的初始展开/收起状态</span>
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="formData.description" type="textarea" :rows="3" maxlength="500" show-word-limit
@@ -496,12 +503,40 @@ const formData = ref({
   color: DEFAULT_WORKSPACE_COLOR,
   description: '',
   parentId: '' as string,
+  collapsed: false,
 })
 
 const presetColors = [...TAG_COLOR_PALETTE]
 
 /** 左侧树数据 */
 const treeData = computed<WorkspaceTreeNode[]>(() => pinSystemGroups(buildWorkspaceTree(workspaces.value)))
+
+/** 树默认展开的工作组：未设置「默认折叠」（collapsed 非 true）且带子节点的节点，其余（默认折叠）初始收起 */
+const defaultExpandedKeys = computed<string[]>(() => {
+  const ids: string[] = []
+  const walk = (nodes: WorkspaceTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.children.length > 0 && !n.workspace.collapsed) ids.push(n.id)
+      walk(n.children)
+    }
+  }
+  walk(treeData.value)
+  return ids
+})
+
+// 树数据刷新后应用「默认折叠」：将设置了默认折叠的工作组收起（其余节点保持当前展开状态）
+watch(treeData, async () => {
+  await nextTick()
+  const tree = treeRef.value
+  if (!tree) return
+  const walk = (nodes: WorkspaceTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.children.length > 0 && n.workspace.collapsed) tree.getNode(n.id)?.collapse()
+      walk(n.children)
+    }
+  }
+  walk(treeData.value)
+})
 
 /** 父工作组选择器：编辑时禁用自身及后代，避免形成环 */
 const parentPickerVisible = ref(false)
@@ -836,7 +871,7 @@ function onColorActiveChange(color: string | null) {
 function showCreateDialog(parentId: string) {
   isEditing.value = false
   editingId.value = ''
-  formData.value = { name: '', color: DEFAULT_WORKSPACE_COLOR, description: '', parentId }
+  formData.value = { name: '', color: DEFAULT_WORKSPACE_COLOR, description: '', parentId, collapsed: false }
   dialogVisible.value = true
 }
 
@@ -848,6 +883,7 @@ function showEditDialog(ws: Workspace) {
     color: ws.color,
     description: ws.description || '',
     parentId: ws.parentId || '',
+    collapsed: ws.collapsed ?? false,
   }
   dialogVisible.value = true
 }
@@ -930,6 +966,7 @@ async function handleSave() {
         color: formData.value.color || '',
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
+        collapsed: formData.value.collapsed,
       },
     })
     if (res.success) ElMessage.success('工作组已更新')
@@ -943,6 +980,7 @@ async function handleSave() {
         color: formData.value.color || '',
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
+        collapsed: formData.value.collapsed,
       },
     })
     if (res.success) {
@@ -1528,6 +1566,13 @@ async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
   font-size: 12px;
   color: #909399;
   padding-left: 90px;
+}
+
+/* 默认状态表单项的补充说明文字 */
+.field-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 12px;
 }
 
 .parent-picker {

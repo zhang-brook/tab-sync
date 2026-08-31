@@ -20,6 +20,7 @@
           <el-descriptions-item label="描述">
             <span :class="{ 'props-muted': !data.description }">{{ data.description || '—' }}</span>
           </el-descriptions-item>
+          <el-descriptions-item label="默认状态">{{ data.collapsed ? '默认折叠' : '默认展开' }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ data.createdAt }}</el-descriptions-item>
           <el-descriptions-item label="修改时间">{{ data.updatedAt }}</el-descriptions-item>
           <el-descriptions-item label="标签页数">
@@ -77,6 +78,8 @@ interface WorkspaceProperties {
   description: string
   createdAt: string
   updatedAt: string
+  /** 默认折叠状态：true=默认折叠，false=默认展开 */
+  collapsed: boolean
   /** 当前工作组直接包含的标签页数 */
   tabCount: number
   /** 直接子工作组数量 */
@@ -136,6 +139,7 @@ async function load(ws: Workspace) {
     description: ws.description || '',
     createdAt: formatDateTime(ws.createdAt),
     updatedAt: formatDateTime(ws.updatedAt),
+    collapsed: ws.collapsed ?? false,
     tabCount: 0,
     childCount: props.workspaces.filter((w) => w.parentId === ws.id).length,
     descendantTabCount: 0,

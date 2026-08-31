@@ -100,12 +100,12 @@ export interface WorkspaceTabPayload {
 export interface CreateWorkspaceMessage {
   action: 'CREATE_WORKSPACE'
   /** 创建时不携带标签页；标签页通过 UPDATE_WORKSPACE / ADD_TABS_TO_WORKSPACE 添加 */
-  payload: { name: string; color: string; icon?: string; description?: string; parentId?: string }
+  payload: { name: string; color: string; icon?: string; description?: string; parentId?: string; collapsed?: boolean }
 }
 
 export interface UpdateWorkspaceMessage {
   action: 'UPDATE_WORKSPACE'
-  payload: { id: string; name?: string; color?: string; icon?: string; description?: string; parentId?: string; tabs?: WorkspaceTabPayload[] }
+  payload: { id: string; name?: string; color?: string; icon?: string; description?: string; parentId?: string; collapsed?: boolean; tabs?: WorkspaceTabPayload[] }
 }
 
 /** 移动工作组到参照节点的指定落点（左侧工作组树拖拽调整层级/顺序） */

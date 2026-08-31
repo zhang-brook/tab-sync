@@ -73,6 +73,7 @@ type Workspace struct {
 	Icon        string `gorm:"size:50"`
 	Description string `gorm:"size:500" json:"description"` // 工作组描述
 	SortOrder   int    `gorm:"default:0"`                   // 排序序号
+	Collapsed   bool   `gorm:"default:false"`               // 默认折叠状态：true=默认折叠，false=默认展开
 	IsDeleted   bool   `gorm:"default:false"`
 	IsSystem    bool   `gorm:"default:false"` // 系统工作组（如「未分组」），不可在前端管理界面删除
 	CreatedAt   time.Time

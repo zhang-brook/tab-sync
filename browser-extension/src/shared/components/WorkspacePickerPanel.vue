@@ -28,7 +28,7 @@
         :props="treeProps"
         :filter-node-method="filterNode"
         :expand-on-click-node="false"
-        default-expand-all
+        :default-expanded-keys="defaultExpandedKeys"
         highlight-current
         @node-click="onNodeClick"
       >
@@ -155,6 +155,33 @@ const { confirmDeleteWorkspace } = useWorkspaceActions()
 const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
 const treeProps = { label: 'name', children: 'children' }
+
+/** 树默认展开的工作组：未设置「默认折叠」（collapsed 非 true）且带子节点的节点，其余（默认折叠）初始收起 */
+const defaultExpandedKeys = computed<string[]>(() => {
+  const ids: string[] = []
+  const walk = (nodes: WorkspaceTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.children.length > 0 && !n.workspace.collapsed) ids.push(n.id)
+      walk(n.children)
+    }
+  }
+  walk(treeData.value)
+  return ids
+})
+
+// 树数据刷新后应用「默认折叠」：将设置了默认折叠的工作组收起（其余节点保持当前展开状态）
+watch(treeData, async () => {
+  await nextTick()
+  const tree = treeRef.value
+  if (!tree) return
+  const walk = (nodes: WorkspaceTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.children.length > 0 && n.workspace.collapsed) tree.getNode(n.id)?.collapse()
+      walk(n.children)
+    }
+  }
+  walk(treeData.value)
+})
 
 watch(keyword, (val) => {
   treeRef.value?.filter(val)
