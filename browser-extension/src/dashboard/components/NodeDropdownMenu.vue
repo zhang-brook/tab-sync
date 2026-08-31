@@ -15,6 +15,9 @@
     <el-dropdown-item :command="'edit'" :icon="Edit" :disabled="data.workspace?.isSystem" divided>
       编辑
     </el-dropdown-item>
+    <el-dropdown-item :command="'tag'" :icon="PriceTag">
+      设置标签
+    </el-dropdown-item>
     <el-dropdown-item :command="'createChild'" :icon="FolderAdd">
       新建子工作组
     </el-dropdown-item>
@@ -46,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files, InfoFilled, Expand, Fold } from '@element-plus/icons-vue'
+import { FolderOpened, CopyDocument, Collection, FolderAdd, Edit, Delete, Star, DocumentCopy, Files, InfoFilled, Expand, Fold, PriceTag } from '@element-plus/icons-vue'
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 
 defineProps<{

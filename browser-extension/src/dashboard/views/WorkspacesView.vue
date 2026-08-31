@@ -960,6 +960,9 @@ function onNodeMenuCommand(command: string, node: WorkspaceTreeNode) {
     case 'edit':
       showEditDialog(ws)
       break
+    case 'tag':
+      openWorkspaceTagEditor(ws)
+      break
     case 'delete':
       handleDelete(ws)
       break
