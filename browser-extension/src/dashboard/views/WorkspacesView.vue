@@ -34,7 +34,7 @@
         <el-tree v-else ref="treeRef" :data="treeData" node-key="id" :props="treeProps" :filter-node-method="filterNode"
           :expand-on-click-node="false" highlight-current :default-expanded-keys="defaultExpandedKeys"
           :draggable="!searchKeyword" :allow-drag="allowDragNode" :allow-drop="allowDropNode"
-          @node-click="onSelectNode" @node-drop="onNodeDrop">
+          @node-click="onSelectNode" @node-expand="onNodeExpand" @node-drop="onNodeDrop">
           <template #default="{ data }">
             <ContextMenu @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @open="() => onNodeContextMenu(data)">
               <span class="tree-node">
@@ -530,16 +530,19 @@ const presetColors = [...TAG_COLOR_PALETTE]
 /** 左侧树数据 */
 const treeData = computed<WorkspaceTreeNode[]>(() => pinSystemGroups(buildWorkspaceTree(workspaces.value)))
 
-/** 树默认展开的工作组：未设置「默认折叠」（collapsed 非 true）且带子节点的节点，其余（默认折叠）初始收起 */
+/** 树默认展开的工作组：未设置「默认折叠」（collapsed 非 true）且带子节点的节点。
+ *  处于默认折叠节点后代的节点不加入：父收起时不可见，且加入会触发 el-tree 的
+ *  autoExpandParent 连带展开折叠祖先，导致首次渲染「先展开再收起」的闪烁 */
 const defaultExpandedKeys = computed<string[]>(() => {
   const ids: string[] = []
-  const walk = (nodes: WorkspaceTreeNode[]) => {
+  const walk = (nodes: WorkspaceTreeNode[], collapsedAncestor: boolean) => {
     for (const n of nodes) {
-      if (n.children.length > 0 && !n.workspace.collapsed) ids.push(n.id)
-      walk(n.children)
+      const collapsed = !!n.workspace.collapsed
+      if (n.children.length > 0 && !collapsed && !collapsedAncestor) ids.push(n.id)
+      walk(n.children, collapsedAncestor || collapsed)
     }
   }
-  walk(treeData.value)
+  walk(treeData.value, false)
   return ids
 })
 
@@ -556,6 +559,22 @@ watch(treeData, async () => {
   }
   walk(treeData.value)
 })
+
+/**
+ * 展开工作组节点时，将其后代中「默认展开」的节点同步展开：
+ * defaultExpandedKeys 为规避首帧闪烁排除了折叠节点的后代，节点展开后
+ * 这些默认展开的后代应恢复为展开态（编程 expand 不触发 node-expand 事件，不会递归）
+ */
+function onNodeExpand(_data: WorkspaceTreeNode, node: any) {
+  const walk = (n: any) => {
+    for (const child of n.childNodes ?? []) {
+      const ws = child.data?.workspace
+      if (child.childNodes?.length > 0 && !child.expanded && !ws?.collapsed) child.expand()
+      walk(child)
+    }
+  }
+  walk(node)
+}
 
 /** 父工作组选择器：编辑时禁用自身及后代，避免形成环 */
 const parentPickerVisible = ref(false)
