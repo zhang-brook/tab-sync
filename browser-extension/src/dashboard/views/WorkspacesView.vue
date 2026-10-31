@@ -303,7 +303,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
 import TabList, { type TabListItem, type TabListSortEvent, type TabTagDisplay } from '@/shared/components/TabList.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
@@ -337,11 +337,13 @@ import {
   removeWorkspaceTab,
   removeWorkspaceTag,
   reportServiceError,
+  UNGROUPED_WORKSPACE_ID,
   updateWorkspace,
 } from '@/shared/services'
 import type { Workspace, TabReference, TagInfo } from '@/shared/types'
 
 const route = useRoute()
+const router = useRouter()
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -647,6 +649,30 @@ const routeWorkspaceId = computed(() => {
   return typeof v === 'string' ? v : ''
 })
 
+/** 选中项同步到 URL query：刷新或复制链接后可恢复到同一工作组。
+ *  「未分组」是默认落点，选中它时不带该参数 */
+function syncSelectedToQuery(id: string) {
+  const next = id === UNGROUPED_WORKSPACE_ID ? '' : id
+  const current = typeof route.query.workspaceId === 'string' ? route.query.workspaceId : ''
+  if (next === current) return
+  const query = { ...route.query }
+  if (next) query.workspaceId = next
+  else delete query.workspaceId
+  void router.replace({ query })
+}
+
+/** 定位并展开选中节点：从 URL 恢复选中项时，保证其祖先与自身展开可见 */
+async function revealSelected(id: string) {
+  await nextTick()
+  const tree = treeRef.value
+  const node = tree?.getNode(id)
+  if (!tree || !node) return
+  // setCurrentKey 默认会连带展开所有祖先节点
+  tree.setCurrentKey(id)
+  // 选中项自身默认展开（设置过「默认折叠」的工作组被选中时同样展开）
+  if (node.childNodes?.length > 0) node.expand()
+}
+
 /** 是否已完成首次加载：首次加载优先定位路由指定分组，其次默认分组 */
 let initialized = false
 
@@ -674,7 +700,7 @@ async function loadWorkspaces(options: { silent?: boolean } = {}) {
     selectedId.value = workspaces.value[0]?.id ?? ''
   }
   await nextTick()
-  if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
+  if (selectedId.value) await revealSelected(selectedId.value)
   // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
   if (selectedId.value) {
     const isAll = tabScope.value === 'all'
@@ -685,10 +711,19 @@ async function loadWorkspaces(options: { silent?: boolean } = {}) {
 
 // 从其他页面带 workspaceId 跳转进来（同一路由仅 query 变化）时定位到目标工作组
 watch(routeWorkspaceId, (id) => {
-  if (id && workspaces.value.some((w) => w.id === id)) {
-    selectedId.value = id
-    void nextTick(() => treeRef.value?.setCurrentKey(id))
+  if (!id || !workspaces.value.some((w) => w.id === id)) return
+  if (id === selectedId.value) {
+    // 选中未分组时不保留参数（外部带入了同样的值）
+    syncSelectedToQuery(id)
+    return
   }
+  selectedId.value = id
+  void revealSelected(id)
+})
+
+// 选中项同步到 URL，保证刷新后能恢复到同一工作组（「未分组」不写入，见 syncSelectedToQuery）
+watch(selectedId, (id) => {
+  syncSelectedToQuery(id)
 })
 
 // ============ 标签相关 ============
