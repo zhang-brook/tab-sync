@@ -76,6 +76,7 @@
           v-for="item in items"
           :key="item.id"
           class="recycle-item"
+          :class="{ 'is-selected': selectedIds.includes(item.id) }"
           @click="onRowClick(item, $event)"
         >
           <el-checkbox
@@ -505,6 +506,11 @@ async function handleEmpty() {
 
 .recycle-item:hover {
   background: #f5f7fa;
+}
+
+.recycle-item.is-selected,
+.recycle-item.is-selected:hover {
+  background: var(--el-color-primary-light-9);
 }
 
 .item-check {
