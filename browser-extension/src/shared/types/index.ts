@@ -13,6 +13,7 @@ export type {
   SyncedTabItem,
   SyncedTabPageData,
   DevicesData,
+  DashboardStatsData,
   WorkspaceTabPayload,
   AddTabsToWorkspaceMessage,
   WorkspaceTabsSummaryData,

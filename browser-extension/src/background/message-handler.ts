@@ -1,9 +1,10 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, DashboardStatsData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getServerVersion } from '../shared/api/auth'
 import { verifyTokenCandidate } from '../shared/api/token-verify'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
+import { getDashboardStats } from '../shared/api/stats'
 import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, copyWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTabs, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
@@ -133,6 +134,9 @@ async function dispatchMessage(message: ExtensionMessage): Promise<MessageRespon
 
     case 'GET_DEVICES':
       return handleGetDevices()
+
+    case 'GET_DASHBOARD_STATS':
+      return handleGetDashboardStats()
 
     case 'DEREGISTER_DEVICE':
       return handleDeregisterDevice(message.payload.deviceId)
@@ -780,6 +784,20 @@ async function handleGetDevices(): Promise<MessageResponse<DevicesData>> {
     success: true,
     data: { devices: [currentDevice] },
   }
+}
+
+/** 管理面板概览统计：只需数量，由后端聚合返回，不拉取设备/工作组/标签列表 */
+async function handleGetDashboardStats(): Promise<MessageResponse<DashboardStatsData>> {
+  const token = await storage.get(STORAGE_KEYS.AUTH_TOKEN)
+  if (token) {
+    const res = await getDashboardStats()
+    if (res.ok && res.data) {
+      return { success: true, data: res.data }
+    }
+    logger.warn('getDashboardStats API failed:', res.error)
+  }
+  // 未登录或后端不可用：与概览页「仅本地数据」状态一致，仅统计当前设备
+  return { success: true, data: { devices: 1, workspaces: 0, tags: 0, workspaceTabs: 0 } }
 }
 
 /** 远程注销指定设备（踢下线） */

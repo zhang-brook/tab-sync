@@ -24,6 +24,7 @@ export type MessageAction =
   | 'REMOVE_WORKSPACE_TAB'
   | 'OPEN_DASHBOARD'
   | 'GET_DEVICES'
+  | 'GET_DASHBOARD_STATS'
   | 'DEREGISTER_DEVICE'
   | 'GET_WORKSPACE_TABS_SUMMARY'
   | 'CHECK_VERSION'
@@ -86,6 +87,11 @@ export interface GetWorkspaceTabsMessage {
 export interface GetSyncedTabsMessage {
   action: 'GET_SYNCED_TABS'
   payload: { page?: number; pageSize?: number; keyword?: string; includeSystem?: boolean }
+}
+
+/** 管理面板概览统计（后端聚合数量，不返回列表） */
+export interface GetDashboardStatsMessage {
+  action: 'GET_DASHBOARD_STATS'
 }
 
 /** 标签页数据（前端传给后端创建工作组的标签页信息） */
@@ -367,6 +373,7 @@ export type ExtensionMessage =
   | RemoveWorkspaceTabMessage
   | OpenDashboardMessage
   | GetDevicesMessage
+  | GetDashboardStatsMessage
   | DeregisterDeviceMessage
   | GetWorkspaceTabsSummaryMessage
   | GetTagsMessage
@@ -453,6 +460,14 @@ export interface SyncedTabPageData {
 /** GET_DEVICES 响应数据 */
 export interface DevicesData {
   devices: Device[]
+}
+
+/** GET_DASHBOARD_STATS 响应数据 */
+export interface DashboardStatsData {
+  devices: number
+  workspaces: number
+  tags: number
+  workspaceTabs: number
 }
 
 /** GET_WORKSPACE_TABS_SUMMARY 响应数据 */

@@ -89,7 +89,7 @@ import {
   Refresh,
 } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
-import type { StateData, DevicesData, WorkspacesData, TagsData } from '@/shared/types'
+import type { StateData, DashboardStatsData } from '@/shared/types'
 
 interface DashboardStats {
   devices: number
@@ -136,26 +136,23 @@ function formatTime(iso: string): string {
 
 async function loadStats() {
   loading.value = true
-  const [stateRes, devicesRes, workspacesRes, tagsRes] = await Promise.all([
+  const [stateRes, statsRes] = await Promise.all([
     sendMessage<StateData>({ action: 'GET_STATE' }),
-    sendMessage<DevicesData>({ action: 'GET_DEVICES' }),
-    sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES' }),
-    sendMessage<TagsData>({ action: 'GET_TAGS' }),
+    // 设备/工作组/标签/工作组内标签页数量由后端聚合接口一次返回，无需拉取列表
+    sendMessage<DashboardStatsData>({ action: 'GET_DASHBOARD_STATS' }),
   ])
 
-  const devices = devicesRes.success ? devicesRes.data?.devices ?? [] : []
-  const workspaces = workspacesRes.success ? workspacesRes.data?.workspaces ?? [] : []
-  const tags = tagsRes.success ? tagsRes.data?.tags ?? [] : []
+  const dashboardStats = statsRes.success ? statsRes.data : undefined
   const tabCount = stateRes.success ? stateRes.data?.tabCount ?? { open: 0, frozen: 0 } : { open: 0, frozen: 0 }
   const authenticated = stateRes.success ? stateRes.data?.auth?.authenticated ?? false : false
 
   stats.value = {
-    devices: devices.length,
-    workspaces: workspaces.length,
-    tags: tags.length,
+    devices: dashboardStats?.devices ?? 0,
+    workspaces: dashboardStats?.workspaces ?? 0,
+    tags: dashboardStats?.tags ?? 0,
     openTabs: tabCount.open,
     frozenTabs: tabCount.frozen,
-    workspaceTabs: workspaces.reduce((sum, w) => sum + (w.tabs?.length ?? 0), 0),
+    workspaceTabs: dashboardStats?.workspaceTabs ?? 0,
     authenticated,
   }
   updatedAt.value = formatTime(new Date().toISOString())
