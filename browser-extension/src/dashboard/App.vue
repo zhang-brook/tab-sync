@@ -68,38 +68,39 @@
             </el-text>
           </template>
         </div>
-        <div v-if="authenticated" class="header-right">
-          <el-button type="danger" size="small" text @click="handleLogout">
+        <div class="header-right">
+          <el-button v-if="authenticated" type="danger" size="small" text @click="handleLogout">
             <el-icon><SwitchButton /></el-icon>
             退出登录
           </el-button>
+          <el-button v-else type="primary" size="small" text @click="openSidePanel">
+            <el-icon><Key /></el-icon>
+            登录
+          </el-button>
         </div>
       </el-header>
-      <el-main class="dashboard-main">
-        <router-view />
+      <el-main class="dashboard-main" :class="{ 'dashboard-main--gated': authBlocked }">
+        <router-view v-if="!authBlocked" />
+        <!-- 未登录时仅放行设置页（Token 输入即面板内的登录入口），其他板块在主内容区提示 -->
+        <div v-else class="auth-gate-card">
+          <el-icon :size="48" color="#f56c6c"><WarningFilled /></el-icon>
+          <h2>需要登录</h2>
+          <p>未登录或登录已过期，该板块需连接同步服务后使用</p>
+          <el-button @click="goToSettings">前往设置</el-button>
+          <el-button type="primary" @click="openSidePanel">打开侧边栏登录</el-button>
+        </div>
       </el-main>
     </el-container>
   </el-container>
-
-  <!-- 登录过期遮罩 -->
-  <div v-if="!authenticated" class="auth-overlay">
-    <div class="auth-overlay-card">
-      <el-icon :size="48" color="#f56c6c"><WarningFilled /></el-icon>
-      <h2>登录已过期</h2>
-      <p>请通过扩展侧边栏重新登录后再继续使用</p>
-      <el-button type="primary" @click="openSidePanel">重新登录</el-button>
-      <el-button text @click="retryCheckAuth">我已登录</el-button>
-    </div>
-  </div>
 
   <EntityTooltipHost />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
+import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete, Key } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { ENTITY_NAVIGATION } from '@/shared/composables/entity-navigation'
 import EntityTooltipHost from '@/shared/components/EntityTooltipHost.vue'
@@ -115,7 +116,7 @@ provide(ENTITY_NAVIGATION, (target) => {
   void router.push(dashboardTargetRoute(target))
 })
 
-const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
+const authenticated = ref(true) // 默认假定已登录，避免首帧闪现未登录提示
 
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
@@ -131,13 +132,27 @@ const pageTitleMap: Record<string, string> = {
 const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => pageTitleMap[route.path] || '本地标签页')
 
+/** 不依赖登录态、未登录也可访问的板块 */
+const AUTH_FREE_ROUTES = new Set(['/settings', '/tabs'])
+
+/** 未登录时仅设置与本地标签页可用，其余板块由主内容区提示替代渲染 */
+const authBlocked = computed(() => !authenticated.value && !AUTH_FREE_ROUTES.has(route.path))
+
+// 登录态失效后自动落到设置页，避免用户被锁在受限板块；本身免登录的板块保持原地址
+watch(authenticated, (value) => {
+  if (!value && !AUTH_FREE_ROUTES.has(route.path)) {
+    void router.replace('/settings')
+  }
+})
+
 /** 从路由 meta 中读取当前页面的数据来源标识 */
 const dataSource = computed(() => route.meta.dataSource ?? null)
 
-// 监听 storage 变化，检测 token 被清除
+// 登录（侧边栏或设置页）与注销都会写入 Token，统一按新值刷新登录态
 function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
-  if (changes[STORAGE_KEYS.AUTH_TOKEN] && !changes[STORAGE_KEYS.AUTH_TOKEN].newValue) {
-    authenticated.value = false
+  const tokenChange = changes[STORAGE_KEYS.AUTH_TOKEN]
+  if (tokenChange) {
+    authenticated.value = !!tokenChange.newValue
   }
 }
 
@@ -157,29 +172,39 @@ async function handleLogout() {
     return // 用户取消
   }
   await sendMessage({ action: 'LOGOUT' })
-  // 页面将被关闭，所以短期内暂不更新状态，避免页面闪现登录态过期弹窗
-  setTimeout(() => {
-    authenticated.value = false
-  }, 1000)
+  // 登录态由 storage 监听自动刷新，失效后会落到设置页，无需关闭管理面板
   ElMessage.success('已退出登录')
+}
 
-  // 关闭当前后台管理页面，用户可通过侧边栏重新登录
-  window.close()
+/** 登录入口：直达设置页的云端设置（API 地址与 Token 输入即面板内的登录表单） */
+function goToSettings() {
+  void router.push({ path: '/settings', query: { tab: 'cloud' } })
 }
 
 /** 打开侧边栏以便重新登录（扩展未配置 popup，登录入口在侧边栏） */
 async function openSidePanel() {
   try {
-    const win = await chrome.windows.getCurrent()
+    const getContexts = chrome.runtime.getContexts?.bind(chrome.runtime)
+    const [win, contexts] = await Promise.all([
+      chrome.windows.getCurrent(),
+      getContexts ? getContexts({ contextTypes: ['SIDE_PANEL'] }) : Promise.resolve([]),
+    ])
+    // 侧边栏已打开时 open() 不会再产生可见效果，改为提示用户直接在侧栏登录
+    if (contexts.length > 0) {
+      ElMessage.info('侧边栏已打开，请在侧边栏中登录')
+      return
+    }
     await chrome.sidePanel.open({ windowId: win.id! })
   } catch {
     ElMessage.info('请点击浏览器工具栏中的扩展图标打开侧边栏登录')
   }
 }
 
-onMounted(() => {
-  retryCheckAuth()
+onMounted(async () => {
   chrome.storage.onChanged.addListener(handleStorageChange)
+  // 先等路由就绪再检查登录态：初始 route.path 尚未解析时会被误判为受限页面，导致当前地址被重定向掉
+  await router.isReady()
+  retryCheckAuth()
 })
 
 onUnmounted(() => {
@@ -362,39 +387,35 @@ html, body, #app {
   background-color: #f5f7fa;
 }
 
-/* 登录过期遮罩 */
-.auth-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(20, 27, 46, 0.55);
+/* 登录过期提示：只占主内容区，侧边栏保持可操作 */
+.dashboard-main--gated {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
 }
 
-.auth-overlay-card {
+.auth-gate-card {
   background: #fff;
   border-radius: 16px;
   padding: 48px;
   text-align: center;
   max-width: 400px;
-  box-shadow: 0 12px 40px rgba(20, 27, 46, 0.25);
+  box-shadow: 0 12px 40px rgba(20, 27, 46, 0.12);
 }
 
-.auth-overlay-card h2 {
+.auth-gate-card h2 {
   margin: 16px 0 8px;
   font-size: 20px;
   color: #1f2a44;
 }
 
-.auth-overlay-card p {
+.auth-gate-card p {
   margin: 0 0 24px;
   font-size: 14px;
   color: #909399;
 }
 
-.auth-overlay-card .el-button {
+.auth-gate-card .el-button {
   margin: 0 8px;
 }
 </style>
