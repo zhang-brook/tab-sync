@@ -1,210 +1,233 @@
 <template>
   <div class="settings-view">
-    <!-- 认证状态 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">认证管理</span>
-      </template>
-
-      <el-form label-width="120px" label-position="left">
-        <!-- 连接模式 -->
-        <el-form-item label="连接模式">
-          <el-radio-group v-model="connectionMode" @change="handleModeChange">
-            <el-radio value="lightweight">轻量后端 (tab-sync-server)</el-radio>
-            <el-radio value="zhige">织个网 (预留)</el-radio>
-          </el-radio-group>
-          <div class="form-tip">
-            {{ connectionMode === 'lightweight'
-              ? '连接自建轻量后端，手动输入 API Token 认证'
-              : '连接织个网云端服务（暂未开放）' }}
-          </div>
-        </el-form-item>
-
-        <!-- API 地址（仅轻量后端模式） -->
-        <el-form-item v-if="connectionMode === 'lightweight'" label="API 地址">
-          <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable @blur="saveApiBaseUrl" />
-          <div class="form-tip">
-            轻量后端的 API 地址，通常为 http://localhost:8080
-            <el-button v-if="connectionMode === 'lightweight' && apiBaseUrl" size="small" @click="checkVersion" :loading="versionChecking" style="margin-left: 8px">
-              检测版本
-            </el-button>
-          </div>
-        </el-form-item>
-
-        <!-- Token 管理 -->
-        <el-form-item label="API Token">
-          <el-input
-            v-model="tokenInput"
-            placeholder="粘贴从管理后台获取的 API Token"
-            type="password"
-            show-password
-            clearable
-          >
-            <template #append>
-              <el-button @click="handleSetToken" :loading="tokenChecking">
-                {{ authStatus === 'authenticated' ? '更换' : '设置' }}
-              </el-button>
+    <el-tabs v-model="activeTab" class="settings-tabs">
+      <!-- 扩展设置: 扩展管理 + 快捷键 -->
+      <el-tab-pane label="扩展设置" name="extension">
+        <div class="settings-pane">
+          <!-- 扩展管理 -->
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">扩展管理</span>
             </template>
-          </el-input>
-          <div class="form-tip">
-            Token 在轻量后端管理后台生成（首次运行后访问 /setup 初始化）
-          </div>
-        </el-form-item>
+            <el-form label-width="96px" label-position="left">
+              <el-form-item label="重新加载">
+                <el-button size="small" type="primary" @click="reloadExtension">重新加载扩展</el-button>
+                <div class="form-tip">修改快捷键后点击此按钮重新加载扩展使新按键立即生效（等同于 chrome://extensions 页面的「重新加载」）</div>
+              </el-form-item>
+            </el-form>
+          </el-card>
 
-        <!-- 认证状态 -->
-        <el-form-item label="连接状态">
-          <el-tag v-if="authStatus === 'authenticated'" type="success">已认证</el-tag>
-          <el-tag v-else-if="authStatus === 'checking'" type="warning">验证中...</el-tag>
-          <el-tag v-else type="info">未认证</el-tag>
-          <el-button v-if="authStatus === 'authenticated'" size="small" type="danger" @click="handleLogout" style="margin-left: 8px">
-            注销
-          </el-button>
-        </el-form-item>
-        </el-form>
-    </el-card>
+          <!-- 快捷键 -->
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">快捷键</span>
+            </template>
 
-    <!-- 快捷键 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">快捷键</span>
-      </template>
+            <el-form label-width="120px" label-position="left">
+              <!-- 加载中占位 -->
+              <el-skeleton v-if="shortcutsLoading" :rows="5" animated />
 
-      <el-form label-width="120px" label-position="left">
-        <!-- 加载中占位 -->
-        <el-skeleton v-if="shortcutsLoading" :rows="5" animated />
+              <template v-else>
+                <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
+                <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label" label-width="170px">
+                  <div class="shortcut-row">
+                    <span class="shortcut-key">
+                      <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
+                      <template v-else>未设置快捷键</template>
 
-        <template v-else>
-          <!-- 按键从 chrome.commands.getAll() 动态读取，反映用户手动绑定后的最新按键 -->
-          <el-form-item v-for="sc in shortcuts" :key="sc.id" :label="sc.label" label-width="170px">
-            <div class="shortcut-row">
-              <span class="shortcut-key">
-                <template v-if="sc.shortcut">{{ sc.shortcut }}</template>
-                <template v-else>未设置快捷键</template>
+                      <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
+                      <span v-else class="shortcut-text shortcut-default">(默认)</span>
 
-                <span v-if="sc.modified" class="shortcut-text shortcut-modified">(已修改)</span>
-                <span v-else class="shortcut-text shortcut-default">(默认)</span>
+                      <el-button link type="primary" size="small" @click="openShortcutsPage" style="margin-left: 5px">
+                        {{ sc.shortcut ? '前往修改' : '前往设置' }}
+                      </el-button>
+                    </span>
+                    <div class="form-tip">
+                      {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default || '无快捷键' }}）</template>
+                    </div>
+                  </div>
+                </el-form-item>
+              </template>
+              <el-form-item label="启用快捷键">
+                <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
+                <div class="form-tip">关闭后「加入并关闭」快捷键将不再触发收藏</div>
+              </el-form-item>
+              <el-form-item label="默认工作组">
+                <div class="ws-picker-row">
+                  <span class="ws-current">{{ defaultWorkspaceName }}</span>
+                  <el-button size="small" @click="defaultPickerVisible = true">修改</el-button>
+                </div>
+                <div class="form-tip">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
+              </el-form-item>
+              <el-form-item>
+                <el-button size="small" @click="openShortcutsPage">打开 Chrome 快捷键设置页</el-button>
+                <div class="form-tip">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
+                <div class="form-tip" v-if="true/* Chrome 浏览器 */">
+                  Chrome 修改快捷键后，需<el-link type="primary" size="small" style="font-size: inherit; vertical-align: baseline;" underline="never" @click="reloadExtension">
+                    重新加载扩展
+                  </el-link>后生效
+                </div>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
 
-                <el-button link type="primary" size="small" @click="openShortcutsPage" style="margin-left: 5px">
-                  {{ sc.shortcut ? '前往修改' : '前往设置' }}
+      <!-- 云端设置: 认证管理 + 服务端信息 + 当前设备 -->
+      <el-tab-pane label="云端设置" name="cloud">
+        <div class="settings-pane">
+          <!-- 认证状态 -->
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">认证管理</span>
+            </template>
+
+            <el-form label-width="120px" label-position="left">
+              <!-- 连接模式 -->
+              <el-form-item label="连接模式">
+                <el-radio-group v-model="connectionMode" @change="handleModeChange">
+                  <el-radio value="lightweight">轻量后端 (tab-sync-server)</el-radio>
+                  <el-radio value="zhige">织个网 (预留)</el-radio>
+                </el-radio-group>
+                <div class="form-tip">
+                  {{ connectionMode === 'lightweight'
+                    ? '连接自建轻量后端，手动输入 API Token 认证'
+                    : '连接织个网云端服务（暂未开放）' }}
+                </div>
+              </el-form-item>
+
+              <!-- API 地址（仅轻量后端模式） -->
+              <el-form-item v-if="connectionMode === 'lightweight'" label="API 地址">
+                <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable @blur="saveApiBaseUrl" />
+                <div class="form-tip">
+                  轻量后端的 API 地址，通常为 http://localhost:8080
+                  <el-button v-if="connectionMode === 'lightweight' && apiBaseUrl" size="small" @click="checkVersion" :loading="versionChecking" style="margin-left: 8px">
+                    检测版本
+                  </el-button>
+                </div>
+              </el-form-item>
+
+              <!-- Token 管理 -->
+              <el-form-item label="API Token">
+                <el-input
+                  v-model="tokenInput"
+                  placeholder="粘贴从管理后台获取的 API Token"
+                  type="password"
+                  show-password
+                  clearable
+                >
+                  <template #append>
+                    <el-button @click="handleSetToken" :loading="tokenChecking">
+                      {{ authStatus === 'authenticated' ? '更换' : '设置' }}
+                    </el-button>
+                  </template>
+                </el-input>
+                <div class="form-tip">
+                  Token 在轻量后端管理后台生成（首次运行后访问 /setup 初始化）
+                </div>
+              </el-form-item>
+
+              <!-- 认证状态 -->
+              <el-form-item label="连接状态">
+                <el-tag v-if="authStatus === 'authenticated'" type="success">已认证</el-tag>
+                <el-tag v-else-if="authStatus === 'checking'" type="warning">验证中...</el-tag>
+                <el-tag v-else type="info">未认证</el-tag>
+                <el-button v-if="authStatus === 'authenticated'" size="small" type="danger" @click="handleLogout" style="margin-left: 8px">
+                  注销
                 </el-button>
-              </span>
-              <div class="form-tip">
-                {{ sc.description }}<template v-if="sc.modified">（默认：{{ sc.default || '无快捷键' }}）</template>
-              </div>
-            </div>
-          </el-form-item>
-        </template>
-        <el-form-item label="启用快捷键">
-          <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
-          <div class="form-tip">关闭后「加入并关闭」快捷键将不再触发收藏</div>
-        </el-form-item>
-        <el-form-item label="默认工作组">
-          <div class="ws-picker-row">
-            <span class="ws-current">{{ defaultWorkspaceName }}</span>
-            <el-button size="small" @click="defaultPickerVisible = true">修改</el-button>
-          </div>
-          <div class="form-tip">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
-        </el-form-item>
-        <el-form-item>
-          <el-button size="small" @click="openShortcutsPage">打开 Chrome 快捷键设置页</el-button>
-          <div class="form-tip">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
-          <div class="form-tip" v-if="true/* Chrome 浏览器 */">
-            Chrome 修改快捷键后，需<el-link type="primary" size="small" style="font-size: inherit; vertical-align: baseline;" underline="never" @click="reloadExtension">
-              重新加载扩展
-            </el-link>后生效
-          </div>
-        </el-form-item>
-      </el-form>
-    </el-card>
+              </el-form-item>
+            </el-form>
+          </el-card>
 
-    <!-- 扩展管理 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">扩展管理</span>
-      </template>
-      <el-form label-width="96px" label-position="left">
-        <el-form-item label="重新加载">
-          <el-button size="small" type="primary" @click="reloadExtension">重新加载扩展</el-button>
-          <div class="form-tip">修改快捷键后点击此按钮重新加载扩展使新按键立即生效（等同于 chrome://extensions 页面的「重新加载」）</div>
-        </el-form-item>
-      </el-form>
-    </el-card>
+          <!-- 版本协商 -->
+          <el-card v-if="versionInfo" shadow="never">
+            <template #header>
+              <span class="card-title">服务端信息</span>
+            </template>
 
-    <!-- 版本协商 -->
-    <el-card v-if="versionInfo" shadow="never">
-      <template #header>
-        <span class="card-title">服务端信息</span>
-      </template>
+            <el-form label-width="120px" label-position="left">
+              <el-form-item label="API 地址">
+                <span class="mono-text">{{ apiBaseUrl || '--' }}</span>
+              </el-form-item>
+              <el-form-item label="服务器版本">
+                <span>{{ versionInfo.serverVersion ?? '--' }}</span>
+              </el-form-item>
+              <el-form-item label="兼容版本范围">
+                <span>{{ versionInfo.minExtVersion ?? '--' }} ~ {{ versionInfo.maxExtVersion ?? '--' }}</span>
+                <div class="form-tip" style="width: 100%">当前服务器支持的扩展版本区间，扩展版本落在此范围内才可用</div>
+              </el-form-item>
+              <el-form-item label="版本兼容性">
+                <el-tag v-if="versionInfo.compatible" type="success">兼容</el-tag>
+                <el-tag v-else type="danger">不兼容</el-tag>
+                <span class="form-tip" style="margin-left: 8px">当前扩展版本 {{ extensionVersion }}</span>
+                <span v-if="!versionInfo.compatible && versionInfo.reason" class="form-tip" style="margin-left: 8px">
+                  {{ versionInfo.reason }}
+                </span>
+              </el-form-item>
+            </el-form>
+          </el-card>
 
-      <el-form label-width="120px" label-position="left">
-        <el-form-item label="服务器版本">
-          <span>{{ versionInfo.serverVersion ?? '--' }}</span>
-        </el-form-item>
-        <el-form-item label="兼容版本范围">
-          <span>{{ versionInfo.minExtVersion ?? '--' }} ~ {{ versionInfo.maxExtVersion ?? '--' }}</span>
-        </el-form-item>
-        <el-form-item label="版本兼容性">
-          <el-tag v-if="versionInfo.compatible" type="success">兼容</el-tag>
-          <el-tag v-else type="danger">不兼容</el-tag>
-          <span v-if="!versionInfo.compatible && versionInfo.reason" class="form-tip" style="margin-left: 8px">
-            {{ versionInfo.reason }}
-          </span>
-        </el-form-item>
-      </el-form>
-    </el-card>
+          <!-- 设备信息 -->
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">当前设备</span>
+            </template>
 
-    <!-- 设备信息 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">当前设备</span>
-      </template>
+            <el-form label-width="120px" label-position="left">
+              <el-form-item label="设备 ID">
+                <span class="device-id-text">{{ deviceId }}</span>
+                <el-button link type="primary" size="small" @click="copyDeviceId" style="margin-left: 8px">复制</el-button>
+              </el-form-item>
+              <el-form-item label="设备名称">
+                <span>{{ deviceName || '--' }}</span>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
 
-      <el-form label-width="120px" label-position="left">
-        <el-form-item label="设备 ID">
-          <span class="device-id-text">{{ deviceId }}</span>
-          <el-button link type="primary" size="small" @click="copyDeviceId" style="margin-left: 8px">复制</el-button>
-        </el-form-item>
-        <el-form-item label="设备名称">
-          <span>{{ deviceName || '--' }}</span>
-        </el-form-item>
-      </el-form>
-    </el-card>
+      <!-- 数据管理 -->
+      <el-tab-pane label="数据管理" name="data">
+        <div class="settings-pane">
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">数据管理</span>
+            </template>
+            <el-form label-width="120px" label-position="left">
+              <el-form-item label="本地标签页">
+                <span>{{ tabCount.open }} 个打开，其中 {{ tabCount.frozen }} 个已冻结</span>
+              </el-form-item>
 
-    <!-- 数据管理 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">数据管理</span>
-      </template>
+              <el-form-item label="清除数据">
+                <el-button type="danger" @click="handleClearData">
+                  清除所有本地数据
+                </el-button>
+                <div class="form-tip">清除本地存储的所有标签页记录、同步状态等（不影响后端数据）</div>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
 
-      <el-form label-width="120px" label-position="left">
-        <el-form-item label="本地标签页">
-          <span>{{ tabCount.open }} 个打开，其中 {{ tabCount.frozen }} 个已冻结</span>
-        </el-form-item>
-
-        <el-form-item label="清除数据">
-          <el-button type="danger" @click="handleClearData">
-            清除所有本地数据
-          </el-button>
-          <div class="form-tip">清除本地存储的所有标签页记录、同步状态等（不影响后端数据）</div>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <!-- 关于 -->
-    <el-card shadow="never">
-      <template #header>
-        <span class="card-title">关于</span>
-      </template>
-
-      <el-form label-width="120px" label-position="left">
-        <el-form-item label="扩展版本">
-          <span>{{ extensionVersion }}</span>
-        </el-form-item>
-        <el-form-item label="扩展 ID">
-          <span class="mono-text">{{ extensionId }}</span>
-        </el-form-item>
-      </el-form>
-    </el-card>
+      <!-- 关于 -->
+      <el-tab-pane label="关于" name="about">
+        <div class="settings-pane">
+          <el-card shadow="never">
+            <template #header>
+              <span class="card-title">关于</span>
+            </template>
+            <el-form label-width="120px" label-position="left">
+              <el-form-item label="扩展版本">
+                <span>{{ extensionVersion }}</span>
+              </el-form-item>
+              <el-form-item label="扩展 ID">
+                <span class="mono-text">{{ extensionId }}</span>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 选择默认工作组 -->
     <WorkspacePickerDialog
@@ -232,6 +255,9 @@ const tabCount = ref({ open: 0, frozen: 0 })
 const tokenInput = ref('')
 const tokenChecking = ref(false)
 const versionChecking = ref(false)
+
+// 顶部 tab: extension(扩展设置) | cloud(云端设置) | data(数据管理) | about(关于)
+const activeTab = ref('extension')
 
 // 快捷键「加入并关闭」默认工作组
 const defaultWorkspaceId = ref('')
@@ -471,6 +497,17 @@ async function handleClearData() {
   flex-direction: column;
   gap: 16px;
   max-width: 720px;
+}
+
+.settings-tabs :deep(.el-tabs__header) {
+  margin-bottom: 16px;
+}
+
+/* 各 tab 内仍可能是多张卡片，保持原有纵向间距 */
+.settings-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .card-title {
