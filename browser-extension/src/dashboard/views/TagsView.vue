@@ -308,7 +308,7 @@ function sortTags(list: TagInfo[]): TagInfo[] {
       const diff = tagCountOf(b) - tagCountOf(a)
       if (diff !== 0) return diff
     }
-    return a.name.localeCompare(b.name, 'zh-CN', { numeric: true })
+    return a.name.localeCompare(b.name, 'zh-CN', { /*numeric: true*/ })
   })
 }
 
