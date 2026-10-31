@@ -72,7 +72,12 @@
       </SelectionBar>
 
       <div v-if="items.length > 0" class="recyclebin-list">
-        <div v-for="item in items" :key="item.id" class="recycle-item">
+        <div
+          v-for="item in items"
+          :key="item.id"
+          class="recycle-item"
+          @click="onRowClick(item, $event)"
+        >
           <el-checkbox
             class="item-check"
             :model-value="selectedIds.includes(item.id)"
@@ -270,6 +275,13 @@ function toggleSelect(id: number) {
   } else {
     selectedIds.value.splice(idx, 1)
   }
+}
+
+/** 点击行内非勾选框、非操作按钮的区域时切换勾选 */
+function onRowClick(item: RecycleBinTab, event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('.item-check, .item-actions')) return
+  toggleSelect(item.id)
 }
 
 /** el-checkbox 的 change 参数可能是 boolean/string/number，统一按真值处理；全选只作用于当前页 */
@@ -487,6 +499,7 @@ async function handleEmpty() {
   gap: 12px;
   padding: 10px 8px;
   border-radius: 6px;
+  cursor: pointer;
   transition: background-color 0.15s;
 }
 
