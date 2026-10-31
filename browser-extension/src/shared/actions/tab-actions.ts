@@ -2,6 +2,7 @@ import type { Component } from 'vue'
 import {
   Close,
   Clock,
+  CopyDocument,
   Delete,
   DocumentCopy,
   Edit,
@@ -42,6 +43,7 @@ export type TabActionId =
   | 'editTime'
   | 'tag'
   | 'move'
+  | 'copy'
   | 'remove'
   | 'removeTag'
   | 'openWorkspace'
@@ -72,6 +74,7 @@ const ACTION_META: Record<TabActionId, ActionMeta> = {
   editTime: { label: '修改添加时间', icon: Clock },
   tag: { label: '设置标签', icon: PriceTag },
   move: { label: '移动到其他工作组', icon: Rank },
+  copy: { label: '复制到其他工作组', icon: CopyDocument },
   remove: { label: '移至回收站', icon: Delete, danger: true },
   removeTag: { label: '移除标签', icon: Delete, danger: true },
   openWorkspace: { label: '打开工作组', icon: FolderOpened },
@@ -129,7 +132,7 @@ export function localTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntr
 /** 云端标签页行菜单 */
 export function cloudTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntry[] {
   return buildTabMenu(
-    ['open', 'copyTitle', 'copyLink', 'rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'remove', 'properties'],
+    ['open', 'copyTitle', 'copyLink', 'rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'copy', 'remove', 'properties'],
     { dividersBefore: ['copyTitle', 'rename', 'move', 'remove', 'properties'], ...options },
   )
 }

@@ -91,6 +91,11 @@ export function moveWorkspaceTab(targetWorkspaceId: string, tabId: string, newIn
   return apiClient.post<{ success: boolean }>(`/v1/tab-sync/workspaces/${encodeURIComponent(targetWorkspaceId)}/tabs/move`, { tabId, newIndex })
 }
 
+/** 复制标签页到指定工作组末尾（源标签页不变） */
+export function copyWorkspaceTab(targetWorkspaceId: string, tabId: string) {
+  return apiClient.post<{ tab: TabReference }>(`/v1/tab-sync/workspaces/${encodeURIComponent(targetWorkspaceId)}/tabs/copy`, { tabId })
+}
+
 /** 通过 URL 向工作组添加标签页 */
 export function addWorkspaceTabByUrl(workspaceId: string, url: string, title?: string) {
   return apiClient.post<{ tab: { tabId: string; url: string; title: string; favIconUrl: string; sortOrder: number; addedAt: string } }>(

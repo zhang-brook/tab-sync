@@ -199,6 +199,17 @@ export interface MoveWorkspaceTabMessage {
   }
 }
 
+/** 复制标签页到目标工作组末尾（源标签页不变） */
+export interface CopyWorkspaceTabMessage {
+  action: 'COPY_WORKSPACE_TAB'
+  payload: {
+    /** 目标工作组 UUID */
+    workspaceId: string
+    /** 要复制的标签页 UUID */
+    tabId: string
+  }
+}
+
 /** 更新工作组内单个标签页属性（支持手动设置添加时间、重命名、编辑链接） */
 export interface UpdateWorkspaceTabMessage {
   action: 'UPDATE_WORKSPACE_TAB'
@@ -340,6 +351,7 @@ export type ExtensionMessage =
   | AddTabsToWorkspaceMessage
   | AddWorkspaceTabByUrlMessage
   | MoveWorkspaceTabMessage
+  | CopyWorkspaceTabMessage
   | UpdateWorkspaceTabMessage
   | RemoveWorkspaceTabMessage
   | OpenDashboardMessage

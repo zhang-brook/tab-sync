@@ -3,7 +3,7 @@ import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
-import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, copyWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTabs, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -72,6 +72,9 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
 
     case 'MOVE_WORKSPACE_TAB':
       return handleMoveWorkspaceTab(message.payload)
+
+    case 'COPY_WORKSPACE_TAB':
+      return handleCopyWorkspaceTab(message.payload)
 
     case 'UPDATE_WORKSPACE_TAB':
       return handleUpdateWorkspaceTab(message.payload)
@@ -612,6 +615,24 @@ async function handleMoveWorkspaceTab(
   } catch (err) {
     logger.warn('moveWorkspaceTab error:', err)
     return { success: false, error: '移动标签页失败: ' + String(err) }
+  }
+}
+
+/** 复制标签页到目标工作组末尾（源标签页不变） */
+async function handleCopyWorkspaceTab(
+  payload: { workspaceId: string; tabId: string },
+): Promise<MessageResponse> {
+  try {
+    const res = await copyWorkspaceTab(payload.workspaceId, payload.tabId)
+    if (res.ok) {
+      logger.info(`Tab copied: ${payload.tabId} → workspace=${payload.workspaceId}`)
+      return { success: true }
+    }
+    logger.warn('copyWorkspaceTab API failed:', res.error)
+    return { success: false, error: res.error || '复制标签页失败', authError: res.status === 401 }
+  } catch (err) {
+    logger.warn('copyWorkspaceTab error:', err)
+    return { success: false, error: '复制标签页失败: ' + String(err) }
   }
 }
 

@@ -92,6 +92,14 @@
       @select="saveMove"
     />
 
+    <!-- 复制到其他工作组 -->
+    <WorkspacePickerDialog
+      v-model="copyOpen"
+      title="复制到工作组"
+      :disabled-ids="moveDisabledIds"
+      @select="saveCopy"
+    />
+
     <!-- 设置标签页标签 -->
     <TagEditorDialog
       v-model="tagOpen"
@@ -110,6 +118,7 @@ import WorkspacePickerDialog from './WorkspacePickerDialog.vue'
 import TagEditorDialog from './TagEditorDialog.vue'
 import {
   addTabTag,
+  copyWorkspaceTab,
   listWorkspaceTabs,
   moveWorkspaceTab,
   removeTabTag,
@@ -119,7 +128,7 @@ import {
 import type { TabReference } from '../types'
 import type { WorkspaceTreeNode } from '../utils/workspace-tree'
 
-export type CloudTabDialogMode = 'rename' | 'editUrl' | 'editDesc' | 'editTime' | 'move' | 'tag'
+export type CloudTabDialogMode = 'rename' | 'editUrl' | 'editDesc' | 'editTime' | 'move' | 'copy' | 'tag'
 
 const props = defineProps<{
   /** 当前操作的标签页及其所属工作组 */
@@ -153,6 +162,7 @@ const editUrlOpen = computed({ get: () => props.mode === 'editUrl', set: (v: boo
 const editDescOpen = computed({ get: () => props.mode === 'editDesc', set: (v: boolean) => { if (!v) close() } })
 const editTimeOpen = computed({ get: () => props.mode === 'editTime', set: (v: boolean) => { if (!v) close() } })
 const moveOpen = computed({ get: () => props.mode === 'move', set: (v: boolean) => { if (!v) close() } })
+const copyOpen = computed({ get: () => props.mode === 'copy', set: (v: boolean) => { if (!v) close() } })
 const tagOpen = computed({ get: () => props.mode === 'tag', set: (v: boolean) => { if (!v) close() } })
 
 watch(
@@ -256,6 +266,19 @@ async function saveMove(node: WorkspaceTreeNode): Promise<void> {
     emit('saved', node.id)
   } catch (err) {
     reportServiceError(err, { fallback: '移动失败' })
+  }
+}
+
+async function saveCopy(node: WorkspaceTreeNode): Promise<void> {
+  const target = props.target
+  if (!target) return
+  try {
+    // 追加到目标工作组末尾，源标签页保持不变
+    await copyWorkspaceTab(node.id, target.tab.tabId)
+    done(`已复制到「${node.name}」`)
+    emit('saved', node.id)
+  } catch (err) {
+    reportServiceError(err, { fallback: '复制失败' })
   }
 }
 

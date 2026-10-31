@@ -127,6 +127,11 @@ export async function moveWorkspaceTab(workspaceId: string, tabId: string, newIn
   await callService({ action: 'MOVE_WORKSPACE_TAB', payload: { workspaceId, tabId, newIndex } })
 }
 
+/** 复制标签页到目标工作组末尾（源标签页不变） */
+export async function copyWorkspaceTab(workspaceId: string, tabId: string): Promise<void> {
+  await callService({ action: 'COPY_WORKSPACE_TAB', payload: { workspaceId, tabId } })
+}
+
 export async function updateWorkspaceTab(
   workspaceId: string,
   tabId: string,
