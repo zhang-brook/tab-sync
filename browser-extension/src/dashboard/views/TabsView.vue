@@ -15,6 +15,9 @@
 
       <div class="toolbar-spacer" />
 
+      <el-tooltip content="定位到当前激活的标签页" placement="top">
+        <el-button :icon="Aim" @click="focusActiveTab">定位</el-button>
+      </el-tooltip>
       <el-button :icon="Refresh" @click="reload()">刷新</el-button>
       <el-button :icon="View" @click="showSavedLocalTabs">查看已保存的本地标签页</el-button>
     </div>
@@ -125,7 +128,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Close, Loading, FolderAdd, FolderChecked, FolderOpened, View } from '@element-plus/icons-vue'
+import { Search, Refresh, Close, Loading, FolderAdd, FolderChecked, FolderOpened, View, Aim } from '@element-plus/icons-vue'
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import TabList from '@/shared/components/TabList.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
@@ -162,6 +165,7 @@ const {
   closeTab,
   closeSelected,
   sortSegment,
+  focusActiveTab,
 } = useLocalTabs()
 
 const menuItems = computed(() => localTabMenu())
