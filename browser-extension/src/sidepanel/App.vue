@@ -4,11 +4,24 @@
     <div class="sidepanel-header">
       <h3>Tab Sync</h3>
       <div class="sp-actions">
-        <el-button size="small" text @click="openDashboard">管理面板</el-button>
-        <el-button size="small" text @click="openSettings">设置</el-button>
-        <el-button v-if="authenticated" size="small" text type="danger" @click="logout">
-          退出
-        </el-button>
+        <el-dropdown trigger="click" placement="bottom-end" @command="onHeaderCommand">
+          <el-button size="small" text circle :icon="MoreFilled" title="更多操作" />
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="dashboard" :icon="Monitor">管理面板</el-dropdown-item>
+              <el-dropdown-item command="settings" :icon="Setting">设置</el-dropdown-item>
+              <el-dropdown-item
+                v-if="authenticated"
+                command="logout"
+                :icon="SwitchButton"
+                divided
+                class="danger-dropdown-item"
+              >
+                退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -105,7 +118,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Loading, Aim } from '@element-plus/icons-vue'
+import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton } from '@element-plus/icons-vue'
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import LocalSaveTabsDialog from '@/shared/components/LocalSaveTabsDialog.vue'
@@ -150,6 +163,12 @@ function openSettings() {
 
 function openDashboard() {
   void sendMessage({ action: 'OPEN_DASHBOARD' })
+}
+
+function onHeaderCommand(command: string) {
+  if (command === 'dashboard') openDashboard()
+  else if (command === 'settings') openSettings()
+  else if (command === 'logout') void logout()
 }
 
 // ============ 标签页管理 ============

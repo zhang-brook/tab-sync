@@ -74,7 +74,7 @@ const router = createRouter({
       name: 'RecycleBin',
       component: () => import('./views/RecycleBinView.vue'),
       meta: {
-        dataSource: { label: '云端', desc: '被移除的标签页暂存于此，可恢复', type: 'success' },
+        dataSource: { label: '云端', desc: '数据跨设备同步', type: 'success' },
       },
     },
     {
