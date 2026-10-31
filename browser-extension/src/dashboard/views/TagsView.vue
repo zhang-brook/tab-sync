@@ -17,6 +17,15 @@
         </div>
       </div>
 
+      <el-input
+        v-model="keyword"
+        placeholder="搜索标签"
+        size="small"
+        clearable
+        :prefix-icon="Search"
+        class="tag-search"
+      />
+
       <el-segmented
         v-model="scopeFilter"
         :options="scopeOptions"
@@ -65,7 +74,13 @@
       </div>
       <el-empty
         v-else-if="visibleTags.length === 0"
-        :description="hideEmpty ? '没有数量大于 0 的标签' : '该分类下还没有标签'"
+        :description="
+          keyword.trim()
+            ? '没有匹配的标签'
+            : hideEmpty
+              ? '没有数量大于 0 的标签'
+              : '该分类下还没有标签'
+        "
         :image-size="60"
       />
       <div v-else class="tag-list">
@@ -272,7 +287,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Loading, Plus, Refresh, SortDown, SortUp } from '@element-plus/icons-vue'
+import { Delete, Edit, Loading, Plus, Refresh, Search, SortDown, SortUp } from '@element-plus/icons-vue'
 import TabList from '@/shared/components/TabList.vue'
 import { taggedTabMenu } from '@/shared/actions/tab-actions'
 import {
@@ -321,6 +336,7 @@ const sortMode = ref<SortMode>('name')
 // 名称默认 A-Z，数量默认多→少；再次点击当前排序项切换方向
 const sortAsc = ref(true)
 const hideEmpty = ref(false)
+const keyword = ref('')
 
 function onSortClick(mode: SortMode): void {
   if (sortMode.value === mode) {
@@ -341,7 +357,13 @@ const visibleTags = computed(() => [...visibleTabTags.value, ...visibleWorkspace
 
 // 当前排序项按方向排序；数量相同的项始终按名称升序兜底
 function sortTags(list: TagInfo[]): TagInfo[] {
-  const visible = hideEmpty.value ? list.filter((tag) => tagCountOf(tag) > 0) : list
+  const kw = keyword.value.trim().toLowerCase()
+  // 关键字按名称模糊匹配（忽略大小写），与隐藏空标签筛选叠加生效
+  const visible = list.filter(
+    (tag) =>
+      (!kw || tag.name.toLowerCase().includes(kw)) &&
+      (!hideEmpty.value || tagCountOf(tag) > 0),
+  )
   return [...visible].sort((a, b) => {
     const primary =
       sortMode.value === 'count'
@@ -738,6 +760,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.tag-search {
+  margin-bottom: 8px;
 }
 .scope-filter {
   margin-bottom: 8px;
