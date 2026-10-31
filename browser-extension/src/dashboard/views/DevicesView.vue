@@ -1,15 +1,5 @@
 <template>
   <div class="devices-view">
-    <div class="toolbar">
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-      >
-        设备列表将在后端服务连接后自动同步。当前仅显示本机设备信息。
-      </el-alert>
-    </div>
-
     <!-- 当前设备卡片 -->
     <el-card shadow="never" class="device-card device-card--current">
       <div class="device-header">
