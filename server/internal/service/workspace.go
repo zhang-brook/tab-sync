@@ -1315,7 +1315,7 @@ type TabURLPair struct {
 // ===================== 回收站 / 未分组 =====================
 
 // UngroupedWorkspaceID 是「未分组」系统工作组的固定标识。
-// 回收站中的标签页恢复后统一归入该工作组，避免回到原工作组造成分组混乱。
+// 回收站恢复时未指定目标工作组则回退到该工作组。
 const UngroupedWorkspaceID = "ungrouped"
 
 // UngroupedWorkspaceName 是「未分组」系统工作组的显示名

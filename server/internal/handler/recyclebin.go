@@ -1,11 +1,18 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spidermemos/tab-sync/server/internal/service"
 )
+
+// restorePayload 恢复请求体；workspaceId 为空时回退到「未分组」
+type restorePayload struct {
+	WorkspaceID string `json:"workspaceId"`
+}
 
 // RecycleBinHandler 回收站相关接口
 type RecycleBinHandler struct {
@@ -27,18 +34,42 @@ func (h *RecycleBinHandler) List(c *gin.Context) {
 	Success(c, items)
 }
 
-// Restore 恢复一条回收站标签页（统一恢复到「未分组」）
+// Restore 恢复一条回收站标签页（可指定目标工作组）
 func (h *RecycleBinHandler) Restore(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		BadRequest(c, "无效的回收站条目 ID")
 		return
 	}
-	if err := h.svc.Restore(uint(id)); err != nil {
+	var payload restorePayload
+	// 旧客户端不带请求体，按「未分组」处理
+	if err := c.ShouldBindJSON(&payload); err != nil && !errors.Is(err, io.EOF) {
+		BadRequest(c, "请求体格式错误")
+		return
+	}
+	if _, err := h.svc.Restore([]uint{uint(id)}, payload.WorkspaceID); err != nil {
 		InternalError(c, err.Error())
 		return
 	}
 	Success(c, gin.H{"success": true})
+}
+
+// RestoreBatch 批量恢复回收站标签页到指定工作组
+func (h *RecycleBinHandler) RestoreBatch(c *gin.Context) {
+	var payload struct {
+		IDs         []uint `json:"ids"`
+		WorkspaceID string `json:"workspaceId"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil || len(payload.IDs) == 0 {
+		BadRequest(c, "请选择要恢复的标签页")
+		return
+	}
+	restored, err := h.svc.Restore(payload.IDs, payload.WorkspaceID)
+	if err != nil {
+		InternalError(c, err.Error())
+		return
+	}
+	Success(c, gin.H{"success": true, "restored": restored})
 }
 
 // Delete 彻底删除一条回收站标签页

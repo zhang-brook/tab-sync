@@ -210,6 +210,16 @@ docker compose start
 | `POST` | `/v1/tab-sync/workspaces/:id/tags` | 给工作组打标签 |
 | `DELETE` | `/v1/tab-sync/workspaces/:id/tags/:tagId` | 去掉工作组上的标签 |
 
+回收站（被移除的标签页暂存，可恢复到指定工作组）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/v1/tab-sync/recyclebin` | 获取回收站列表 |
+| `POST` | `/v1/tab-sync/recyclebin/restore` | 批量恢复（`ids` + 可选 `workspaceId`；省略 `workspaceId` 时恢复到「未分组」） |
+| `POST` | `/v1/tab-sync/recyclebin/:id/restore` | 恢复单条（可带 `workspaceId`；省略时恢复到「未分组」） |
+| `DELETE` | `/v1/tab-sync/recyclebin/:id` | 彻底删除单条 |
+| `DELETE` | `/v1/tab-sync/recyclebin` | 清空回收站 |
+
 管理接口（Admin Token 或 `/setup` 登录会话）：
 
 | 方法 | 路径 | 说明 |

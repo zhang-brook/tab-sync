@@ -153,6 +153,7 @@ func main() {
 
 			// 回收站（被移除的标签页暂存，可恢复/彻底删除）
 			auth.GET("/recyclebin", handlers.RecycleBin.List)
+			auth.POST("/recyclebin/restore", handlers.RecycleBin.RestoreBatch)
 			auth.POST("/recyclebin/:id/restore", handlers.RecycleBin.Restore)
 			auth.DELETE("/recyclebin/:id", handlers.RecycleBin.Delete)
 			auth.DELETE("/recyclebin", handlers.RecycleBin.Empty)

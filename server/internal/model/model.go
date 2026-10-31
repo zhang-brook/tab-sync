@@ -157,7 +157,7 @@ func (WorkspaceTagRelation) TableName() string { return "workspace_tags_rel" }
 // ===================== 回收站 =====================
 
 // RecycleBinTab 回收站中的标签页：从工作组移除后暂存于此，可恢复或彻底删除。
-// 恢复时统一归入「未分组」系统工作组（见 service.WorkspaceService.GetOrCreateUngroupedWorkspace）。
+// 恢复时由用户指定目标工作组（未指定时回退「未分组」系统工作组）。
 type RecycleBinTab struct {
 	ID                    uint      `gorm:"primaryKey;autoIncrement"`
 	OriginalWorkspaceID   string    `gorm:"index;size:64;not null"` // 被移除时所属工作组 UUID
