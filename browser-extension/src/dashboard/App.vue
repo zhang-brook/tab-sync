@@ -73,7 +73,7 @@
             <el-icon><SwitchButton /></el-icon>
             退出登录
           </el-button>
-          <el-button v-else type="primary" size="small" text @click="openSidePanel">
+          <el-button v-else type="primary" size="small" text @click="loginVisible = true">
             <el-icon><Key /></el-icon>
             登录
           </el-button>
@@ -87,11 +87,14 @@
           <h2>需要登录</h2>
           <p>未登录或登录已过期，该板块需连接同步服务后使用</p>
           <el-button @click="goToSettings">前往设置</el-button>
-          <el-button type="primary" @click="openSidePanel">打开侧边栏登录</el-button>
+          <el-button type="primary" @click="loginVisible = true">立即登录</el-button>
         </div>
       </el-main>
     </el-container>
   </el-container>
+
+  <!-- 登录弹窗：与侧边栏复用同一组件 -->
+  <LoginDialog v-model="loginVisible" @login-success="onLoginSuccess" />
 
   <EntityTooltipHost />
 </template>
@@ -104,6 +107,7 @@ import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton
 import { sendMessage } from '@/shared/composables/useMessage'
 import { ENTITY_NAVIGATION } from '@/shared/composables/entity-navigation'
 import EntityTooltipHost from '@/shared/components/EntityTooltipHost.vue'
+import LoginDialog from '@/shared/components/LoginDialog.vue'
 import { dashboardTargetRoute } from '@/shared/utils/dashboard-links'
 import { STORAGE_KEYS } from '@/shared/storage'
 import type { StateData } from '@/shared/types'
@@ -117,6 +121,9 @@ provide(ENTITY_NAVIGATION, (target) => {
 })
 
 const authenticated = ref(true) // 默认假定已登录，避免首帧闪现未登录提示
+
+/** 管理面板内的登录弹窗（与侧边栏复用） */
+const loginVisible = ref(false)
 
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
@@ -181,23 +188,10 @@ function goToSettings() {
   void router.push({ path: '/settings', query: { tab: 'cloud' } })
 }
 
-/** 打开侧边栏以便重新登录（扩展未配置 popup，登录入口在侧边栏） */
-async function openSidePanel() {
-  try {
-    const getContexts = chrome.runtime.getContexts?.bind(chrome.runtime)
-    const [win, contexts] = await Promise.all([
-      chrome.windows.getCurrent(),
-      getContexts ? getContexts({ contextTypes: ['SIDE_PANEL'] }) : Promise.resolve([]),
-    ])
-    // 侧边栏已打开时 open() 不会再产生可见效果，改为提示用户直接在侧栏登录
-    if (contexts.length > 0) {
-      ElMessage.info('侧边栏已打开，请在侧边栏中登录')
-      return
-    }
-    await chrome.sidePanel.open({ windowId: win.id! })
-  } catch {
-    ElMessage.info('请点击浏览器工具栏中的扩展图标打开侧边栏登录')
-  }
+/** 面板内登录成功：先本地置位，storage 监听随后同步最新 Token 状态 */
+function onLoginSuccess() {
+  authenticated.value = true
+  ElMessage.success('登录成功')
 }
 
 onMounted(async () => {

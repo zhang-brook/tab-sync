@@ -127,9 +127,7 @@
     />
 
     <!-- 顶部「登录」按钮打开的面板内登录框 -->
-    <el-dialog v-model="loginVisible" title="登录" width="90%" append-to-body destroy-on-close>
-      <LoginPanel @login-success="onLoginSuccess" />
-    </el-dialog>
+    <LoginDialog v-model="loginVisible" width="90%" @login-success="onLoginSuccess" />
 
     <EntityTooltipHost />
   </div>
@@ -142,7 +140,7 @@ import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton, Refre
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import LocalSaveTabsDialog from '@/shared/components/LocalSaveTabsDialog.vue'
-import LoginPanel from '@/shared/components/LoginPanel.vue'
+import LoginDialog from '@/shared/components/LoginDialog.vue'
 import EntityTooltipHost from '@/shared/components/EntityTooltipHost.vue'
 import { useLocalTabs } from '@/shared/composables/useLocalTabs'
 import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
@@ -169,7 +167,6 @@ async function initAuth() {
 }
 
 async function onLoginSuccess() {
-  loginVisible.value = false
   authenticated.value = true
   await reload()
   void loadWorkspaceIndex()
