@@ -105,9 +105,6 @@
                 <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable @blur="saveApiBaseUrl" />
                 <div class="form-tip">
                   轻量后端的 API 地址，通常为 http://localhost:8080
-                  <el-button v-if="connectionMode === 'lightweight' && apiBaseUrl" size="small" @click="checkVersion" :loading="versionChecking" style="margin-left: 8px">
-                    检测版本
-                  </el-button>
                 </div>
               </el-form-item>
 
@@ -144,9 +141,19 @@
           </el-card>
 
           <!-- 版本协商 -->
-          <el-card v-if="versionInfo" shadow="never">
+          <el-card shadow="never">
             <template #header>
-              <span class="card-title">服务端信息</span>
+              <div class="card-header">
+                <span class="card-title">服务端信息</span>
+                <el-button
+                  size="small"
+                  :loading="versionChecking"
+                  :disabled="connectionMode !== 'lightweight' || !apiBaseUrl"
+                  @click="checkVersion()"
+                >
+                  重新检测
+                </el-button>
+              </div>
             </template>
 
             <el-form label-width="120px" label-position="left">
@@ -154,19 +161,30 @@
                 <span class="mono-text">{{ apiBaseUrl || '--' }}</span>
               </el-form-item>
               <el-form-item label="服务器版本">
-                <span>{{ versionInfo.serverVersion ?? '--' }}</span>
+                <span>{{ versionInfo?.serverVersion ?? '--' }}</span>
               </el-form-item>
               <el-form-item label="兼容版本范围">
-                <span>{{ versionInfo.minExtVersion ?? '--' }} ~ {{ versionInfo.maxExtVersion ?? '--' }}</span>
+                <span>{{ versionInfo?.minExtVersion ?? '--' }} ~ {{ versionInfo?.maxExtVersion ?? '--' }}</span>
                 <div class="form-tip" style="width: 100%">当前服务器支持的扩展版本区间，扩展版本落在此范围内才可用</div>
               </el-form-item>
               <el-form-item label="版本兼容性">
-                <el-tag v-if="versionInfo.compatible" type="success">兼容</el-tag>
-                <el-tag v-else type="danger">不兼容</el-tag>
-                <span class="form-tip" style="margin-left: 8px">当前扩展版本 {{ extensionVersion }}</span>
-                <span v-if="!versionInfo.compatible && versionInfo.reason" class="form-tip" style="margin-left: 8px">
-                  {{ versionInfo.reason }}
-                </span>
+                <template v-if="versionInfo">
+                  <el-tag v-if="versionInfo.compatible" type="success">兼容</el-tag>
+                  <el-tag v-else type="danger">不兼容</el-tag>
+                  <span class="form-tip" style="margin-left: 8px">当前扩展版本 {{ extensionVersion }}</span>
+                  <span v-if="!versionInfo.compatible && versionInfo.reason" class="form-tip" style="margin-left: 8px">
+                    {{ versionInfo.reason }}
+                  </span>
+                </template>
+                <span v-else>--</span>
+              </el-form-item>
+              <el-divider />
+              <el-form-item label="连接时延">
+                <span>{{ versionInfo?.latencyMs != null ? `${versionInfo.latencyMs} ms` : '--' }}</span>
+              </el-form-item>
+              <el-form-item label="时间差">
+                <span>{{ formatClockDiff(versionInfo?.clockDiffMs) }}</span>
+                <div class="form-tip" style="width: 100%">服务端时间减去本地时间，正值表示服务端时间快于本地</div>
               </el-form-item>
             </el-form>
           </el-card>
@@ -355,6 +373,8 @@ const versionInfo = ref<{
   minExtVersion?: string
   maxExtVersion?: string
   reason?: string
+  latencyMs?: number
+  clockDiffMs?: number
 } | null>(null)
 
 onMounted(async () => {
@@ -381,6 +401,11 @@ onMounted(async () => {
   await loadWorkspaces()
   shortcutEnabled.value = await storage.get(STORAGE_KEYS.SHORTCUT_ENABLED)
   await loadShortcuts()
+
+  // 进入页面自动静默检测一次版本，结果直接展示在服务端信息卡片，不弹提示
+  if (connectionMode.value === 'lightweight' && apiBaseUrl.value) {
+    void checkVersion(false)
+  }
 })
 
 async function handleModeChange() {
@@ -453,26 +478,45 @@ function saveShortcutEnabled() {
   storage.set(STORAGE_KEYS.SHORTCUT_ENABLED, shortcutEnabled.value)
 }
 
-async function checkVersion() {
+// 时间差展示：正负号 + 带单位的绝对值，避免出现 "0 ms" 这类难读写法
+function formatClockDiff(ms?: number): string {
+  if (ms == null) return '--'
+  if (ms === 0) return '0'
+  const abs = Math.abs(ms)
+  const value = abs < 1000
+    ? `${abs} 毫秒`
+    : abs < 60000
+      ? `${(abs / 1000).toFixed(1)} 秒`
+      : `${(abs / 60000).toFixed(1)} 分钟`
+  return `${ms > 0 ? '+' : '-'}${value}`
+}
+
+async function checkVersion(showToast = true) {
   versionChecking.value = true
+  // 先清空上次的检测结果，避免检测期间或失败后仍展示旧记录
+  versionInfo.value = null
   const res = await sendMessage<{
     compatible: boolean
     serverVersion: string
     minExtVersion: string
     maxExtVersion: string
     reason?: string
+    latencyMs?: number
+    clockDiffMs?: number
   }>({ action: 'CHECK_VERSION' })
 
   versionChecking.value = false
 
   if (res.success && res.data) {
     versionInfo.value = res.data
+    // 进入设置页时的自动检测只更新卡片内容，不弹提示打扰用户
+    if (!showToast) return
     if (res.data.compatible) {
       ElMessage.success(`服务器版本 ${res.data.serverVersion}，版本兼容`)
     } else {
       ElMessage.warning(res.data.reason || '版本不兼容')
     }
-  } else {
+  } else if (showToast) {
     ElMessage.error(res.error || '版本检测失败')
   }
 }
@@ -523,6 +567,13 @@ async function handleClearData() {
   font-size: 15px;
   font-weight: 500;
   color: #303133;
+}
+
+/* 卡片标题行：左侧标题 + 右侧操作按钮 */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .form-tip {

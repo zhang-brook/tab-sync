@@ -17,4 +17,6 @@ export interface ServerVersionInfo {
   minExtVersion: string
   maxExtVersion: string
   apiVersion: string
+  /** 服务端时间（Unix 毫秒），旧版服务端可能不返回 */
+  serverTime?: number
 }

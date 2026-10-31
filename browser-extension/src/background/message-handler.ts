@@ -205,7 +205,9 @@ async function handleLogout(): Promise<MessageResponse> {
 
 /** 版本协商：检查客户端与服务端版本兼容性 */
 async function handleCheckVersion(): Promise<MessageResponse> {
+  const startedAt = Date.now()
   const res = await getServerVersion()
+  const latencyMs = Date.now() - startedAt
 
   if (!res.ok || !res.data) {
     return {
@@ -218,12 +220,17 @@ async function handleCheckVersion(): Promise<MessageResponse> {
     }
   }
 
-  const { serverVersion, minExtVersion, maxExtVersion } = res.data
+  const { serverVersion, minExtVersion, maxExtVersion, serverTime } = res.data
   const extVersion = chrome.runtime.getManifest().version
 
   const compatible =
     compareVersions(extVersion, minExtVersion) >= 0 &&
     compareVersions(extVersion, maxExtVersion) <= 0
+
+  // 服务端时间戳约产生于请求往返的中点，用它和本地时间估算时钟偏差；正值表示服务端更快
+  const clockDiffMs = typeof serverTime === 'number'
+    ? Math.round(serverTime - (startedAt + latencyMs / 2))
+    : undefined
 
   return {
     success: true,
@@ -234,6 +241,8 @@ async function handleCheckVersion(): Promise<MessageResponse> {
       maxExtVersion,
       extVersion,
       reason: compatible ? undefined : `扩展版本 ${extVersion} 不在服务器兼容范围 [${minExtVersion}, ${maxExtVersion}]`,
+      latencyMs,
+      clockDiffMs,
     },
   }
 }

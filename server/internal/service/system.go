@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"time"
 
 	"github.com/spidermemos/tab-sync/server/internal/config"
 	"github.com/spidermemos/tab-sync/server/internal/database"
@@ -35,6 +36,8 @@ func (s *SystemService) GetVersionInfo() map[string]interface{} {
 		"minExtVersion": s.cfg.MinExtVersion,
 		"maxExtVersion": s.cfg.MaxExtVersion,
 		"apiVersion":    "v1",
+		// 服务端当前时间（Unix 毫秒），供客户端估算时钟偏差
+		"serverTime": time.Now().UnixMilli(),
 		// 扩展 → 后端版本兼容性映射表
 		"versionMap": []VersionRange{
 			{
