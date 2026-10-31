@@ -2,7 +2,7 @@
   <div class="recyclebin-view">
     <div class="toolbar">
       <el-alert type="info" :closable="false" show-icon>
-        从工作组移除的标签页会暂存在此处，恢复时统一归入「未分组」；也可在此彻底删除，或一键清空。
+        从工作组移除的标签页会暂存在此处，可勾选后恢复到指定工作组；也可在此彻底删除，或一键清空。
       </el-alert>
       <div class="toolbar-actions">
         <el-button
@@ -18,13 +18,34 @@
       </div>
     </div>
 
+    <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="batch-bar">
+      <el-button @click="clearSelection">取消选择</el-button>
+      <el-button type="primary" :loading="restoring" @click="openRestoreDialog(selectedItems)">
+        恢复到工作组
+      </el-button>
+    </SelectionBar>
+
     <el-card v-loading="loading" shadow="never" class="recyclebin-card">
       <template #header>
-        <span class="card-title">回收站（{{ items.length }}）</span>
+        <div class="card-header">
+          <span class="card-title">回收站（{{ items.length }}）</span>
+          <el-checkbox
+            v-if="items.length > 0"
+            :model-value="allSelected"
+            :indeterminate="someSelected"
+            @change="toggleSelectAll"
+          >全选</el-checkbox>
+        </div>
       </template>
 
       <div v-if="items.length > 0" class="recyclebin-list">
         <div v-for="item in sortedItems" :key="item.id" class="recycle-item">
+          <el-checkbox
+            class="item-check"
+            :model-value="selectedIds.includes(item.id)"
+            @change="toggleSelect(item.id)"
+          />
+
           <el-avatar :size="36" shape="square" class="item-favicon">
             <img v-if="item.favIconUrl" :src="item.favIconUrl" alt="" @error="onFavError" />
             <el-icon v-else><Link /></el-icon>
@@ -45,7 +66,7 @@
           </div>
 
           <div class="item-actions">
-            <el-button type="primary" size="small" :loading="restoringId === item.id" @click="handleRestore(item)">
+            <el-button type="primary" size="small" :disabled="restoring" @click="openRestoreDialog([item])">
               恢复
             </el-button>
             <el-button
@@ -63,6 +84,17 @@
 
       <el-empty v-else description="回收站为空，从工作组移除的标签页会显示在这里" :image-size="120" />
     </el-card>
+
+    <WorkspacePickerDialog
+      v-model="restoreDialogVisible"
+      title="选择恢复到的工作组"
+      confirmable
+      :show-close-option="false"
+      :highlight-default-workspace="false"
+      :preselect-id="restorePreselectId"
+      :manageable="false"
+      @select="handleRestoreTarget"
+    />
   </div>
 </template>
 
@@ -71,17 +103,39 @@ import { ref, computed, onMounted } from 'vue'
 import { Delete, Link } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
+import SelectionBar from '@/shared/components/SelectionBar.vue'
+import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import type { RecycleBinData, RecycleBinTab } from '@/shared/types'
 
 const items = ref<RecycleBinTab[]>([])
 const loading = ref(true)
 const emptying = ref(false)
-const restoringId = ref<number | null>(null)
+const restoring = ref(false)
 const deletingId = ref<number | null>(null)
+
+/** 当前勾选的回收站条目 id */
+const selectedIds = ref<number[]>([])
+/** 待恢复的条目（单条或批量），恢复目标由用户在选择弹窗中确定 */
+const restoreTargets = ref<RecycleBinTab[]>([])
+const restoreDialogVisible = ref(false)
+/** 选择弹窗的预选工作组：单条恢复或来源一致时预选原工作组 */
+const restorePreselectId = ref('')
 
 /** 按删除时间倒序展示 */
 const sortedItems = computed(() =>
   [...items.value].sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()),
+)
+
+const selectedCount = computed(() => selectedIds.value.length)
+const allSelected = computed(
+  () => items.value.length > 0 && selectedIds.value.length === items.value.length,
+)
+const someSelected = computed(
+  () => selectedIds.value.length > 0 && selectedIds.value.length < items.value.length,
+)
+const selectedItems = computed(() =>
+  sortedItems.value.filter((item) => selectedIds.value.includes(item.id)),
 )
 
 onMounted(load)
@@ -91,6 +145,9 @@ async function load() {
   const res = await sendMessage<RecycleBinData>({ action: 'GET_RECYCLE_BIN' })
   if (res.success && res.data) {
     items.value = res.data.recycleBin ?? []
+    // 丢弃已不在列表中的勾选项（可能已被其他设备恢复或彻底删除）
+    const existing = new Set(items.value.map((item) => item.id))
+    selectedIds.value = selectedIds.value.filter((id) => existing.has(id))
   } else {
     ElMessage.error(res.error || '获取回收站失败')
   }
@@ -113,22 +170,52 @@ function formatTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** 恢复：统一恢复到「未分组」 */
-async function handleRestore(item: RecycleBinTab) {
-  try {
-    await ElMessageBox.confirm(
-      `将「${displayName(item)}」恢复到「未分组」，确定吗？`,
-      '恢复标签页',
-      { type: 'info', confirmButtonText: '恢复' },
-    )
-  } catch {
-    return
+function toggleSelect(id: number) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx === -1) {
+    selectedIds.value.push(id)
+  } else {
+    selectedIds.value.splice(idx, 1)
   }
-  restoringId.value = item.id
-  const res = await sendMessage({ action: 'RESTORE_RECYCLE_BIN_TAB', payload: { id: item.id } })
-  restoringId.value = null
+}
+
+/** el-checkbox 的 change 参数可能是 boolean/string/number，统一按真值处理 */
+function toggleSelectAll(checked: boolean | string | number) {
+  selectedIds.value = checked ? items.value.map((item) => item.id) : []
+}
+
+function clearSelection() {
+  selectedIds.value = []
+}
+
+/** 打开恢复目标选择弹窗；单条恢复或来源一致时预选原工作组 */
+function openRestoreDialog(targets: RecycleBinTab[]) {
+  if (targets.length === 0 || restoring.value) return
+  restoreTargets.value = [...targets]
+  const origins = new Set(targets.map((item) => item.originalWorkspaceId).filter(Boolean))
+  restorePreselectId.value = origins.size === 1 ? [...origins][0] : ''
+  restoreDialogVisible.value = true
+}
+
+/** 选定目标工作组后提交恢复 */
+async function handleRestoreTarget(node: WorkspaceTreeNode) {
+  if (restoring.value || restoreTargets.value.length === 0) return
+  restoring.value = true
+  const ids = restoreTargets.value.map((item) => item.id)
+  const res = await sendMessage({
+    action: 'RESTORE_RECYCLE_BIN_TABS',
+    payload: { ids, workspaceId: node.id },
+  })
+  restoring.value = false
   if (res.success) {
-    ElMessage.success('已恢复到「未分组」')
+    ElMessage.success(
+      ids.length > 1
+        ? `已恢复 ${ids.length} 个标签页到「${node.name}」`
+        : `已恢复到「${node.name}」`,
+    )
+    restoreDialogVisible.value = false
+    restoreTargets.value = []
+    clearSelection()
     await load()
   } else {
     ElMessage.error(res.error || '恢复失败')
@@ -201,6 +288,13 @@ async function handleEmpty() {
   flex-shrink: 0;
 }
 
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .card-title {
   font-weight: 600;
 }
@@ -219,6 +313,10 @@ async function handleEmpty() {
   border: 1px solid #ebeef5;
   border-radius: 8px;
   background: #fff;
+}
+
+.item-check {
+  flex-shrink: 0;
 }
 
 .item-favicon {

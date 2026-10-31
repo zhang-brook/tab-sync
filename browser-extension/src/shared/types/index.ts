@@ -22,6 +22,6 @@ export type {
   GetTagTabsMessage,
   RecycleBinTab,
   RecycleBinData,
-  RestoreRecycleBinTabMessage,
+  RestoreRecycleBinTabsMessage,
   DeleteRecycleBinTabMessage,
 } from './messages'

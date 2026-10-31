@@ -6,9 +6,12 @@ export function getRecycleBin() {
   return apiClient.get<RecycleBinTab[]>('/v1/tab-sync/recyclebin')
 }
 
-/** 恢复一条回收站标签页（统一恢复到「未分组」） */
-export function restoreRecycleBinTab(id: number) {
-  return apiClient.post<{ success: boolean }>(`/v1/tab-sync/recyclebin/${id}/restore`)
+/** 批量恢复回收站标签页到指定工作组（workspaceId 为空时回退「未分组」） */
+export function restoreRecycleBinTabs(ids: number[], workspaceId?: string) {
+  return apiClient.post<{ success: boolean; restored: number }>('/v1/tab-sync/recyclebin/restore', {
+    ids,
+    workspaceId,
+  })
 }
 
 /** 彻底删除一条回收站标签页 */

@@ -38,7 +38,7 @@ export type MessageAction =
   | 'REMOVE_WORKSPACE_TAG'
   | 'GET_TAG_TABS'
   | 'GET_RECYCLE_BIN'
-  | 'RESTORE_RECYCLE_BIN_TAB'
+  | 'RESTORE_RECYCLE_BIN_TABS'
   | 'DELETE_RECYCLE_BIN_TAB'
   | 'EMPTY_RECYCLE_BIN'
 
@@ -304,10 +304,10 @@ export interface GetRecycleBinMessage {
   action: 'GET_RECYCLE_BIN'
 }
 
-/** 恢复一条回收站标签页（统一恢复到「未分组」） */
-export interface RestoreRecycleBinTabMessage {
-  action: 'RESTORE_RECYCLE_BIN_TAB'
-  payload: { id: number }
+/** 批量恢复回收站标签页到指定工作组（workspaceId 为空时回退「未分组」） */
+export interface RestoreRecycleBinTabsMessage {
+  action: 'RESTORE_RECYCLE_BIN_TABS'
+  payload: { ids: number[]; workspaceId?: string }
 }
 
 /** 彻底删除一条回收站标签页 */
@@ -356,7 +356,7 @@ export type ExtensionMessage =
   | RemoveWorkspaceTagMessage
   | GetTagTabsMessage
   | GetRecycleBinMessage
-  | RestoreRecycleBinTabMessage
+  | RestoreRecycleBinTabsMessage
   | DeleteRecycleBinTabMessage
   | EmptyRecycleBinMessage
 

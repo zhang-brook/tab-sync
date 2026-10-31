@@ -5,7 +5,7 @@ import { verifyToken, getServerVersion } from '../shared/api/auth'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
-import { getRecycleBin, restoreRecycleBinTab, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
+import { getRecycleBin, restoreRecycleBinTabs, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
 import { openTabAfterActive, openTabsAfterActive } from '../shared/utils/tab-utils'
 import { DASHBOARD_URL } from '../shared/utils/pages'
@@ -82,8 +82,8 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
     case 'GET_RECYCLE_BIN':
       return handleGetRecycleBin()
 
-    case 'RESTORE_RECYCLE_BIN_TAB':
-      return handleRestoreRecycleBinTab(message.payload)
+    case 'RESTORE_RECYCLE_BIN_TABS':
+      return handleRestoreRecycleBinTabs(message.payload)
 
     case 'DELETE_RECYCLE_BIN_TAB':
       return handleDeleteRecycleBinTab(message.payload)
@@ -841,8 +841,11 @@ async function handleGetRecycleBin(): Promise<MessageResponse<RecycleBinData>> {
   return { success: false, error: res.error || '获取回收站失败', authError: res.status === 401 }
 }
 
-async function handleRestoreRecycleBinTab(payload: { id: number }): Promise<MessageResponse> {
-  const res = await restoreRecycleBinTab(payload.id)
+async function handleRestoreRecycleBinTabs(payload: { ids: number[]; workspaceId?: string }): Promise<MessageResponse> {
+  if (!payload?.ids?.length) {
+    return { success: false, error: '请选择要恢复的标签页' }
+  }
+  const res = await restoreRecycleBinTabs(payload.ids, payload.workspaceId)
   if (res.ok) {
     return { success: true, data: res.data }
   }

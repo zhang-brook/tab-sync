@@ -129,6 +129,8 @@ const props = withDefaults(defineProps<{
   manageable?: boolean
   /** 打开/刷新时默认选中「默认分组」并标注 (默认)；传入 false 则不做默认选中，默认 true */
   highlightDefaultWorkspace?: boolean
+  /** 打开/刷新时默认选中的工作组 id（优先于「默认分组」，且不会标注 (默认)） */
+  preselectId?: string
 }>(), {
   manageable: true,
   highlightDefaultWorkspace: true,
@@ -224,6 +226,9 @@ async function reload() {
   loading.value = true
   if (props.highlightDefaultWorkspace) {
     defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
+  } else {
+    // 不参与「默认分组」高亮：清空标记，避免误标 (默认)
+    defaultWorkspaceId.value = ''
   }
   try {
     const workspaces = await listWorkspaces({ includeSystem: true })
@@ -234,14 +239,13 @@ async function reload() {
   }
   // 先结束 loading 让 el-tree 完成渲染，否则下一帧 treeRef 尚未挂载，高亮会被静默跳过
   loading.value = false
-  // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）
-  const defaultNode = defaultWorkspaceId.value
-    ? findWorkspaceTreeNode(treeData.value, defaultWorkspaceId.value)
-    : null
-  if (defaultNode && !disabledSet.value.has(defaultNode.id)) {
+  // 默认选中：优先使用调用方指定的工作组，其次「默认分组」（被禁用的分组不选中）
+  const initialId = props.preselectId || defaultWorkspaceId.value
+  const initialNode = initialId ? findWorkspaceTreeNode(treeData.value, initialId) : null
+  if (initialNode && !disabledSet.value.has(initialNode.id)) {
     await nextTick()
-    treeRef.value?.setCurrentKey(defaultNode.id)
-    selectedNode.value = defaultNode
+    treeRef.value?.setCurrentKey(initialNode.id)
+    selectedNode.value = initialNode
   }
 }
 

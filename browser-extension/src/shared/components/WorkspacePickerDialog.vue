@@ -16,6 +16,7 @@
       :disabled-ids="disabledIds"
       :manageable="manageable"
       :highlight-default-workspace="highlightDefaultWorkspace"
+      :preselect-id="preselectId"
       @select="onSelect"
       @update:close-tab="onUpdateCloseTab"
       @cancel="onCancel"
@@ -47,6 +48,8 @@ const props = defineProps<{
   manageable?: boolean
   /** 打开时默认选中「默认分组」并标注 (默认)；传入 false 则不做默认选中，默认 true */
   highlightDefaultWorkspace?: boolean
+  /** 打开时默认选中的工作组 id（优先于「默认分组」，且不会标注 (默认)） */
+  preselectId?: string
 }>()
 
 const emit = defineEmits<{
