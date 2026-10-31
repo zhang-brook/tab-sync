@@ -108,6 +108,9 @@ func main() {
 		auth := v1.Group("")
 		auth.Use(middleware.TokenAuth(services.Auth))
 		{
+			// 概览统计（管理面板仪表盘只取数量，无需拉取列表）
+			auth.GET("/stats", handlers.System.GetDashboardStats)
+
 			// 设备管理
 			auth.POST("/devices/register", handlers.Device.Register)
 			auth.GET("/devices", handlers.Device.List)

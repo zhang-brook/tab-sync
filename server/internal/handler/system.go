@@ -27,3 +27,13 @@ func (h *SystemHandler) GetStats(c *gin.Context) {
 	stats := h.svc.GetStats()
 	Success(c, stats)
 }
+
+// GetDashboardStats 获取管理面板概览统计（仅数量，避免前端全量拉取列表）
+func (h *SystemHandler) GetDashboardStats(c *gin.Context) {
+	stats, err := h.svc.GetDashboardStats()
+	if err != nil {
+		InternalError(c, "获取概览统计失败")
+		return
+	}
+	Success(c, stats)
+}

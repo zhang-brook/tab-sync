@@ -136,6 +136,38 @@ func (s *SystemService) GetStats() map[string]interface{} {
 	}
 }
 
+// DashboardStats 管理面板概览统计（仅数量）
+type DashboardStats struct {
+	Devices       int64 `json:"devices"`
+	Workspaces    int64 `json:"workspaces"`
+	Tags          int64 `json:"tags"`
+	WorkspaceTabs int64 `json:"workspaceTabs"`
+}
+
+// GetDashboardStats 汇总管理面板概览所需的各项数量。
+// 与前端列表口径保持一致：工作组不含系统分组（「未分组」），工作组内标签页同样不计入系统分组。
+func (s *SystemService) GetDashboardStats() (DashboardStats, error) {
+	var stats DashboardStats
+	if err := s.db.Model(&model.Device{}).Count(&stats.Devices).Error; err != nil {
+		return stats, err
+	}
+	if err := s.db.Model(&model.Workspace{}).
+		Where("is_deleted = ? AND is_system = ?", false, false).
+		Count(&stats.Workspaces).Error; err != nil {
+		return stats, err
+	}
+	if err := s.db.Model(&model.Tag{}).Count(&stats.Tags).Error; err != nil {
+		return stats, err
+	}
+	if err := s.db.Model(&model.Tab{}).
+		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
+		Where("workspaces.is_deleted = ? AND workspaces.is_system = ?", false, false).
+		Count(&stats.WorkspaceTabs).Error; err != nil {
+		return stats, err
+	}
+	return stats, nil
+}
+
 // hashPassword 使用 SHA-256 哈希密码
 func hashPassword(password string) string {
 	hash := sha256.Sum256([]byte(password))

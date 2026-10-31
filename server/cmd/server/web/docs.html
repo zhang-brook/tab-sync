@@ -156,6 +156,7 @@
   <div class="nav-bar">
     <a href="#public" class="active">公开接口</a>
     <a href="#auth">认证管理</a>
+    <a href="#stats">概览统计</a>
     <a href="#devices">设备管理</a>
     <a href="#workspaces">工作组管理</a>
     <a href="#admin">管理后台</a>
@@ -260,6 +261,31 @@
         <tr><td>认证方式</td><td>所有需要认证的接口在请求头携带 <code>Authorization: Bearer &lt;token&gt;</code></td></tr>
         <tr><td>设备绑定</td><td>Token 首次使用时自动绑定 <code>X-Device-Id</code> 请求头中的设备 ID</td></tr>
       </table>
+    </div>
+
+    <!-- 概览统计 -->
+    <div class="section" id="stats">
+      <h2>概览统计</h2>
+      <p style="font-size:13px;color:#999;margin-bottom:16px;">需要 Bearer Token 认证。</p>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method get">GET</span>
+          <span class="ep-path">/v1/tab-sync/stats</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>管理面板概览统计，仅返回各项数量；工作组与工作组内标签页均不含系统分组（「未分组」）</td></tr></table>
+          <h3>响应体</h3>
+          <div class="code-block">{
+  <span class="key">"devices"</span>: <span class="num">3</span>,
+  <span class="key">"workspaces"</span>: <span class="num">5</span>,
+  <span class="key">"tags"</span>: <span class="num">12</span>,
+  <span class="key">"workspaceTabs"</span>: <span class="num">128</span>
+}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 设备管理 -->

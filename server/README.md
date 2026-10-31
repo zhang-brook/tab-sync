@@ -178,6 +178,7 @@ docker compose start
 |------|------|------|
 | `GET` | `/v1/tab-sync/version` | 版本信息（公开） |
 | `POST` | `/v1/tab-sync/auth/verify-token` | Token 验证 |
+| `GET` | `/v1/tab-sync/stats` | 概览统计（设备/工作组/标签/工作组内标签页数量，仅返回数字；不含系统分组「未分组」） |
 | `POST` | `/v1/tab-sync/devices/register` | 设备注册/更新 |
 | `GET` | `/v1/tab-sync/devices` | 设备列表 |
 | `PATCH` | `/v1/tab-sync/devices/:deviceId` | 更新设备 |
