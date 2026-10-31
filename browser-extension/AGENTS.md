@@ -94,7 +94,7 @@ src/
   dashboard/              # 独立标签页管理面板 (完整功能 SPA)
     views/
       DashboardView.vue   # 仪表盘概览
-      TabsView.vue        # 本地标签页管理 (搜索/筛选/批量操作)
+      LocalTabsView.vue   # 本地标签页管理 (搜索/筛选/批量操作)
       SyncedView.vue      # 已同步标签页
       WorkspacesView.vue  # 工作组管理 (CRUD + 恢复打开)
       TagsView.vue        # 标签管理

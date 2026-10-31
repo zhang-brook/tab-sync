@@ -40,7 +40,7 @@ const router = createRouter({
     {
       path: '/tabs',
       name: 'Tabs',
-      component: () => import('./views/TabsView.vue'),
+      component: () => import('./views/LocalTabsView.vue'),
       meta: {
         dataSource: { label: '本地', desc: '数据来自当前浏览器', type: 'info' },
       },
