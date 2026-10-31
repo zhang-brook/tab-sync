@@ -1,51 +1,67 @@
 <template>
   <div class="sidepanel-container">
-    <!-- 顶部栏 -->
-    <div class="sidepanel-header">
-      <h3>Tab Sync</h3>
-      <div class="sp-actions">
-        <el-button
-          v-if="!authLoading && !authenticated"
-          size="small"
-          type="primary"
-          text
-          @click="loginVisible = true"
-        >
-          登录
-        </el-button>
-        <el-dropdown trigger="click" placement="bottom-end" @command="onHeaderCommand">
-          <el-button size="small" text circle :icon="MoreFilled" title="更多操作" />
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="dashboard" :icon="Monitor">管理面板</el-dropdown-item>
-              <el-dropdown-item command="settings" :icon="Setting">设置</el-dropdown-item>
-              <el-dropdown-item
-                v-if="authenticated"
-                command="logout"
-                :icon="SwitchButton"
-                divided
-                class="danger-dropdown-item"
-              >
-                退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
+    <!-- 本地标签页不依赖登录态，未登录也可查看；登录入口在顶部 -->
+    <!-- 未登录提示：只提示状态与登录入口，不遮挡标签页列表 -->
+    <div v-if="!authLoading && !authenticated" class="auth-banner">
+      <span class="auth-banner-text">当前未登录，工作组同步不可用</span>
+      <el-button size="small" type="primary" :icon="Key" @click="loginVisible = true">登录</el-button>
     </div>
 
-    <!-- 本地标签页不依赖登录态，未登录也可查看；登录入口在顶部 -->
     <!-- 工具栏：窗口选择 + 搜索 -->
     <div class="toolbar">
-      <el-select v-model="windowFilter" size="small" class="window-select">
-        <el-option label="全部窗口" value="all" />
-        <el-option
-          v-for="win in windowOptions"
-          :key="win.id"
-          :label="win.label"
-          :value="win.id"
-        />
-      </el-select>
+      <!-- 顶部栏 -->
+      <!-- 侧栏已有浏览器提供的标题，这里只保留操作入口 -->
+      <div class="toolbar-row">
+        <el-select v-model="windowFilter" size="small" class="window-select">
+          <el-option label="全部窗口" value="all" />
+          <el-option
+            v-for="win in windowOptions"
+            :key="win.id"
+            :label="win.label"
+            :value="win.id"
+          />
+        </el-select>
+        <el-tooltip content="定位到当前激活的标签页" placement="top">
+          <el-button
+            size="small"
+            :icon="Aim"
+            circle
+            aria-label="定位到当前激活的标签页"
+            @click="focusActiveTab"
+          />
+        </el-tooltip>
+        <!-- 刷新标签页与已保存标记 -->
+        <el-tooltip content="刷新" placement="top">
+          <el-button
+            size="small"
+            :icon="Refresh"
+            circle
+            aria-label="刷新"
+            :loading="refreshing"
+            @click="refreshAll"
+          />
+        </el-tooltip>
+        <div class="sp-actions">
+          <el-dropdown trigger="click" placement="bottom-end" @command="onHeaderCommand">
+            <el-button size="small" text circle :icon="MoreFilled" title="更多操作" />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="dashboard" :icon="Monitor">管理面板</el-dropdown-item>
+                <el-dropdown-item command="settings" :icon="Setting">设置</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="authenticated"
+                  command="logout"
+                  :icon="SwitchButton"
+                  divided
+                  class="danger-dropdown-item"
+                >
+                  退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
       <el-input
         v-model="keyword"
         placeholder="搜索标签页..."
@@ -54,18 +70,6 @@
         :prefix-icon="Search"
         class="search-input"
       />
-      <el-tooltip content="定位到当前激活的标签页" placement="top">
-        <el-button size="small" :icon="Aim" @click="focusActiveTab">定位</el-button>
-      </el-tooltip>
-      <el-tooltip content="刷新标签页与已保存标记" placement="top">
-        <el-button
-          size="small"
-          :icon="Refresh"
-          circle
-          :loading="refreshing"
-          @click="refreshAll"
-        />
-      </el-tooltip>
     </div>
 
     <!-- 选择操作栏 -->
@@ -136,7 +140,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton, Refresh, TopRight } from '@element-plus/icons-vue'
+import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton, Refresh, TopRight, Key } from '@element-plus/icons-vue'
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import LocalSaveTabsDialog from '@/shared/components/LocalSaveTabsDialog.vue'
@@ -332,47 +336,77 @@ onUnmounted(() => {
 })
 </script>
 
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+html, body {
+  overflow: hidden;
+}
+</style>
+
 <style scoped>
 .sidepanel-container {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #fff;
 }
 
-.sidepanel-header {
+.auth-banner {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #f5f7fa;
 }
 
-.sidepanel-header h3 {
-  margin: 0;
-  font-size: 15px;
-  color: #303133;
+.auth-banner-text {
+  font-size: 12px;
+  color: #909399;
 }
 
 .sp-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+}
+
+/* Element Plus 默认给相邻按钮/下拉加外边距，统一交给父容器的 gap 控制 */
+:deep(.el-button + .el-button),
+:deep(.el-button + .el-dropdown),
+:deep(.el-dropdown + .el-button) {
+  margin-left: 0;
 }
 
 .toolbar {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px 8px;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .window-select {
-  width: 140px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .search-input {
-  flex: 1;
+  width: 100%;
 }
 
 .selection {
