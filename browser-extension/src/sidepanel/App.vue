@@ -85,6 +85,7 @@
           @close="closeTab"
           @sort="onSort"
           @command="(cmd, tab) => run(cmd, tab)"
+          @tag-click="onTagClick"
         />
       </div>
     </template>
@@ -117,7 +118,7 @@ import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { DASHBOARD_URL } from '@/shared/utils/pages'
 import type { StateData } from '@/shared/types'
-import type { TabRowMeta } from '@/shared/types/tab-list'
+import type { TabRowMeta, TabTagDisplay } from '@/shared/types/tab-list'
 
 // ============ 登录态（从 popup 迁移） ============
 const authLoading = ref(true)
@@ -185,6 +186,11 @@ const { load: loadWorkspaceIndex, tagsFor, colorsFor } = useWorkspaceTabIndex()
 function metaForTab(tab: LocalTab): TabRowMeta | undefined {
   const tags = tagsFor(tab.url)
   return tags.length ? { tags, saved: true, savedColors: colorsFor(tab.url) } : undefined
+}
+
+function onTagClick(tag: TabTagDisplay) {
+  if (!tag.key) return
+  void openTabAfterActive(`${DASHBOARD_URL}#/workspaces?workspaceId=${encodeURIComponent(tag.key)}`)
 }
 
 async function onSort(payload: { segment: LocalTabSegment; orderedIds: number[]; movedId: number }) {
