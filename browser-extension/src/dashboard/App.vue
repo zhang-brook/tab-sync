@@ -2,7 +2,7 @@
   <el-container class="dashboard-layout">
     <el-aside width="220px" class="dashboard-aside">
       <div class="aside-logo">
-        <img class="aside-logo-img" src="/icons/icon.png" alt="Tab Sync" />
+        <img class="aside-logo-img" src="/icons/icon.svg" alt="Tab Sync" />
         <div class="aside-logo-text">
           <span class="aside-logo-title">Tab Sync</span>
           <span class="aside-logo-sub">多端标签页同步</span>

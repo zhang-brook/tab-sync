@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 960" width="960" height="960" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">Tab Sync</title>
+
+  <defs>
+    <linearGradient id="ts-lid-face" x1="320" y1="80" x2="480" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F0F9FD"/>
+    </linearGradient>
+
+    <linearGradient id="ts-lid-panel" x1="420" y1="130" x2="420" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9BBFD8"/>
+      <stop offset="1" stop-color="#B6D3E5"/>
+    </linearGradient>
+
+    <linearGradient id="ts-cavity-left" x1="180" y1="494" x2="180" y2="584" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A9CBE0"/>
+      <stop offset="0.22" stop-color="#9EC5DB"/>
+      <stop offset="0.26" stop-color="#4E86AB"/>
+      <stop offset="1" stop-color="#3E7499"/>
+    </linearGradient>
+
+    <linearGradient id="ts-cavity-right" x1="815" y1="520" x2="888" y2="588" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5E95B9"/>
+      <stop offset="1" stop-color="#2F6A90"/>
+    </linearGradient>
+
+    <linearGradient id="ts-content" x1="420" y1="470" x2="420" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C2DCEC"/>
+      <stop offset="1" stop-color="#B0D2E5"/>
+    </linearGradient>
+
+    <linearGradient id="ts-front" x1="760" y1="620" x2="280" y2="890" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F6FBFE"/>
+    </linearGradient>
+
+    <path id="ts-lid-outline" d="M 110 492
+      C 170 484 230 476 290 466
+      C 420 424 560 336 650 266
+      Q 660 254 670 244
+      L 675 240
+      L 721 150
+      C 721 145 719 138 714 130
+      C 708 120 699 107 688 97
+      Q 680 89 674 82
+      Q 667 76 655 74
+      L 245 103
+      Q 222 105 214 124
+      L 70 400
+      C 64 420 62 446 75 466
+      Q 92 480 110 492 Z"/>
+
+    <path id="ts-lid-panel-shape" d="M 124 452
+      C 150 360 188 252 276 170
+      Q 284 164 302 163
+      L 760 136
+      L 790 540
+      L 600 540
+      L 360 420
+      C 300 432 240 440 180 444
+      L 124 452 Z"/>
+
+    <clipPath id="ts-lid-clip">
+      <use href="#ts-lid-outline"/>
+    </clipPath>
+  </defs>
+
+  <g stroke="#081730" stroke-width="26" stroke-linejoin="round" stroke-linecap="round">
+    <!-- box interior -->
+    <path d="M 104 498 L 252 484 L 252 612 L 104 552 Z" fill="url(#ts-cavity-left)" stroke="none"/>
+    <path d="M 813 527 L 902 574 L 902 610 L 813 610 Z" fill="url(#ts-cavity-right)" stroke="none"/>
+    <path d="M 812 515 L 890 556" fill="none"/>
+    <path d="M 878 535
+      C 886 539 894 543 900 549
+      C 904 553 907 561 908.8 571
+      L 908.8 600 L 888 600 L 888 588
+      C 884 580 877 574 875 566
+      C 874 556 876 545 878 535 Z" fill="#081730" stroke="none"/>
+
+    <!-- lid -->
+    <use href="#ts-lid-outline" fill="url(#ts-lid-face)" stroke="none"/>
+    <g clip-path="url(#ts-lid-clip)">
+      <use href="#ts-lid-panel-shape" fill="url(#ts-lid-panel)" stroke="none"/>
+      <path d="M 648 158 L 601 246" fill="none" stroke="#2F7DB3" stroke-width="22"/>
+      <path d="M 106 476
+        L 250 198
+        Q 272 163 302 163
+        L 704 138" fill="none"/>
+    </g>
+    <use href="#ts-lid-outline" fill="none"/>
+
+    <!-- stacked browser windows, back to front -->
+    <g>
+      <rect x="347" y="250" width="411" height="420" rx="44" fill="#FFFFFF"/>
+      <rect x="400" y="335" width="326" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
+      <rect x="389" y="288" width="85" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="708" cy="295" r="15" fill="#081730" stroke="none"/>
+
+      <rect x="416" y="331" width="392" height="429" rx="44" fill="#FFFFFF"/>
+      <rect x="451" y="416" width="325" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
+      <rect x="456" y="383.5" width="88" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="759" cy="376" r="15" fill="#081730" stroke="none"/>
+
+      <rect x="312" y="320" width="404" height="430" rx="44" fill="#FFFFFF"/>
+      <rect x="347" y="409" width="337" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
+      <rect x="362" y="374.5" width="88" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="665" cy="364" r="15" fill="#081730" stroke="none"/>
+
+      <rect x="256" y="378" width="392" height="420" rx="44" fill="#FFFFFF"/>
+      <rect x="291" y="468" width="323" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
+      <rect x="298" y="420.5" width="91" height="22" rx="11" fill="#081730" stroke="none"/>
+      <circle cx="594" cy="426" r="15" fill="#081730" stroke="none"/>
+    </g>
+
+    <!-- box front -->
+    <path d="M 102.5 735
+      L 102.5 519
+      Q 102.5 506.78 114.5 513.15
+      L 318 621.21
+      Q 336.4 630.98 354 629.54
+      L 856 588.32
+      C 860.14 587.98 864.04 586.37 868 585
+      C 872.04 583.6 876.35 581.06 880 580
+      C 882.68 579.22 884.89 579.15 887 579.5
+      C 888.89 579.81 890.76 580.39 892 582
+      C 893.59 584.06 895.5 587.44 895.5 590.5
+      L 895.5 780
+      C 895.5 783.76 893.98 787.61 893 791
+      C 892.15 793.95 891.15 796.36 890 799
+      C 888.82 801.7 887.37 804.44 886 807
+      C 884.7 809.44 883.55 811.93 882 814
+      C 880.55 815.93 878.71 817.46 877 819
+      C 875.37 820.46 873.78 821.71 872 823
+      C 870.11 824.37 868 825.67 866 827
+      C 864 828.33 862 829.67 860 831
+      C 858 832.33 856.04 833.81 854 835
+      C 852.04 836.15 850.12 837.18 848 838
+      C 845.79 838.85 843.34 839.41 841 840
+      C 838.68 840.58 836.43 841.11 834 841.5
+      C 831.43 841.91 828.67 842.15 826 842.4
+      L 352 886.65
+      C 348.01 887.03 343.82 886.46 340 886
+      C 336.48 885.58 333.31 884.83 330 884
+      C 326.65 883.16 323.31 882.16 320 881
+      C 316.64 879.82 313.43 878.72 310 877
+      C 306.1 875.05 302.65 872.51 298 870
+      C 292.15 866.85 284.9 863.37 278.5 860
+      C 272.23 856.7 266.17 853.33 260 850
+      C 253.83 846.67 247.62 843.35 241.5 840
+      C 235.45 836.68 229.55 833.32 223.5 830
+      C 217.38 826.65 211.27 823.3 205 820
+      C 198.6 816.63 191.85 813.39 185.5 810
+      C 179.35 806.72 173.55 803.32 167.5 800
+      C 161.38 796.65 154.91 793.42 149 790
+      C 143.41 786.76 138 783.45 133 780
+      C 128.34 776.78 123.78 773.52 120 770
+      C 116.62 766.85 113.76 763.48 111.5 760
+      C 109.43 756.82 108.33 753.19 107 750
+      C 105.83 747.19 104.78 744.61 104 742
+      C 103.28 739.61 102.5 737.39 102.5 735
+      Z" fill="url(#ts-front)"/>
+
+    <rect x="322" y="672" width="22" height="168" rx="11" fill="#081730" stroke="none"/>
+  </g>
+</svg>
