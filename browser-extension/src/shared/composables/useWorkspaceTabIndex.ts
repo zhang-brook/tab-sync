@@ -1,7 +1,7 @@
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getWorkspaceTabsSummary } from '../services/workspace-service'
 import { normalizeColor } from '../constants/theme'
-import type { WorkspaceTabsSummaryData } from '../types'
+import type { WorkspaceTabsSummaryData, WorkspaceTabsChangedMessage } from '../types'
 import type { TabTagDisplay } from '../types/tab-list'
 
 type WorkspaceSummary = WorkspaceTabsSummaryData['summaries'][number]
@@ -61,7 +61,30 @@ export function useWorkspaceTabIndex() {
     return workspacesFor(url).map((w) => w.color)
   }
 
-  onMounted(() => void load())
+  let reloadTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** 批量操作会连续触发多条变更广播，合并为一次刷新 */
+  function scheduleLoad() {
+    if (reloadTimer) clearTimeout(reloadTimer)
+    reloadTimer = setTimeout(() => void load(), 120)
+  }
+
+  function onMessage(message: unknown) {
+    if ((message as WorkspaceTabsChangedMessage | null)?.action === 'WORKSPACE_TABS_CHANGED') {
+      scheduleLoad()
+    }
+  }
+
+  onMounted(() => {
+    // 工作组标签页的写操作统一由 background 广播，其他页面（管理面板/右键菜单）修改后也能同步刷新
+    chrome.runtime.onMessage.addListener(onMessage)
+    void load()
+  })
+
+  onUnmounted(() => {
+    chrome.runtime.onMessage.removeListener(onMessage)
+    if (reloadTimer) clearTimeout(reloadTimer)
+  })
 
   return { load, tagsFor, colorsFor }
 }

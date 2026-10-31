@@ -381,6 +381,13 @@ export type ExtensionMessage =
   | DeleteRecycleBinTabMessage
   | EmptyRecycleBinMessage
 
+// ============ 广播事件 ============
+
+/** Background → 各 UI 页面：工作组或其标签页已变更，页面应刷新缓存的标签页摘要 */
+export interface WorkspaceTabsChangedMessage {
+  action: 'WORKSPACE_TABS_CHANGED'
+}
+
 // ============ 响应定义 ============
 
 /** 通用响应包装 */

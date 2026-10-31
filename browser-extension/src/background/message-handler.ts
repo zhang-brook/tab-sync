@@ -1,4 +1,4 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
@@ -11,10 +11,46 @@ import { openTabAfterActive, openTabsAfterActive } from '../shared/utils/tab-uti
 import { DASHBOARD_URL } from '../shared/utils/pages'
 import { logger } from '../shared/utils/logger'
 
+/** 会改变工作组标签页摘要的写操作：成功后需通知各 UI 页面刷新「已保存到云端」标记 */
+const WORKSPACE_TABS_CHANGED_ACTIONS: ReadonlySet<ExtensionMessage['action']> = new Set<
+  ExtensionMessage['action']
+>([
+  'ADD_TABS_TO_WORKSPACE',
+  'ADD_WORKSPACE_TAB_BY_URL',
+  'MOVE_WORKSPACE_TAB',
+  'COPY_WORKSPACE_TAB',
+  'UPDATE_WORKSPACE_TAB',
+  'REMOVE_WORKSPACE_TAB',
+  'UPDATE_WORKSPACE',
+  'DELETE_WORKSPACE',
+  'DUPLICATE_WORKSPACE',
+  'RESTORE_RECYCLE_BIN_TABS',
+])
+
+/**
+ * 广播工作组标签页变更：侧边栏与管理面板均为独立页面，
+ * 需要主动通知才能让按 URL 交叉比对的来源色条与工作组标签同步刷新。
+ */
+function broadcastWorkspaceTabsChanged() {
+  const message: WorkspaceTabsChangedMessage = { action: 'WORKSPACE_TABS_CHANGED' }
+  chrome.runtime.sendMessage(message, () => {
+    // 没有打开的 UI 页面时会报 "Receiving end does not exist"，读取 lastError 避免控制台报错
+    void chrome.runtime.lastError
+  })
+}
+
 /**
  * 统一消息处理分发器
  */
 export async function handleMessage(message: ExtensionMessage): Promise<MessageResponse> {
+  const response = await dispatchMessage(message)
+  if (response.success && WORKSPACE_TABS_CHANGED_ACTIONS.has(message.action)) {
+    broadcastWorkspaceTabsChanged()
+  }
+  return response
+}
+
+async function dispatchMessage(message: ExtensionMessage): Promise<MessageResponse> {
   switch (message.action) {
     case 'GET_STATE':
       return handleGetState()

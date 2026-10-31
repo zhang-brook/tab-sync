@@ -25,4 +25,5 @@ export type {
   GetRecycleBinMessage,
   RestoreRecycleBinTabsMessage,
   DeleteRecycleBinTabMessage,
+  WorkspaceTabsChangedMessage,
 } from './messages'
