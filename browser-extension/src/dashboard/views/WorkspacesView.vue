@@ -649,16 +649,24 @@ const routeWorkspaceId = computed(() => {
   return typeof v === 'string' ? v : ''
 })
 
+/** 已发起但路由尚未更新的目标参数值：用户点选时选中项 watcher 会再触发一次，
+ *  据此跳过重复写入，避免把刚 push 的历史记录又 replace 掉 */
+let pendingQuerySync: string | null = null
+
 /** 选中项同步到 URL query：刷新或复制链接后可恢复到同一工作组。
- *  「未分组」是默认落点，选中它时不带该参数 */
-function syncSelectedToQuery(id: string) {
+ *  「未分组」是默认落点，选中它时不带该参数。
+ *  mode=push 用于用户点选，让浏览器返回能逐个回到之前选中的工作组；其余场景替换当前记录 */
+function syncSelectedToQuery(id: string, mode: 'push' | 'replace' = 'replace') {
   const next = id === UNGROUPED_WORKSPACE_ID ? '' : id
   const current = typeof route.query.workspaceId === 'string' ? route.query.workspaceId : ''
-  if (next === current) return
+  if (next === current || next === pendingQuerySync) return
+  pendingQuerySync = next
   const query = { ...route.query }
   if (next) query.workspaceId = next
   else delete query.workspaceId
-  void router.replace({ query })
+  void router[mode]({ query }).finally(() => {
+    if (pendingQuerySync === next) pendingQuerySync = null
+  })
 }
 
 /** 定位并展开选中节点：从 URL 恢复选中项时，保证其祖先与自身展开可见 */
@@ -711,7 +719,18 @@ async function loadWorkspaces(options: { silent?: boolean } = {}) {
 
 // 从其他页面带 workspaceId 跳转进来（同一路由仅 query 变化）时定位到目标工作组
 watch(routeWorkspaceId, (id) => {
-  if (!id || !workspaces.value.some((w) => w.id === id)) return
+  if (!id) {
+    // URL 无参数（如返回到未带参数的初始记录）：回到默认分组
+    if (selectedId.value === UNGROUPED_WORKSPACE_ID) return
+    const fallback = defaultWorkspaceId.value && workspaces.value.some((w) => w.id === defaultWorkspaceId.value)
+      ? defaultWorkspaceId.value
+      : workspaces.value[0]?.id ?? ''
+    if (!fallback) return
+    selectedId.value = fallback
+    void revealSelected(fallback)
+    return
+  }
+  if (!workspaces.value.some((w) => w.id === id)) return
   if (id === selectedId.value) {
     // 选中未分组时不保留参数（外部带入了同样的值）
     syncSelectedToQuery(id)
@@ -762,12 +781,14 @@ async function onTagEditorConfirm(ids: number[]) {
 
 function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
+  syncSelectedToQuery(node.id, 'push')
 }
 
 /** 右键节点：选中该节点，由 ContextMenu 负责打开操作菜单 */
 function onNodeContextMenu(data: WorkspaceTreeNode) {
   selectedId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
+  syncSelectedToQuery(data.id, 'push')
 }
 
 // ============ 工作组树拖拽（调整层级 / 同级顺序） ============
