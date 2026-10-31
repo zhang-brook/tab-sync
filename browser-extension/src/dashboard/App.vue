@@ -18,12 +18,12 @@
           <span>仪表盘</span>
         </el-menu-item>
         <el-divider class="aside-divider" />
-        <el-menu-item index="/tabs">
+        <el-menu-item index="/local-tabs">
           <el-icon><Collection /></el-icon>
           <span>本地标签页</span>
         </el-menu-item>
         <!-- <el-divider class="aside-divider" /> -->
-        <el-menu-item index="/synced">
+        <el-menu-item index="/tabs">
           <el-icon><Files /></el-icon>
           <span>标签页</span>
           <span class="cloud-badge">云端</span>
@@ -127,10 +127,10 @@ const loginVisible = ref(false)
 
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
-  '/tabs': '本地标签页',
+  '/local-tabs': '本地标签页',
+  '/tabs': '已同步标签页',
   '/workspaces': '工作组',
   '/tags': '标签',
-  '/synced': '已同步标签页',
   '/recyclebin': '回收站',
   '/devices': '登录设备管理',
   '/settings': '设置',
@@ -140,7 +140,7 @@ const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => pageTitleMap[route.path] || '本地标签页')
 
 /** 不依赖登录态、未登录也可访问的板块 */
-const AUTH_FREE_ROUTES = new Set(['/settings', '/tabs'])
+const AUTH_FREE_ROUTES = new Set(['/settings', '/local-tabs'])
 
 /** 未登录时仅设置与本地标签页可用，其余板块由主内容区提示替代渲染 */
 const authBlocked = computed(() => !authenticated.value && !AUTH_FREE_ROUTES.has(route.path))

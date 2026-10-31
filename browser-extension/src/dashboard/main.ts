@@ -38,8 +38,8 @@ const router = createRouter({
       component: () => import('./views/DashboardView.vue'),
     },
     {
-      path: '/tabs',
-      name: 'Tabs',
+      path: '/local-tabs',
+      name: 'LocalTabs',
       component: () => import('./views/LocalTabsView.vue'),
       meta: {
         dataSource: { label: '本地', desc: '数据来自当前浏览器', type: 'info' },
@@ -62,9 +62,9 @@ const router = createRouter({
       },
     },
     {
-      path: '/synced',
-      name: 'Synced',
-      component: () => import('./views/SyncedView.vue'),
+      path: '/tabs',
+      name: 'Tabs',
+      component: () => import('./views/TabsView.vue'),
       meta: {
         dataSource: { label: '云端', desc: '数据跨设备同步', type: 'success' },
       },

@@ -111,8 +111,8 @@ const cards = computed(() => [
   { key: 'devices', label: '设备数', value: stats.value?.devices ?? 0, icon: Monitor, color: '#e6f4ff', to: '/devices' },
   { key: 'workspaces', label: '工作组数', value: stats.value?.workspaces ?? 0, icon: FolderOpened, color: '#f6ffed', to: '/workspaces' },
   { key: 'tags', label: '标签数', value: stats.value?.tags ?? 0, icon: PriceTag, color: '#fff7e6', to: '/tags' },
-  { key: 'openTabs', label: '本地打开标签', value: stats.value?.openTabs ?? 0, icon: Document, color: '#f9f0ff', to: '/tabs' },
-  { key: 'frozenTabs', label: '已冻结标签', value: stats.value?.frozenTabs ?? 0, icon: Lock, color: '#fff1f0', to: '/tabs' },
+  { key: 'openTabs', label: '本地打开标签', value: stats.value?.openTabs ?? 0, icon: Document, color: '#f9f0ff', to: '/local-tabs' },
+  { key: 'frozenTabs', label: '已冻结标签', value: stats.value?.frozenTabs ?? 0, icon: Lock, color: '#fff1f0', to: '/local-tabs' },
   { key: 'workspaceTabs', label: '工作组内标签', value: stats.value?.workspaceTabs ?? 0, icon: Files, color: '#e6fffb', to: '/workspaces' },
 ])
 

@@ -197,7 +197,7 @@ function onHeaderCommand(command: string) {
 }
 
 function openDashboardTabs() {
-  void openTabAfterActive(DASHBOARD_URL + '#/tabs')
+  void openTabAfterActive(DASHBOARD_URL + '#/local-tabs')
 }
 
 /** 刷新本地标签页列表与「已保存到工作组」索引（色块/标签按 URL 匹配，同样需要重新拉取） */
