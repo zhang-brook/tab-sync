@@ -11,13 +11,13 @@ export type {
 import { computed, ref, watch, nextTick } from 'vue'
 import { MoreFilled } from '@element-plus/icons-vue'
 import LazyFavicon from './LazyFavicon.vue'
+import EntityTag from './EntityTag.vue'
 import draggable from 'vuedraggable'
 import { formatDateTime } from '../utils/format'
 import type {
   TabListItem,
   TabListMenuEntry,
   TabListSortEvent,
-  TabTagDisplay,
 } from '../types/tab-list'
 
 const props = withDefaults(
@@ -51,8 +51,6 @@ const emit = defineEmits<{
   (e: 'click', item: TabListItem): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
   (e: 'command', command: string, item: TabListItem): void
-  (e: 'tag-click', tag: TabTagDisplay, item: TabListItem): void
-  (e: 'badge-click', workspaceId: string, item: TabListItem): void
 }>()
 
 /** 组件内可变列表：拖拽就地排序，父组件通过 sort 事件持久化 */
@@ -90,13 +88,6 @@ function titleAttr(item: TabListItem): string {
   return item.originalTitle ? `${item.title}（原：${item.originalTitle}）` : item.title
 }
 
-function tagStyle(tag: TabTagDisplay) {
-  if (!tag.color) return {}
-  return tag.kind === 'workspace'
-    ? { borderColor: tag.color, color: tag.color }
-    : { backgroundColor: tag.color, borderColor: tag.color }
-}
-
 /** 多工作组色条：各段占满均分区间，仅在相邻色段间留窄过渡，避免混出奇怪的中间色 */
 function savedAccent(colors: string[]): string {
   if (colors.length === 1) return colors[0]
@@ -117,14 +108,6 @@ function savedStyle(item: TabListItem) {
   const colors = item.savedColors?.filter(Boolean) ?? []
   if (colors.length === 0) return undefined
   return { '--tab-saved-accent': savedAccent(colors) }
-}
-
-function onTagClick(tag: TabTagDisplay, item: TabListItem) {
-  if (tag.clickable) emit('tag-click', tag, item)
-}
-
-function onBadgeClick(item: TabListItem) {
-  if (item.badgeKey) emit('badge-click', item.badgeKey, item)
 }
 
 /** 整个列表共用一个下拉菜单，避免每行各挂一套弹出层组件（大列表会撑爆渲染进程） */
@@ -207,31 +190,22 @@ function onSharedMenuCommand(command: string) {
             v-if="element.description || element.tags?.length || element.addedAt || $slots.extra"
             class="tab-extra"
           >
-            <el-tag
+            <EntityTag
               v-for="tag in element.tags"
               :key="tag.id ?? tag.name"
-              size="small"
-              :effect="tag.kind === 'workspace' ? 'plain' : 'dark'"
-              :round="tag.kind !== 'workspace'"
+              :tag="tag"
               class="tab-tag"
-              :class="{ 'is-clickable': tag.clickable }"
-              :style="tagStyle(tag)"
-              @click.stop="onTagClick(tag, element)"
-            >{{ tag.name }}</el-tag>
+            />
             <span v-if="element.addedAt" class="tab-time">{{ formatDateTime(element.addedAt) }}</span>
             <span v-if="element.description" class="tab-desc" :title="element.description">{{ element.description }}</span>
             <slot name="extra" :item="element" />
           </div>
         </div>
-        <el-tag
+        <EntityTag
           v-if="element.badgeText"
-          size="small"
-          effect="plain"
           class="tab-badge"
-          :class="{ 'is-clickable': element.badgeKey }"
-          :style="element.badgeColor ? { borderColor: element.badgeColor, color: element.badgeColor } : {}"
-          @click.stop="onBadgeClick(element)"
-        >{{ element.badgeText }}</el-tag>
+          :tag="{ name: element.badgeText, color: element.badgeColor, key: element.badgeKey, kind: 'workspace' }"
+        />
         <div class="tab-actions" @click.stop>
           <slot name="actions" :item="element" />
           <button
@@ -373,10 +347,6 @@ function onSharedMenuCommand(command: string) {
   line-height: 16px;
 }
 
-.tab-tag.is-clickable {
-  cursor: pointer;
-}
-
 .tab-time,
 .tab-desc {
   font-size: 11px;
@@ -392,10 +362,6 @@ function onSharedMenuCommand(command: string) {
 
 .tab-badge {
   flex-shrink: 0;
-}
-
-.tab-badge.is-clickable {
-  cursor: pointer;
 }
 
 .tab-actions {

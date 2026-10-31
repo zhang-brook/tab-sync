@@ -3,7 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { CaretRight, Close, Monitor } from '@element-plus/icons-vue'
 import TabList from './TabList.vue'
 import { flattenLocalWindows, type LocalTab, type LocalTabGroup, type LocalTabSegment, type LocalTabWindow } from '../services/local-tabs'
-import type { TabListItem, TabListMenuEntry, TabListSortEvent, TabTagDisplay, TabRowMeta } from '../types/tab-list'
+import type { TabListItem, TabListMenuEntry, TabListSortEvent, TabRowMeta } from '../types/tab-list'
 
 const props = withDefaults(
   defineProps<{
@@ -39,7 +39,6 @@ const emit = defineEmits<{
   (e: 'close', tab: LocalTab): void
   (e: 'sort', payload: { segment: LocalTabSegment; orderedIds: number[]; movedId: number }): void
   (e: 'command', command: string, tab: LocalTab | undefined): void
-  (e: 'tag-click', tag: TabTagDisplay, tab: LocalTab | undefined): void
 }>()
 
 const selectedArray = computed<Array<string | number>>(() => Array.from(props.selected))
@@ -106,10 +105,6 @@ function onCommand(command: string, item: TabListItem) {
   emit('command', command, tabOf(item))
 }
 
-function onTagClick(tag: TabTagDisplay, item: TabListItem) {
-  emit('tag-click', tag, tabOf(item))
-}
-
 function onActivate(item: TabListItem) {
   const tab = tabOf(item)
   if (tab) emit('activate', tab)
@@ -167,7 +162,6 @@ function onClose(item: TabListItem) {
                 @click="onActivate"
                 @sort="(items, evt) => onSort(seg, items, evt)"
                 @command="onCommand"
-                @tag-click="onTagClick"
               >
                 <template #actions="{ item }">
                   <slot name="actions" :item="item" :tab="tabOf(item)" />
@@ -191,7 +185,6 @@ function onClose(item: TabListItem) {
             @click="onActivate"
             @sort="(items, evt) => onSort(seg, items, evt)"
             @command="onCommand"
-            @tag-click="onTagClick"
           >
             <template #actions="{ item }">
               <slot name="actions" :item="item" :tab="tabOf(item)" />

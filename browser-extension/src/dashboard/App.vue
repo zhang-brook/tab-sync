@@ -94,15 +94,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { ENTITY_NAVIGATION } from '@/shared/composables/entity-navigation'
+import { dashboardTargetRoute } from '@/shared/utils/dashboard-links'
 import { STORAGE_KEYS } from '@/shared/storage'
 import type { StateData } from '@/shared/types'
 
 const route = useRoute()
+const router = useRouter()
+
+/** 实体芯片在本页面内直接路由跳转，避免再开一个管理面板 */
+provide(ENTITY_NAVIGATION, (target) => {
+  void router.push(dashboardTargetRoute(target))
+})
 
 const authenticated = ref(true) // 默认假定已登录，避免闪现遮罩
 

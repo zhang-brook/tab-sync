@@ -23,9 +23,7 @@
         <el-descriptions-item label="所在工作组">{{ workspacePath || '—' }}</el-descriptions-item>
         <el-descriptions-item label="标签">
           <span v-if="tab.tags?.length" class="props-tags">
-            <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="dark" round class="props-tag"
-              :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}"
-              @click="onTagClick(tg)">{{ tg.name }}</el-tag>
+            <EntityTag v-for="tg in tab.tags" :key="tg.id" :tag="tg" @open="visible = false" />
           </span>
           <span v-else class="props-muted">—</span>
         </el-descriptions-item>
@@ -46,11 +44,10 @@ import { computed } from 'vue'
 import { CopyDocument } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import LazyFavicon from '@/shared/components/LazyFavicon.vue'
-import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
+import EntityTag from '@/shared/components/EntityTag.vue'
 import { copyText } from '@/shared/utils/clipboard'
 import { formatDateTime } from '@/shared/utils/format'
 import type { TabReference } from '@/shared/types'
-import type { TagInfo } from '@/shared/types/workspace'
 
 const props = defineProps<{
   modelValue: boolean
@@ -71,14 +68,6 @@ const visible = computed({
 
 /** 重命名时优先展示显示名 */
 const title = computed(() => props.tab?.displayName || props.tab?.title || '')
-
-const { navigateToTag } = useDashboardNavigation()
-
-/** 点击标签：关闭属性弹窗并跳到标签详情 */
-function onTagClick(tag: TagInfo) {
-  visible.value = false
-  navigateToTag(tag)
-}
 
 async function copyUrl() {
   if (!props.tab) return
@@ -140,10 +129,6 @@ async function copyUrl() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.props-tag {
-  cursor: pointer;
 }
 
 .props-muted {

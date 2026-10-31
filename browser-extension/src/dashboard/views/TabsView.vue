@@ -71,7 +71,6 @@
           @close="closeTab"
           @sort="onSort"
           @command="(cmd, tab) => run(cmd, tab)"
-          @tag-click="navigateToTag"
         />
       </div>
     </div>
@@ -107,7 +106,6 @@
             :menu-items="[]"
             @update:selected="onSavedSelectionChange"
             @click="(item) => openSavedTab(item)"
-            @tag-click="navigateToTag"
           >
             <template #actions="{ item }">
               <el-button text :icon="Close" title="关闭标签页" @click="closeSavedTab(Number(item.id))" />
@@ -140,10 +138,7 @@ import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
 import { localTabMenu } from '@/shared/actions/tab-actions'
 import { closeLocalTabs, type LocalTab, type LocalTabSegment } from '@/shared/services/local-tabs'
 import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
-import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import type { TabListItem, TabRowMeta } from '@/shared/types/tab-list'
-
-const { navigateToTag } = useDashboardNavigation()
 
 const {
   loading,

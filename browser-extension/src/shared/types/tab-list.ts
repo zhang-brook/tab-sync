@@ -7,7 +7,6 @@ export interface TabTagDisplay {
   key?: string
   name: string
   color?: string
-  clickable?: boolean
   /** 标签来源：普通标签用深色胶囊，工作组用浅色描边 */
   kind?: 'tag' | 'workspace'
 }

@@ -186,16 +186,7 @@
                   {{ ws.description }}
                 </div>
                 <div v-if="ws.tags?.length" class="workspace-tags">
-                  <el-tag
-                    v-for="t in ws.tags"
-                    :key="t.id"
-                    size="small"
-                    effect="dark"
-                    round
-                    class="tag-chip"
-                    :style="t.color ? { backgroundColor: normalizeColor(t.color), borderColor: normalizeColor(t.color) } : {}"
-                    @click.stop="navigateToTag(t)"
-                  >{{ t.name }}</el-tag>
+                  <EntityTag v-for="t in ws.tags" :key="t.id" :tag="t" />
                 </div>
               </div>
               <el-button
@@ -221,7 +212,6 @@
               :menu-items="tabMenu"
               @click="openTab"
               @command="onTabCommand"
-              @badge-click="navigateToWorkspace"
             />
           </div>
         </template>
@@ -301,12 +291,13 @@ import { DEFAULT_WORKSPACE_COLOR, normalizeColor } from '@/shared/constants/them
 import { copyText } from '@/shared/utils/clipboard'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
+import EntityTag from '@/shared/components/EntityTag.vue'
 import type { TagInfo, TagTabItem, Workspace } from '@/shared/types'
 import type { TabListItem } from '@/shared/types/tab-list'
 
 const route = useRoute()
 const router = useRouter()
-const { navigateToTag, navigateToWorkspace } = useDashboardNavigation()
+const { navigateToWorkspace } = useDashboardNavigation()
 
 const tags = ref<TagInfo[]>([])
 const workspaces = ref<Workspace[]>([])
@@ -963,9 +954,6 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
-}
-.tag-chip {
-  cursor: pointer;
 }
 .scope-readonly {
   font-size: 13px;

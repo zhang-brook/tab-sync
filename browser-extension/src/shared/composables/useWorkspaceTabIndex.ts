@@ -53,7 +53,6 @@ export function useWorkspaceTabIndex() {
       key: w.workspaceId,
       name: w.workspaceName,
       color: w.color,
-      clickable: true,
       kind: 'workspace' as const,
     }))
   }

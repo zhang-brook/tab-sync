@@ -71,9 +71,7 @@
             <div class="detail-title-row">
               <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
               <span class="ws-name">{{ selectedWorkspace.name }}</span>
-              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="dark" round
-                class="tag-chip" :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}"
-                @click="navigateToTag(tg)">{{ tg.name }}</el-tag>
+              <EntityTag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" :tag="tg" />
               <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
             <div class="detail-actions">
@@ -203,8 +201,6 @@
               @sort="onTabSort"
               @click="onTabClick"
               @command="onTabMenuCommand"
-              @tag-click="navigateToTag"
-              @badge-click="navigateToWorkspace"
             />
           </div>
         </template>
@@ -319,10 +315,10 @@ import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
 import TabPropertiesDialog from '../components/TabPropertiesDialog.vue'
+import EntityTag from '@/shared/components/EntityTag.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
-import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, getWorkspacePath, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
@@ -352,7 +348,6 @@ import type { Workspace, TabReference, TagInfo } from '@/shared/types'
 
 const route = useRoute()
 const router = useRouter()
-const { navigateToTag, navigateToWorkspace } = useDashboardNavigation()
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -590,7 +585,6 @@ const tabListItems = computed<WsTabListItem[]>(() =>
       id: t.id,
       name: t.name,
       color: t.color,
-      clickable: true,
     })),
     description: it.tab.description,
     addedAt: it.tab.addedAt,
@@ -1455,10 +1449,6 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   font-size: 15px;
   font-weight: 500;
   color: #303133;
-}
-
-.tag-chip {
-  cursor: pointer;
 }
 
 .detail-actions {

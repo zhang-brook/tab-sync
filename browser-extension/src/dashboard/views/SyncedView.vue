@@ -33,8 +33,6 @@
           :menu-items="tabMenu"
           @click="onTabClick"
           @command="onCommand"
-          @tag-click="navigateToTag"
-          @badge-click="navigateToWorkspace"
         >
           <template #actions="{ item }">
             <el-button
@@ -76,7 +74,6 @@ import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Search, Refresh, Delete, Loading } from '@element-plus/icons-vue'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { copyText } from '@/shared/utils/clipboard'
-import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import { syncedTabMenu } from '@/shared/actions/tab-actions'
 import { listSyncedTabs, removeWorkspaceTab, reportServiceError } from '@/shared/services'
 import type { TabReference } from '@/shared/types/workspace'
@@ -90,7 +87,6 @@ interface SyncedItem {
 }
 
 const router = useRouter()
-const { navigateToTag, navigateToWorkspace } = useDashboardNavigation()
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -120,7 +116,7 @@ const listItems = computed<SyncedListItem[]>(() =>
     badgeText: i.name,
     badgeColor: i.color,
     badgeKey: i.workspaceId,
-    tags: (i.tab.tags ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color, clickable: true })),
+    tags: (i.tab.tags ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color })),
     description: i.tab.description,
     addedAt: i.tab.addedAt,
     source: i,
