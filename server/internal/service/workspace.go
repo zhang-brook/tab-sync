@@ -1001,6 +1001,94 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 	})
 }
 
+// CopyTab 复制标签页到目标工作组末尾（源标签页保持不变）。
+// 副本保留源标签页的链接/标题/显示名/图标/描述/添加时间，并复制标签关联（全局标签共享，仅重建关联行），
+// 使用新的主键与目标工作组内的末尾排序。
+func (s *WorkspaceService) CopyTab(workspaceID, tabID string) (*TabReference, error) {
+	if workspaceID == "" || tabID == "" {
+		return nil, errors.New("workspaceID 和 tabID 不能为空")
+	}
+	uid, err := strconv.ParseUint(tabID, 10, 64)
+	if err != nil {
+		return nil, errors.New("tabID 格式无效")
+	}
+
+	var copied model.Tab
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// 验证目标工作组存在
+		var workspace model.Workspace
+		if err := tx.Where("workspace_id = ? AND is_deleted = ?", workspaceID, false).First(&workspace).Error; err != nil {
+			return err
+		}
+
+		// 加载源标签页
+		var src model.Tab
+		if err := tx.Where("id = ?", uid).First(&src).Error; err != nil {
+			return err
+		}
+
+		// 计算副本在目标工作组内的末尾排序
+		var maxOrder int
+		if err := tx.Model(&model.Tab{}).
+			Where("workspace_id = ?", workspaceID).
+			Select("COALESCE(MAX(sort_order), -1)").
+			Scan(&maxOrder).Error; err != nil {
+			return err
+		}
+
+		copied = model.Tab{
+			WorkspaceID: workspaceID,
+			URL:         src.URL,
+			Title:       src.Title,
+			DisplayName: src.DisplayName,
+			FavIconURL:  src.FavIconURL,
+			SortOrder:   maxOrder + 1,
+			AddedAt:     src.AddedAt,
+			Description: src.Description,
+		}
+		if err := tx.Create(&copied).Error; err != nil {
+			return err
+		}
+
+		// 复制标签关联：全局标签共享，仅重建指向新标签页主键的关联行，
+		// 归属工作组以目标为准（不沿用源关联行的 workspace_id）
+		var rels []model.TabTagRelation
+		if err := tx.Where("tab_id = ?", src.ID).Find(&rels).Error; err != nil {
+			return err
+		}
+		for _, rel := range rels {
+			if err := tx.Create(&model.TabTagRelation{
+				TabID:       copied.ID,
+				WorkspaceID: workspaceID,
+				TagID:       rel.TagID,
+			}).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 记录同步事件
+	if s.syncSvc != nil {
+		s.syncSvc.RecordEvent("added", "tab", workspaceID, copied)
+	}
+
+	return &TabReference{
+		TabID:       strconv.FormatUint(uint64(copied.ID), 10),
+		URL:         copied.URL,
+		Title:       copied.Title,
+		DisplayName: copied.DisplayName,
+		FavIconURL:  copied.FavIconURL,
+		Description: copied.Description,
+		SortOrder:   copied.SortOrder,
+		AddedAt:     copied.AddedAt.Format(time.RFC3339),
+	}, nil
+}
+
 // AddTabByURLPayload 通过 URL 添加标签页的请求体
 type AddTabByURLPayload struct {
 	URL   string `json:"url" binding:"required"`

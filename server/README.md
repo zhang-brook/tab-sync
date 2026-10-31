@@ -193,6 +193,7 @@ docker compose start
 | `DELETE` | `/v1/tab-sync/workspaces/:id` | 删除工作组 |
 | `GET` | `/v1/tab-sync/workspaces/tabs-summary` | 标签页摘要 |
 | `POST` | `/v1/tab-sync/workspaces/:id/tabs/move` | 移动标签页 |
+| `POST` | `/v1/tab-sync/workspaces/:id/tabs/copy` | 复制标签页到工作组末尾（保留标题/显示名/图标/描述/添加时间与标签关联，源标签页不变） |
 | `POST` | `/v1/tab-sync/sync/push` | 推送同步事件（预留） |
 | `GET` | `/v1/tab-sync/sync/pull` | 拉取同步事件（增量，预留） |
 | `GET` | `/v1/tab-sync/sse/events` | SSE 实时事件流（扩展长连接，预留） |
@@ -214,7 +215,7 @@ docker compose start
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/v1/tab-sync/recyclebin` | 获取回收站列表 |
+| `GET` | `/v1/tab-sync/recyclebin` | 分页获取回收站列表（`page`/`pageSize`；`sort=name/deletedAt/addedAt`，`order=asc/desc`） |
 | `POST` | `/v1/tab-sync/recyclebin/restore` | 批量恢复（`ids` + 可选 `workspaceId`；省略 `workspaceId` 时恢复到「未分组」） |
 | `POST` | `/v1/tab-sync/recyclebin/:id/restore` | 恢复单条（可带 `workspaceId`；省略时恢复到「未分组」） |
 | `DELETE` | `/v1/tab-sync/recyclebin/:id` | 彻底删除单条 |

@@ -262,6 +262,29 @@ func (h *WorkspaceHandler) MoveTab(c *gin.Context) {
 	Success(c, gin.H{"success": true})
 }
 
+// CopyTabRequest 复制标签页请求
+type CopyTabRequest struct {
+	TabID string `json:"tabId" binding:"required"`
+}
+
+// CopyTab 复制标签页到目标工作组末尾
+func (h *WorkspaceHandler) CopyTab(c *gin.Context) {
+	workspaceID := c.Param("id")
+	var req CopyTabRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "请提供 tabId")
+		return
+	}
+
+	tab, err := h.svc.CopyTab(workspaceID, req.TabID)
+	if err != nil {
+		BadRequest(c, "复制标签页失败: "+err.Error())
+		return
+	}
+
+	Created(c, gin.H{"tab": tab})
+}
+
 // AddTabByURL 通过 URL 向工作组添加标签页
 func (h *WorkspaceHandler) AddTabByURL(c *gin.Context) {
 	workspaceID := c.Param("id")

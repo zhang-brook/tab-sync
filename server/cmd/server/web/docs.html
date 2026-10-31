@@ -456,6 +456,22 @@
         </div>
       </div>
 
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="method post">POST</span>
+          <span class="ep-path">/v1/tab-sync/workspaces/:id/tabs/copy</span>
+          <span class="ep-auth token">Token</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <table class="info-table"><tr><td>说明</td><td>复制标签页到工作组末尾（保留标题、显示名、图标、描述、添加时间与标签关联，源标签页不变）</td></tr></table>
+          <h3>请求体</h3>
+          <div class="code-block">{
+  <span class="key">"tabId"</span>: <span class="str">"uuid"</span>
+}</div>
+        </div>
+      </div>
+
       <!-- 同步/SSE (预留) -->
       <div class="endpoint">
         <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
