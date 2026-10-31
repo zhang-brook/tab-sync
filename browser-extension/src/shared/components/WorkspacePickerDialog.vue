@@ -12,6 +12,7 @@
       :confirmable="confirmable"
       :close-tab="closeTab"
       :close-tab-label="closeTabLabel"
+      :show-close-option="showCloseOption"
       :disabled-ids="disabledIds"
       :manageable="manageable"
       :highlight-default-workspace="highlightDefaultWorkspace"
@@ -38,6 +39,8 @@ const props = defineProps<{
   closeTab?: boolean
   /** 确认模式下底部复选框文案，默认「加入后关闭该页面」 */
   closeTabLabel?: string
+  /** 确认模式下是否显示底部「关闭」复选框，默认 true */
+  showCloseOption?: boolean
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
   /** 启用分组管理：新建 / 重命名 / 删除（不传时透传 undefined，Panel 默认开启） */

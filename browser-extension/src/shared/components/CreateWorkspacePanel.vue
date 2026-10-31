@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { sendMessage } from '../composables/useMessage'
+import { createWorkspace, fromChromeTabs, reportServiceError, saveTabsToWorkspace } from '../services'
 import { DEFAULT_WORKSPACE_COLOR } from '../constants/theme'
 
 const props = withDefaults(defineProps<{
@@ -69,38 +69,20 @@ async function onConfirm() {
   }
   submitting.value = true
   try {
-    // 先创建新工作组
-    const createRes = await sendMessage<{ workspace: { id: string } }>({
-      action: 'CREATE_WORKSPACE',
-      payload: { name: wsName, color: props.color },
-    })
-    if (!createRes.success || !createRes.data) {
-      ElMessage.error(createRes.authError ? '未登录或连接已失效，请先在侧边栏登录' : createRes.error || '创建工作组失败')
-      submitting.value = false
-      return
-    }
+    const workspace = await createWorkspace({ name: wsName, color: props.color })
     // 再按「添加后关闭」开关加入选中标签页（background 统一负责关闭原页面和弹通知）
-    const addRes = await sendMessage<{ added: number; skipped: number }>({
-      action: 'ADD_TABS_TO_WORKSPACE',
-      payload: {
-        workspaceId: createRes.data.workspace.id,
-        tabs: props.tabs.map((tab) => ({
-          chromeTabId: tab.id ?? 0,
-          url: tab.url ?? '',
-          title: tab.title ?? '',
-          favIconUrl: tab.favIconUrl ?? '',
-        })),
-        closeAfterAdd: closeTab.value,
-      },
+    await saveTabsToWorkspace(
+      workspace.id,
+      fromChromeTabs(props.tabs),
+      { closeAfterAdd: closeTab.value },
+    )
+    emit('success')
+  } catch (err) {
+    reportServiceError(err, {
+      fallback: '保存失败，请重试',
+      authMessage: '未登录或连接已失效，请先在侧边栏登录',
     })
-    if (addRes.success) {
-      emit('success')
-    } else {
-      ElMessage.error(addRes.authError ? '未登录或连接已失效，请先在侧边栏登录' : addRes.error || '保存失败')
-      submitting.value = false
-    }
-  } catch {
-    ElMessage.error('保存失败，请重试')
+  } finally {
     submitting.value = false
   }
 }

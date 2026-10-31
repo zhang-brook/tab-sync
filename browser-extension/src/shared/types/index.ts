@@ -18,6 +18,7 @@ export type {
   WorkspaceTabsSummaryData,
   TagsData,
   TagTabsData,
+  TagTabItem,
   GetTagTabsMessage,
   RecycleBinTab,
   RecycleBinData,

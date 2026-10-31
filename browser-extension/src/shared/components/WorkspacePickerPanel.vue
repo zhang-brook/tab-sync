@@ -78,7 +78,7 @@
 
     <div class="picker-footer">
       <el-checkbox
-        v-if="confirmable"
+        v-if="confirmable && showCloseOption"
         :model-value="closeTabModel"
         @update:model-value="onCloseTabChange"
       >
@@ -103,13 +103,13 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Edit, Delete, FolderAdd, Open } from '@element-plus/icons-vue'
-import { sendMessage } from '../composables/useMessage'
 import { useWorkspaceActions } from '../composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '../storage'
 import { buildWorkspaceTree, findWorkspaceTreeNode, flattenWorkspaces, pinSystemGroups, type WorkspaceTreeNode } from '../utils/workspace-tree'
 import { DEFAULT_WORKSPACE_COLOR } from '../constants/theme'
+import { createWorkspace, listWorkspaces, updateWorkspace } from '../services/workspace-service'
+import { reportServiceError } from '../services/feedback'
 import ContextMenu from './ContextMenu.vue'
-import type { WorkspacesData } from '../types'
 import { DASHBOARD_URL } from '../utils/pages'
 
 const props = withDefaults(defineProps<{
@@ -119,6 +119,8 @@ const props = withDefaults(defineProps<{
   closeTab?: boolean
   /** 确认模式下底部复选框文案，默认「加入后关闭该页面」 */
   closeTabLabel?: string
+  /** 确认模式下是否显示底部「关闭」复选框，默认 true */
+  showCloseOption?: boolean
   /** 需要禁用（可见但不可选）的工作组 id，例如标签页当前所在工作组 */
   disabledIds?: string[]
   /** 撑满父容器高度：树区自动拉伸，底部按钮区吸到容器底部（弹窗版不传） */
@@ -130,6 +132,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   manageable: true,
   highlightDefaultWorkspace: true,
+  showCloseOption: true,
 })
 
 const emit = defineEmits<{
@@ -222,14 +225,13 @@ async function reload() {
   if (props.highlightDefaultWorkspace) {
     defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
   }
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true } })
-  if (!res.success || !res.data) {
+  try {
+    const workspaces = await listWorkspaces({ includeSystem: true })
+    // 与管理面板左侧树一致：系统工作组固定置顶，避免混入普通分组的 sortOrder 排序
+    treeData.value = pinSystemGroups(buildWorkspaceTree(workspaces))
+  } catch {
     treeData.value = []
-    loading.value = false
-    return
   }
-  // 与管理面板左侧树一致：系统工作组固定置顶，避免混入普通分组的 sortOrder 排序
-  treeData.value = pinSystemGroups(buildWorkspaceTree(res.data.workspaces))
   // 先结束 loading 让 el-tree 完成渲染，否则下一帧 treeRef 尚未挂载，高亮会被静默跳过
   loading.value = false
   // 默认选中「默认分组」：高亮该项并初始化确认模式的选中项（被禁用的分组不选中）
@@ -279,12 +281,12 @@ async function onCreate() {
   }).catch(() => null)
   if (!result) return
   const name = String(result.value).trim()
-  const res = await sendMessage({ action: 'CREATE_WORKSPACE', payload: { name, color: DEFAULT_WORKSPACE_COLOR } })
-  if (res.success) {
+  try {
+    await createWorkspace({ name, color: DEFAULT_WORKSPACE_COLOR })
     ElMessage.success('工作组已创建')
     await reload()
-  } else {
-    ElMessage.error(res.error || '创建工作组失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '创建工作组失败' })
   }
 }
 
@@ -297,15 +299,12 @@ async function onCreateChild(node: WorkspaceTreeNode) {
   }).catch(() => null)
   if (!result) return
   const name = String(result.value).trim()
-  const res = await sendMessage({
-    action: 'CREATE_WORKSPACE',
-    payload: { name, color: DEFAULT_WORKSPACE_COLOR, parentId: node.id },
-  })
-  if (res.success) {
+  try {
+    await createWorkspace({ name, color: DEFAULT_WORKSPACE_COLOR, parentId: node.id })
     ElMessage.success('子工作组已创建')
     await reload()
-  } else {
-    ElMessage.error(res.error || '创建子工作组失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '创建子工作组失败' })
   }
 }
 
@@ -358,12 +357,12 @@ async function onRenameNode(node: WorkspaceTreeNode) {
   if (!result) return
   const name = String(result.value).trim()
   if (!name || name === node.name) return
-  const res = await sendMessage({ action: 'UPDATE_WORKSPACE', payload: { id: node.id, name } })
-  if (res.success) {
+  try {
+    await updateWorkspace({ id: node.id, name })
     ElMessage.success('工作组已重命名')
     await reload()
-  } else {
-    ElMessage.error(res.error || '重命名失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '重命名失败' })
   }
 }
 

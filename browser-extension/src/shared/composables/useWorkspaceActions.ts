@@ -1,5 +1,5 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { sendMessage } from './useMessage'
+import { deleteWorkspace, reportServiceError } from '../services'
 import type { Workspace } from '../types'
 import { getDeleteImpact } from '../utils/workspace-tree'
 
@@ -34,16 +34,14 @@ export function useWorkspaceActions() {
       return false
     }
 
-    const res = await sendMessage({
-      action: 'DELETE_WORKSPACE',
-      payload: { id: ws.id, defaultWorkspaceId },
-    })
-    if (res.success) {
+    try {
+      await deleteWorkspace(ws.id, defaultWorkspaceId)
       ElMessage.success('工作组已删除')
       return true
+    } catch (err) {
+      reportServiceError(err, { fallback: '删除失败' })
+      return false
     }
-    ElMessage.error(res.error || '删除失败')
-    return false
   }
 
   return { confirmDeleteWorkspace }

@@ -14,7 +14,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import WorkspacePickerPanel from './WorkspacePickerPanel.vue'
-import { sendMessage } from '../composables/useMessage'
+import { fromChromeTabs } from '../services/local-tabs'
+import { reportServiceError } from '../services/feedback'
+import { saveTabsToWorkspace } from '../services/save-tabs'
 import type { WorkspaceTreeNode } from '../utils/workspace-tree'
 
 const props = defineProps<{
@@ -47,34 +49,17 @@ async function onSelect(node: WorkspaceTreeNode) {
   }
   selecting = true
   try {
-    const res = await sendMessage<{ added: number; skipped: number }>({
-      action: 'ADD_TABS_TO_WORKSPACE',
-      payload: {
-        workspaceId: node.id,
-        tabs: props.tabs.map((tab) => ({
-          chromeTabId: tab.id ?? 0,
-          url: tab.url ?? '',
-          title: tab.title ?? '',
-          favIconUrl: tab.favIconUrl ?? '',
-        })),
-        // 按「加入后关闭该页面」开关告诉 background 是否关闭原页面（background 同时负责弹通知）
-        closeAfterAdd: closeTab.value,
-      },
+    // 按「加入后关闭该页面」开关交给 background 关闭原页面并弹通知
+    await saveTabsToWorkspace(node.id, fromChromeTabs(props.tabs), {
+      closeAfterAdd: closeTab.value,
     })
-
-    // 注意，当前页面中没有 chrome 对象，所以要借助 background 处理关闭原页面和弹通知的逻辑
-    if (res.success) {
-      emit('success')
-    } else if (res.authError) {
-      ElMessage.error('未登录或连接已失效，请先在侧边栏登录')
-      selecting = false
-    } else {
-      ElMessage.error(res.error || '加入工作组失败')
-      selecting = false
-    }
-  } catch {
-    ElMessage.error('加入工作组失败，请重试')
+    emit('success')
+  } catch (err) {
     selecting = false
+    reportServiceError(err, {
+      fallback: '加入工作组失败，请重试',
+      authMessage: '未登录或连接已失效，请先在侧边栏登录',
+    })
   }
 }
 
