@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"gorm.io/gorm"
+
 	"github.com/spidermemos/tab-sync/server/internal/config"
 	"github.com/spidermemos/tab-sync/server/internal/model"
 )
@@ -136,11 +138,33 @@ func TestMigrateLegacyTabTable(t *testing.T) {
 	if err := AutoMigrate(db); err != nil {
 		t.Fatalf("重复执行迁移不应报错: %v", err)
 	}
+
+	var migrationCount int64
+	if err := db.Table("schema_migrations").
+		Where("version = ? AND name = ?", 1, "tabs_rename").
+		Count(&migrationCount).Error; err != nil {
+		t.Fatalf("查询迁移记录失败: %v", err)
+	}
+	if migrationCount != 1 {
+		t.Errorf("tabs_rename 迁移应恰好登记一次: got %d", migrationCount)
+	}
 }
 
 func indexExists(db *DB, table, name string) bool {
 	var count int64
 	db.Raw("SELECT count(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?", table, name).Scan(&count)
+	return count > 0
+}
+
+func tableExists(db *gorm.DB, table string) bool {
+	var count int64
+	db.Raw("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&count)
+	return count > 0
+}
+
+func columnExists(db *gorm.DB, table, column string) bool {
+	var count int64
+	db.Raw("SELECT count(*) FROM pragma_table_info(\""+table+"\") WHERE name = ?", column).Scan(&count)
 	return count > 0
 }
 
