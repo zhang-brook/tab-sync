@@ -10,7 +10,10 @@
               <el-tag v-if="data.isSystem" size="small" type="info">系统分组</el-tag>
             </div>
             <div class="props-path-row">
-              <span class="props-path">路径：{{ data.fullPath }}</span>
+              <span class="props-path">ID：{{ data.id }}</span>
+            </div>
+            <div class="props-path-row">
+              <span class="props-path">完整路径：{{ data.fullPath }}</span>
               <el-button link type="info" size="small" :icon="CopyDocument" @click="copyPath">复制</el-button>
             </div>
           </div>
@@ -68,6 +71,8 @@ const visible = computed({
 const loading = ref(false)
 
 interface WorkspaceProperties {
+  /** 工作组 ID（后端生成的 UUID，「未分组」为固定标识） */
+  id: string
   name: string
   color: string
   isSystem: boolean
@@ -131,6 +136,7 @@ async function copyPath() {
 async function load(ws: Workspace) {
   const { fullPath, parentPath } = buildPaths(ws.id)
   data.value = {
+    id: ws.id,
     name: ws.name,
     color: ws.color,
     isSystem: !!ws.isSystem,
