@@ -8,6 +8,8 @@ export interface TabTagDisplay {
   name: string
   color?: string
   clickable?: boolean
+  /** 标签来源：普通标签用深色胶囊，工作组用浅色描边 */
+  kind?: 'tag' | 'workspace'
 }
 
 /** TabList 行菜单项：由各端按场景组装，执行通过 command 事件回传 */

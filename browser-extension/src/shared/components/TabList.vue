@@ -90,7 +90,10 @@ function titleAttr(item: TabListItem): string {
 }
 
 function tagStyle(tag: TabTagDisplay) {
-  return tag.color ? { borderColor: tag.color, color: tag.color } : {}
+  if (!tag.color) return {}
+  return tag.kind === 'workspace'
+    ? { borderColor: tag.color, color: tag.color }
+    : { backgroundColor: tag.color, borderColor: tag.color }
 }
 
 /** 多工作组色条：各段占满均分区间，仅在相邻色段间留窄过渡，避免混出奇怪的中间色 */
@@ -203,7 +206,8 @@ function onSharedMenuCommand(command: string) {
               v-for="tag in element.tags"
               :key="tag.id ?? tag.name"
               size="small"
-              effect="plain"
+              :effect="tag.kind === 'workspace' ? 'plain' : 'dark'"
+              :round="tag.kind !== 'workspace'"
               class="tab-tag"
               :class="{ 'is-clickable': tag.clickable }"
               :style="tagStyle(tag)"

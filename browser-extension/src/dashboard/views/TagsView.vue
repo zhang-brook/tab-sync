@@ -190,8 +190,9 @@
                     v-for="t in ws.tags"
                     :key="t.id"
                     size="small"
-                    effect="plain"
-                    :style="t.color ? { borderColor: normalizeColor(t.color), color: normalizeColor(t.color) } : {}"
+                    effect="dark"
+                    round
+                    :style="t.color ? { backgroundColor: normalizeColor(t.color), borderColor: normalizeColor(t.color) } : {}"
                   >{{ t.name }}</el-tag>
                 </div>
               </div>

@@ -23,8 +23,8 @@
         <el-descriptions-item label="所在工作组">{{ workspacePath || '—' }}</el-descriptions-item>
         <el-descriptions-item label="标签">
           <span v-if="tab.tags?.length" class="props-tags">
-            <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="plain"
-              :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+            <el-tag v-for="tg in tab.tags" :key="tg.id" size="small" effect="dark" round
+              :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
           </span>
           <span v-else class="props-muted">—</span>
         </el-descriptions-item>

@@ -71,8 +71,8 @@
             <div class="detail-title-row">
               <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
               <span class="ws-name">{{ selectedWorkspace.name }}</span>
-              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="plain"
-                :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+              <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="dark" round
+                :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
               <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
             <div class="detail-actions">
