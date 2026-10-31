@@ -8,25 +8,25 @@
     </linearGradient>
 
     <linearGradient id="ts-lid-panel" x1="420" y1="130" x2="420" y2="450" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#AECDE0"/>
-      <stop offset="1" stop-color="#A8C7DA"/>
+      <stop offset="0" stop-color="#9BBFD8"/>
+      <stop offset="1" stop-color="#B6D3E5"/>
     </linearGradient>
 
     <linearGradient id="ts-cavity-left" x1="180" y1="494" x2="180" y2="584" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#A6C9DC"/>
-      <stop offset="0.22" stop-color="#A3C7DA"/>
-      <stop offset="0.26" stop-color="#6E9DBA"/>
-      <stop offset="1" stop-color="#5C90B1"/>
+      <stop offset="0" stop-color="#A9CBE0"/>
+      <stop offset="0.22" stop-color="#9EC5DB"/>
+      <stop offset="0.26" stop-color="#4E86AB"/>
+      <stop offset="1" stop-color="#3E7499"/>
     </linearGradient>
 
     <linearGradient id="ts-cavity-right" x1="815" y1="520" x2="888" y2="588" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7FACC9"/>
-      <stop offset="1" stop-color="#467FA5"/>
+      <stop offset="0" stop-color="#5E95B9"/>
+      <stop offset="1" stop-color="#2F6A90"/>
     </linearGradient>
 
     <linearGradient id="ts-content" x1="420" y1="470" x2="420" y2="640" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#B6D2E4"/>
-      <stop offset="1" stop-color="#AACADE"/>
+      <stop offset="0" stop-color="#C2DCEC"/>
+      <stop offset="1" stop-color="#B0D2E5"/>
     </linearGradient>
 
     <linearGradient id="ts-front" x1="760" y1="620" x2="280" y2="890" gradientUnits="userSpaceOnUse">
@@ -65,7 +65,7 @@
     </clipPath>
   </defs>
 
-  <g stroke="#00002E" stroke-width="26" stroke-linejoin="round" stroke-linecap="round">
+  <g stroke="#081730" stroke-width="26" stroke-linejoin="round" stroke-linecap="round">
     <!-- box interior -->
     <path d="M 104 498 L 252 484 L 252 612 L 104 552 Z" fill="url(#ts-cavity-left)" stroke="none"/>
     <path d="M 813 527 L 902 574 L 902 610 L 813 610 Z" fill="url(#ts-cavity-right)" stroke="none"/>
@@ -75,13 +75,13 @@
       C 904 553 907 561 908.8 571
       L 908.8 600 L 888 600 L 888 588
       C 884 580 877 574 875 566
-      C 874 556 876 545 878 535 Z" fill="#00002E" stroke="none"/>
+      C 874 556 876 545 878 535 Z" fill="#081730" stroke="none"/>
 
     <!-- lid -->
     <use href="#ts-lid-outline" fill="url(#ts-lid-face)" stroke="none"/>
     <g clip-path="url(#ts-lid-clip)">
       <use href="#ts-lid-panel-shape" fill="url(#ts-lid-panel)" stroke="none"/>
-      <path d="M 648 158 L 601 246" fill="none" stroke="#4380A8" stroke-width="22"/>
+      <path d="M 648 158 L 601 246" fill="none" stroke="#2F7DB3" stroke-width="22"/>
       <path d="M 106 476
         L 250 198
         Q 272 163 302 163
@@ -93,23 +93,23 @@
     <g>
       <rect x="347" y="250" width="411" height="420" rx="44" fill="#FFFFFF"/>
       <rect x="400" y="335" width="326" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
-      <rect x="389" y="288" width="85" height="19" rx="9.5" fill="#00002E" stroke="none"/>
-      <circle cx="708" cy="295" r="15" fill="#00002E" stroke="none"/>
+      <rect x="389" y="288" width="85" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="708" cy="295" r="15" fill="#081730" stroke="none"/>
 
       <rect x="416" y="331" width="392" height="429" rx="44" fill="#FFFFFF"/>
       <rect x="451" y="416" width="325" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
-      <rect x="456" y="383.5" width="88" height="19" rx="9.5" fill="#00002E" stroke="none"/>
-      <circle cx="759" cy="376" r="15" fill="#00002E" stroke="none"/>
+      <rect x="456" y="383.5" width="88" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="759" cy="376" r="15" fill="#081730" stroke="none"/>
 
       <rect x="312" y="320" width="404" height="430" rx="44" fill="#FFFFFF"/>
       <rect x="347" y="409" width="337" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
-      <rect x="362" y="374.5" width="88" height="19" rx="9.5" fill="#00002E" stroke="none"/>
-      <circle cx="665" cy="364" r="15" fill="#00002E" stroke="none"/>
+      <rect x="362" y="374.5" width="88" height="19" rx="9.5" fill="#081730" stroke="none"/>
+      <circle cx="665" cy="364" r="15" fill="#081730" stroke="none"/>
 
       <rect x="256" y="378" width="392" height="420" rx="44" fill="#FFFFFF"/>
       <rect x="291" y="468" width="323" height="300" rx="16" fill="url(#ts-content)" stroke="none"/>
-      <rect x="298" y="420.5" width="91" height="22" rx="11" fill="#00002E" stroke="none"/>
-      <circle cx="594" cy="426" r="15" fill="#00002E" stroke="none"/>
+      <rect x="298" y="420.5" width="91" height="22" rx="11" fill="#081730" stroke="none"/>
+      <circle cx="594" cy="426" r="15" fill="#081730" stroke="none"/>
     </g>
 
     <!-- box front -->
@@ -160,6 +160,6 @@
       C 103.28 739.61 102.5 737.39 102.5 735
       Z" fill="url(#ts-front)"/>
 
-    <rect x="322" y="672" width="22" height="168" rx="11" fill="#00002E" stroke="none"/>
+    <rect x="322" y="672" width="22" height="168" rx="11" fill="#081730" stroke="none"/>
   </g>
 </svg>
