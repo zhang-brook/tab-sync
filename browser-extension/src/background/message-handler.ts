@@ -400,31 +400,26 @@ async function handleDuplicateWorkspace(id: string): Promise<MessageResponse> {
 async function handleAddTabsToWorkspace(
   payload: { workspaceId: string; tabs: Array<{ url: string; title: string; favIconUrl: string; chromeTabId: number }> },
 ): Promise<MessageResponse> {
-  // 1. 获取所有工作组（含系统工作组「未分组」，否则右键菜单「保存到未分组」无法定位目标）
-  const res = await getWorkspaces(true)
-  if (!res.ok || !res.data) {
-    logger.warn('addTabsToWorkspace: getWorkspaces failed:', res.error)
-    return { success: false, error: res.error || '获取工作组列表失败', authError: res.status === 401 }
+  // 1. 只取目标工作组的已有标签页（用于去重），无需拉取全部工作组
+  const tabsRes = await getWorkspaceTabs(payload.workspaceId)
+  if (!tabsRes.ok || !tabsRes.data) {
+    logger.warn('addTabsToWorkspace: getWorkspaceTabs failed:', tabsRes.error)
+    return { success: false, error: tabsRes.error || '获取工作组标签页失败', authError: tabsRes.status === 401 }
   }
+  const workspaceTabs = 'tabs' in tabsRes.data ? tabsRes.data.tabs : []
 
-  // 2. 找到目标工作组
-  const workspace = res.data.workspaces.find(w => w.id === payload.workspaceId)
-  if (!workspace) {
-    return { success: false, error: '工作组不存在' }
-  }
+  // 2. 获取已有标签页 URL 集合（用于去重）
+  const existingUrls = new Set(workspaceTabs.map(t => t.url))
 
-  // 3. 获取已有标签页 URL 集合（用于去重）
-  const existingUrls = new Set(workspace.tabs.map(t => t.url))
-
-  // 4. 过滤新标签页，只保留不在工作组中的
+  // 3. 过滤新标签页，只保留不在工作组中的
   const newTabs = payload.tabs.filter(t => !existingUrls.has(t.url))
   if (newTabs.length === 0) {
     // 所有标签页已存在
     return { success: true, data: { added: 0, skipped: payload.tabs.length } }
   }
 
-  // 5. 将已有 TabReference 转为 WorkspaceTabPayload（chromeTabId=0 表示未知，保留 tabId）
-  const existingTabPayloads = workspace.tabs.map(t => ({
+  // 4. 将已有 TabReference 转为 WorkspaceTabPayload（chromeTabId=0 表示未知，保留 tabId）
+  const existingTabPayloads = workspaceTabs.map(t => ({
     tabId: t.tabId,
     url: t.url,
     title: t.title,
@@ -432,11 +427,11 @@ async function handleAddTabsToWorkspace(
     chromeTabId: 0,
   }))
 
-  // 6. 合并后调用更新 API
+  // 5. 合并后调用更新 API
   const allTabs = [...existingTabPayloads, ...newTabs]
   const updateRes = await updateWorkspace(payload.workspaceId, { tabs: allTabs })
   if (updateRes.ok) {
-    logger.info(`Added ${newTabs.length} tabs to workspace "${workspace.name}"`)
+    logger.info(`Added ${newTabs.length} tabs to workspace "${payload.workspaceId}"`)
     return { success: true, data: { added: newTabs.length, skipped: payload.tabs.length - newTabs.length } }
   }
   logger.warn('addTabsToWorkspace: updateWorkspace failed:', updateRes.error)

@@ -5,6 +5,7 @@ import { logger } from '../../shared/utils/logger'
 import { DASHBOARD_URL, PICKER_URL } from '../../shared/utils/pages'
 import { openTabAfterActive } from '../../shared/utils/tab-utils'
 import { handleMessage } from '../message-handler'
+import type { MessageResponse, WorkspaceTabPayload } from '../../shared/types'
 import { NOTIFICATION_SAVE_TAB_SUCCESS, TAB_GROUP_COLOR_HEX, UNGROUPED_WORKSPACE_ID } from './constants'
 
 /**
@@ -98,84 +99,100 @@ export async function openPickerWindow(
 }
 
 /**
+ * 标签页加入工作组并按结果弹桌面通知：closeAfterAdd 时在成功后关闭原标签页。
+ * 失败时仅 background 发起的入口（右键菜单/快捷键）弹通知，选择器弹窗内的失败由弹窗自己提示。
+ */
+export async function saveTabsWithNotification(
+  workspaceId: string,
+  tabs: WorkspaceTabPayload[],
+  options: { closeAfterAdd?: boolean; notifyOnError?: boolean } = {},
+): Promise<MessageResponse> {
+  // 注意：这里是 background 自身发起操作，不能走 runtime.sendMessage（消息不会投递给自己，
+  // 会报 "Could not establish connection. Receiving end does not exist."），需直接调用消息处理器
+  const res = await handleMessage({
+    action: 'ADD_TABS_TO_WORKSPACE',
+    payload: { workspaceId, tabs },
+  })
+  if (!res.success) {
+    if (options.notifyOnError) {
+      if (res.authError) await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
+      else await notify('收藏失败', res.error || '请检查后端连接')
+    }
+    return res
+  }
+
+  const data = (res.data ?? {}) as { added?: number; skipped?: number }
+  const added = data.added ?? tabs.length
+  const skipped = data.skipped ?? 0
+
+  // 「保存并关闭」语义：无论新增还是跳过，统一关闭用户选中的可收藏页面，避免混选时行为不一致
+  let closed = false
+  if (options.closeAfterAdd) {
+    const ids = tabs.map((t) => t.chromeTabId).filter((id) => id > 0)
+    if (ids.length > 0) {
+      try {
+        await chrome.tabs.remove(ids)
+        closed = true
+      } catch (err) {
+        // 标签可能已关闭：记录日志但不影响整体成功结果
+        logger.warn('关闭已收藏标签页失败:', err)
+      }
+    }
+  }
+
+  // 读取分组名用于提示文案（失败不影响主流程，回退通用表述）
+  let wsLabel = '该分组'
+  try {
+    const wsRes = await getWorkspaces(true)
+    if (wsRes.ok && wsRes.data) {
+      const name = wsRes.data.workspaces.find((w) => w.id === workspaceId)?.name
+      if (name) wsLabel = `「${name}」`
+    }
+  } catch {
+    /* ignore */
+  }
+
+  let title: string
+  let detail: string
+  if (added === 0 && skipped > 0) {
+    // 全部已存在：跳过（页面仍按「保存并关闭」语义关闭）
+    title = '已存在'
+    detail = `${wsLabel}下已存在该页面，已跳过${closed ? '并关闭' : ''}`
+  } else if (skipped > 0) {
+    // 部分已存在：加入新增项
+    title = '已加入工作组'
+    detail = `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过）${closed ? '并关闭' : ''}，点击查看`
+  } else {
+    title = '已加入工作组'
+    const saved = tabs.length > 1 ? `已收藏 ${tabs.length} 个标签页` : '当前标签页已收藏'
+    detail = closed ? `${saved}并关闭，点击查看` : `${saved}，点击查看`
+  }
+  await notify(title, detail, NOTIFICATION_SAVE_TAB_SUCCESS)
+  return res
+}
+
+/**
  * 将标签页（支持批量，如标签组）加入指定工作组并关闭：
  * 仅当加入成功后才关闭页面；失败（含未登录）则保留页面并通知。
  * 非 http(s)/file 页面会被跳过，不影响其余标签页收藏。
  */
 export async function saveTabsToWorkspaceAndClose(tabs: chrome.tabs.Tab[], workspaceId: string) {
   // 仅允许 http(s)/file 页面，浏览器内置页面不支持（组内混有此类页面时跳过）
-  const savable = tabs.filter((tab) => {
-    if (!tab.url) return false
-    try {
-      return ['http:', 'https:', 'file:'].includes(new URL(tab.url).protocol)
-    } catch {
-      return false
-    }
-  })
+  const savable = tabs.filter(isSavableTab)
   if (savable.length === 0) {
     await notify('无法收藏', '当前页面类型不支持收藏（如浏览器内置页面）')
     return
   }
-
-  // 注意：这里是 background 自身发起操作，不能走 runtime.sendMessage（消息不会投递给自己，
-  // 会报 "Could not establish connection. Receiving end does not exist."），需直接调用消息处理器
-  const res = await handleMessage({
-    action: 'ADD_TABS_TO_WORKSPACE',
-    payload: {
-      workspaceId,
-      tabs: savable.map((tab) => ({
-        chromeTabId: tab.id ?? 0,
-        url: tab.url ?? '',
-        title: tab.title ?? '',
-        favIconUrl: tab.favIconUrl ?? '',
-      })),
-    },
-  })
-
-  if (res.success) {
-    const data = (res.data ?? {}) as { added?: number; skipped?: number }
-    const added = data.added ?? savable.length
-    const skipped = data.skipped ?? 0
-    // 「保存并关闭」语义：无论新增还是跳过，统一关闭用户选中的可收藏页面，避免混选时行为不一致
-    const ids = savable.map((t) => t.id).filter((id): id is number => id != null)
-    if (ids.length > 0) {
-      await chrome.tabs.remove(ids)
-    }
-    // 读取分组名用于提示文案（失败不影响主流程，回退通用表述）
-    let wsLabel = '该分组'
-    try {
-      const wsRes = await getWorkspaces(true)
-      if (wsRes.ok && wsRes.data) {
-        const name = wsRes.data.workspaces.find((w) => w.id === workspaceId)?.name
-        if (name) wsLabel = `「${name}」`
-      }
-    } catch {
-      /* ignore */
-    }
-    let title: string
-    let message: string
-    if (added === 0 && skipped > 0) {
-      // 全部已存在：跳过（页面仍按"保存并关闭"语义关闭）
-      title = '已存在'
-      message = `${wsLabel}下已存在该页面，已跳过并关闭`
-    } else if (skipped > 0) {
-      // 部分已存在：加入新增项并关闭
-      title = '已加入工作组'
-      message =
-        savable.length > 1
-          ? `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过），已全部关闭，点击查看`
-          : `已收藏（${wsLabel}下已存在该页面，已跳过），已关闭，点击查看`
-    } else {
-      title = '已加入工作组'
-      message =
-        savable.length > 1 ? `已收藏 ${savable.length} 个标签页并关闭，点击查看` : '当前标签页已收藏并关闭，点击查看'
-    }
-    await notify(title, message, NOTIFICATION_SAVE_TAB_SUCCESS)
-  } else if (res.authError) {
-    await notify('收藏失败', '未登录或连接已失效，请先在侧边栏登录')
-  } else {
-    await notify('收藏失败', res.error || '请检查后端连接')
-  }
+  await saveTabsWithNotification(
+    workspaceId,
+    savable.map((tab) => ({
+      chromeTabId: tab.id ?? 0,
+      url: tab.url ?? '',
+      title: tab.title ?? '',
+      favIconUrl: tab.favIconUrl ?? '',
+    })),
+    { closeAfterAdd: true, notifyOnError: true },
+  )
 }
 
 /** 是否为可收藏的页面协议（http/https/file），浏览器内置页面不支持 */

@@ -3,16 +3,15 @@ import type { AddTabsToWorkspaceMessage, MessageResponse } from '../shared/types
 import { logger } from '../shared/utils/logger'
 import { getOrCreateDeviceId, getDeviceName, getBrowserInfo, getOSInfo } from '../shared/utils/device-fingerprint'
 import { registerDevice } from '../shared/api/devices'
-import { getWorkspaces } from '../shared/api/workspaces'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import {
   lastFocusedWindowId,
-  notify,
   openPickerWindow,
   openSettingsPage,
   openSidePanel,
   openWorkspacesPage,
   saveTabsToWorkspaceAndClose,
+  saveTabsWithNotification,
   saveToDefaultWorkspaceAndClose,
 } from './context-menu/actions'
 import { NOTIFICATION_SAVE_TAB_SUCCESS, UNGROUPED_WORKSPACE_ID } from './context-menu/constants'
@@ -123,72 +122,15 @@ chrome.runtime.onStartup.addListener(async () => {
 /**
  * 分组选择器弹窗的收藏流程（payload 带 closeAfterAdd 标记）：
  * 加入成功后由 background 统一弹桌面通知；closeAfterAdd 为 true 时一并关闭原标签页。
- * 与右键菜单「保存到默认/未分组并关闭」保持同一行为：关闭与通知都不放在弹窗页面上下文里做
+ * 与右键菜单「保存到默认/未分组并关闭」共用同一流程：关闭与通知都不放在弹窗页面上下文里做
  * （弹窗页面里 chrome.tabs.remove 可能静默失败，且桌面通知本应由 background 发出）。
  */
 async function savePickerTabsToWorkspace(
   payload: AddTabsToWorkspaceMessage['payload'],
 ): Promise<MessageResponse> {
-  const res = await handleMessage({
-    action: 'ADD_TABS_TO_WORKSPACE',
-    payload: { workspaceId: payload.workspaceId, tabs: payload.tabs },
+  return saveTabsWithNotification(payload.workspaceId, payload.tabs, {
+    closeAfterAdd: payload.closeAfterAdd,
   })
-
-  if (res.success) {
-    const data = (res.data ?? {}) as { added?: number; skipped?: number }
-    const added = data.added ?? payload.tabs.length
-    const skipped = data.skipped ?? 0
-    const count = payload.tabs.length
-    // 「保存并关闭」语义：无论新增还是跳过，统一关闭用户选中的页面，避免混选时行为不一致
-    let closed = false
-    if (payload.closeAfterAdd) {
-      const ids = payload.tabs.map((t) => t.chromeTabId).filter((id) => id > 0)
-      if (ids.length > 0) {
-        try {
-          await chrome.tabs.remove(ids)
-          closed = true
-        } catch (err) {
-          // 标签可能已关闭：记录日志但不影响整体成功结果
-          logger.warn('关闭已收藏标签页失败:', err)
-        }
-      }
-    }
-    // 读取分组名用于提示文案（失败不影响主流程，回退通用表述）
-    let wsLabel = '该分组'
-    try {
-      const wsRes = await getWorkspaces(true)
-      if (wsRes.ok && wsRes.data) {
-        const name = wsRes.data.workspaces.find((w) => w.id === payload.workspaceId)?.name
-        if (name) wsLabel = `「${name}」`
-      }
-    } catch {
-      /* ignore */
-    }
-    let title: string
-    let detail: string
-    if (added === 0 && skipped > 0) {
-      // 全部已存在：跳过（页面仍按"保存并关闭"语义关闭）
-      title = '已存在'
-      detail = `${wsLabel}下已存在该页面，已跳过并关闭`
-    } else if (skipped > 0) {
-      // 部分已存在：加入新增项并关闭
-      title = '已加入工作组'
-      detail = closed
-        ? `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过）并关闭，点击查看`
-        : `已收藏 ${added} 个标签页（${skipped} 个已存在，已跳过），点击查看`
-    } else {
-      title = '已加入工作组'
-      detail = closed
-        ? count > 1
-          ? `已收藏 ${count} 个标签页并关闭，点击查看`
-          : '当前标签页已收藏并关闭，点击查看'
-        : count > 1
-          ? `已收藏 ${count} 个标签页，点击查看`
-          : '当前标签页已收藏，点击查看'
-    }
-    await notify(title, detail, NOTIFICATION_SAVE_TAB_SUCCESS)
-  }
-  return res
 }
 
 // 监听来自 popup/sidepanel/dashboard 的消息
