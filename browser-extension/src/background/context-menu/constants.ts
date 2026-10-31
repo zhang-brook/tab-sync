@@ -21,6 +21,8 @@ export const MENU_TAB_SAVE_AS_NEW = 'tab-sync-tab-save-as-new'
 export const MENU_OPEN_SIDEPANEL = 'tab-sync-open-sidepanel'
 export const MENU_OPEN_SETTINGS = 'tab-sync-open-settings'
 export const MENU_OPEN_WORKSPACES = 'tab-sync-open-workspaces'
+// 工具栏图标右键：打开浏览器扩展管理页（查看权限、快捷键并重新加载）
+export const MENU_OPEN_EXTENSIONS = 'tab-sync-open-extensions'
 // 更多选项子菜单（父项带子菜单，子项以 parentId 挂在父项下）
 export const MENU_MORE = 'tab-sync-more'
 export const MENU_MORE_SHORTCUTS = 'tab-sync-more-shortcuts'

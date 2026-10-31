@@ -1,4 +1,5 @@
 import { openTabAfterActive } from '../../shared/utils/tab-utils'
+import { extensionManageUrl } from '../../shared/utils/pages'
 import {
   handleSaveGroupClick,
   lastFocusedWindowId,
@@ -13,6 +14,7 @@ import {
 import {
   MENU_MORE_RELOAD,
   MENU_MORE_SHORTCUTS,
+  MENU_OPEN_EXTENSIONS,
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
   MENU_OPEN_WORKSPACES,
@@ -53,6 +55,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (id === MENU_MORE_SHORTCUTS) {
     // 快捷键配置页：在激活标签页之后打开
     await openTabAfterActive('chrome://extensions/shortcuts')
+    return
+  }
+  if (id === MENU_OPEN_EXTENSIONS) {
+    await openTabAfterActive(extensionManageUrl())
     return
   }
   if (id === MENU_MORE_RELOAD || id === `${MENU_MORE_RELOAD}-${chrome.contextMenus.ContextType.ACTION}`) {

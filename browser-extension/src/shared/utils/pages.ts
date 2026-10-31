@@ -8,3 +8,8 @@ export const DASHBOARD_URL = chrome.runtime.getURL('src/dashboard/index.html')
 
 /** 分组选择器弹窗页面 URL，参数经 query 传递，如 PICKER_URL + '?tabIds=1,2' */
 export const PICKER_URL = chrome.runtime.getURL('src/picker/index.html')
+
+/** 浏览器扩展管理页（定位到本扩展，可查看权限、编辑快捷键并重新加载） */
+export function extensionManageUrl(): string {
+  return `chrome://extensions/?id=${chrome.runtime.id}`
+}

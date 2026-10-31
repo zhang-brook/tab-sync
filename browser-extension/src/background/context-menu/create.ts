@@ -5,6 +5,7 @@ import {
   MENU_MORE,
   MENU_MORE_RELOAD,
   MENU_MORE_SHORTCUTS,
+  MENU_OPEN_EXTENSIONS,
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
   MENU_OPEN_WORKSPACES,
@@ -200,6 +201,11 @@ export async function createContextMenus() {
 
     {
       const ctx = chrome.contextMenus.ContextType.ACTION
+      chrome.contextMenus.create({
+        id: MENU_OPEN_EXTENSIONS,
+        title: '管理扩展',
+        contexts: [ctx],
+      })
       chrome.contextMenus.create({
         id: `${MENU_MORE_RELOAD}-${ctx}`,
         title: '重启扩展',
