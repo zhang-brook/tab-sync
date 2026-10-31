@@ -72,7 +72,8 @@
               <span class="ws-color-dot" :style="{ backgroundColor: selectedWorkspace.color }" />
               <span class="ws-name">{{ selectedWorkspace.name }}</span>
               <el-tag v-for="tg in (selectedWorkspace.tags ?? [])" :key="tg.id" size="small" effect="dark" round
-                :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
+                class="tag-chip" :style="tg.color ? { backgroundColor: tg.color, borderColor: tg.color } : {}"
+                @click="navigateToTag(tg)">{{ tg.name }}</el-tag>
               <el-tag size="small" type="info">{{ rightTabs.length }} 个标签页</el-tag>
             </div>
             <div class="detail-actions">
@@ -202,7 +203,8 @@
               @sort="onTabSort"
               @click="onTabClick"
               @command="onTabMenuCommand"
-              @tag-click="onTagClick"
+              @tag-click="navigateToTag"
+              @badge-click="navigateToWorkspace"
             />
           </div>
         </template>
@@ -309,7 +311,7 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
-import TabList, { type TabListItem, type TabListSortEvent, type TabTagDisplay } from '@/shared/components/TabList.vue'
+import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import CloudTabDialogs, { type CloudTabDialogMode } from '@/shared/components/CloudTabDialogs.vue'
 import TagEditorDialog from '@/shared/components/TagEditorDialog.vue'
@@ -320,6 +322,7 @@ import TabPropertiesDialog from '../components/TabPropertiesDialog.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
+import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, getWorkspacePath, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
@@ -349,6 +352,7 @@ import type { Workspace, TabReference, TagInfo } from '@/shared/types'
 
 const route = useRoute()
 const router = useRouter()
+const { navigateToTag, navigateToWorkspace } = useDashboardNavigation()
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -578,6 +582,10 @@ const tabListItems = computed<WsTabListItem[]>(() =>
       tabScope.value === 'all' && it.workspaceId !== selectedWorkspace.value?.id
         ? it.workspaceColor
         : undefined,
+    badgeKey:
+      tabScope.value === 'all' && it.workspaceId !== selectedWorkspace.value?.id
+        ? it.workspaceId
+        : undefined,
     tags: (it.tab.tags ?? []).map((t) => ({
       id: t.id,
       name: t.name,
@@ -619,12 +627,6 @@ function onTabDialogSaved(workspaceId: string) {
 function onTabClick(item: TabListItem) {
   const target = tabListItems.value.find((i) => i.id === item.id)
   if (target) void openSingleTab(target.tab.url)
-}
-
-/** 点击行内标签：切换「按标签筛选」，与顶部筛选下拉联动 */
-function onTagClick(tag: TabTagDisplay) {
-  if (tag.id == null) return
-  tagFilter.value = tagFilter.value === tag.id ? null : tag.id
 }
 
 watch(searchKeyword, (val) => {
@@ -1453,6 +1455,10 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   font-size: 15px;
   font-weight: 500;
   color: #303133;
+}
+
+.tag-chip {
+  cursor: pointer;
 }
 
 .detail-actions {

@@ -52,6 +52,7 @@ const emit = defineEmits<{
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
   (e: 'command', command: string, item: TabListItem): void
   (e: 'tag-click', tag: TabTagDisplay, item: TabListItem): void
+  (e: 'badge-click', workspaceId: string, item: TabListItem): void
 }>()
 
 /** 组件内可变列表：拖拽就地排序，父组件通过 sort 事件持久化 */
@@ -120,6 +121,10 @@ function savedStyle(item: TabListItem) {
 
 function onTagClick(tag: TabTagDisplay, item: TabListItem) {
   if (tag.clickable) emit('tag-click', tag, item)
+}
+
+function onBadgeClick(item: TabListItem) {
+  if (item.badgeKey) emit('badge-click', item.badgeKey, item)
 }
 
 /** 整个列表共用一个下拉菜单，避免每行各挂一套弹出层组件（大列表会撑爆渲染进程） */
@@ -223,7 +228,9 @@ function onSharedMenuCommand(command: string) {
           size="small"
           effect="plain"
           class="tab-badge"
+          :class="{ 'is-clickable': element.badgeKey }"
           :style="element.badgeColor ? { borderColor: element.badgeColor, color: element.badgeColor } : {}"
+          @click.stop="onBadgeClick(element)"
         >{{ element.badgeText }}</el-tag>
         <div class="tab-actions" @click.stop>
           <slot name="actions" :item="element" />
@@ -385,6 +392,10 @@ function onSharedMenuCommand(command: string) {
 
 .tab-badge {
   flex-shrink: 0;
+}
+
+.tab-badge.is-clickable {
+  cursor: pointer;
 }
 
 .tab-actions {

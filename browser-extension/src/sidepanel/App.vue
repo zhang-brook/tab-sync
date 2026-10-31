@@ -116,6 +116,7 @@ import { closeLocalTabs, type LocalTab, type LocalTabSegment } from '@/shared/se
 import { sendMessage } from '@/shared/composables/useMessage'
 import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { dashboardTargetUrl, targetOfTag } from '@/shared/utils/dashboard-links'
 import { DASHBOARD_URL } from '@/shared/utils/pages'
 import type { StateData } from '@/shared/types'
 import type { TabRowMeta, TabTagDisplay } from '@/shared/types/tab-list'
@@ -189,8 +190,8 @@ function metaForTab(tab: LocalTab): TabRowMeta | undefined {
 }
 
 function onTagClick(tag: TabTagDisplay) {
-  if (!tag.key) return
-  void openTabAfterActive(`${DASHBOARD_URL}#/workspaces?workspaceId=${encodeURIComponent(tag.key)}`)
+  const target = targetOfTag(tag)
+  if (target) void openTabAfterActive(dashboardTargetUrl(target))
 }
 
 async function onSort(payload: { segment: LocalTabSegment; orderedIds: number[]; movedId: number }) {

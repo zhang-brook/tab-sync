@@ -174,7 +174,7 @@
               :key="ws.id"
               class="workspace-item"
               :style="{ paddingLeft: `${10 + workspaceDepth(ws.id) * 16}px` }"
-              @click="openWorkspace(ws.id)"
+              @click="navigateToWorkspace(ws.id)"
             >
               <span class="tag-dot" :style="{ backgroundColor: normalizeColor(ws.color) }" />
               <div class="workspace-info">
@@ -192,7 +192,9 @@
                     size="small"
                     effect="dark"
                     round
+                    class="tag-chip"
                     :style="t.color ? { backgroundColor: normalizeColor(t.color), borderColor: normalizeColor(t.color) } : {}"
+                    @click.stop="navigateToTag(t)"
                   >{{ t.name }}</el-tag>
                 </div>
               </div>
@@ -219,6 +221,7 @@
               :menu-items="tabMenu"
               @click="openTab"
               @command="onTabCommand"
+              @badge-click="navigateToWorkspace"
             />
           </div>
         </template>
@@ -277,7 +280,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Loading, Plus, Refresh, SortDown, SortUp } from '@element-plus/icons-vue'
 import TabList from '@/shared/components/TabList.vue'
@@ -297,10 +300,13 @@ import {
 import { DEFAULT_WORKSPACE_COLOR, normalizeColor } from '@/shared/constants/theme'
 import { copyText } from '@/shared/utils/clipboard'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import type { TagInfo, TagTabItem, Workspace } from '@/shared/types'
 import type { TabListItem } from '@/shared/types/tab-list'
 
+const route = useRoute()
 const router = useRouter()
+const { navigateToTag, navigateToWorkspace } = useDashboardNavigation()
 
 const tags = ref<TagInfo[]>([])
 const workspaces = ref<Workspace[]>([])
@@ -363,8 +369,7 @@ function tagCountOf(tag: TagInfo): number {
 watch(scopeFilter, (scope) => {
   const tag = selectedTag.value
   if (tag && tag.scope !== scope) {
-    selectedTag.value = null
-    taggedTabs.value = []
+    clearSelection()
   }
 })
 const taggedWorkspaces = computed(() =>
@@ -418,6 +423,7 @@ const tabItems = computed<TabListItem[]>(() =>
     url: t.url,
     favIconUrl: t.favIconUrl,
     badgeText: t.workspaceName,
+    badgeKey: t.workspaceId,
   })),
 )
 
@@ -467,7 +473,7 @@ async function loadTagTabs(tagId: number): Promise<void> {
   }
 }
 
-async function selectTag(tag: TagInfo): Promise<void> {
+async function applySelection(tag: TagInfo): Promise<void> {
   selectedTag.value = tag
   if (tag.scope === 'tab') {
     await loadTagTabs(tag.id)
@@ -475,6 +481,64 @@ async function selectTag(tag: TagInfo): Promise<void> {
     taggedTabs.value = []
   }
 }
+
+/** 路由带入的目标标签（从标签页/工作组跳转过来时定位） */
+const routeTagId = computed(() => {
+  const v = route.query.tagId
+  const id = typeof v === 'string' ? Number(v) : NaN
+  return Number.isFinite(id) ? id : null
+})
+
+/** 已发起但路由尚未更新的目标值：避免选中项 watcher 把刚 push 的记录又 replace 掉 */
+let pendingTagQuery: number | null = null
+
+/** 选中项同步到 URL query：刷新或复制链接后可恢复到同一标签 */
+function syncTagToQuery(id: number | null, mode: 'push' | 'replace' = 'replace') {
+  if (id === routeTagId.value || id === pendingTagQuery) return
+  pendingTagQuery = id
+  const query = { ...route.query }
+  if (id == null) delete query.tagId
+  else query.tagId = String(id)
+  void router[mode]({ query }).finally(() => {
+    if (pendingTagQuery === id) pendingTagQuery = null
+  })
+}
+
+function clearSelection(): void {
+  selectedTag.value = null
+  taggedTabs.value = []
+  syncTagToQuery(null)
+}
+
+/** 用户点选标签：写入历史记录，浏览器返回可逐个回到之前选中的标签 */
+async function selectTag(tag: TagInfo): Promise<void> {
+  scopeFilter.value = tag.scope
+  await applySelection(tag)
+  syncTagToQuery(tag.id, 'push')
+}
+
+/** 从 URL 恢复选中项：标签列表加载完成后按 id 定位 */
+async function restoreFromQuery(): Promise<void> {
+  const id = routeTagId.value
+  if (id == null) return
+  const tag = tags.value.find((t) => t.id === id)
+  if (!tag) return
+  scopeFilter.value = tag.scope
+  await applySelection(tag)
+}
+
+// 同一路由仅 query 变化（返回/前进或外部跳转）时同步右侧详情
+watch(routeTagId, (id) => {
+  if (id == null) {
+    selectedTag.value = null
+    taggedTabs.value = []
+    return
+  }
+  const tag = tags.value.find((t) => t.id === id)
+  if (!tag || selectedTag.value?.id === tag.id) return
+  scopeFilter.value = tag.scope
+  void applySelection(tag)
+})
 
 async function refresh(): Promise<void> {
   await Promise.all([loadTags(), loadWorkspaces()])
@@ -488,10 +552,6 @@ async function refresh(): Promise<void> {
 async function openTab(item: TabListItem): Promise<void> {
   const tab = tabById.value.get(String(item.id))
   if (tab?.url) await openTabAfterActive(tab.url)
-}
-
-function openWorkspace(id: string): void {
-  router.push({ path: '/workspaces', query: { workspaceId: id } })
 }
 
 async function copyWithFeedback(text: string, label: string): Promise<void> {
@@ -515,7 +575,7 @@ async function onTabCommand(command: string, item: TabListItem): Promise<void> {
       await copyWithFeedback(tab.url, '链接')
       return
     case 'openWorkspace':
-      openWorkspace(tab.workspaceId)
+      navigateToWorkspace(tab.workspaceId)
       return
     case 'removeTag':
       await removeTagFromTab(tab)
@@ -640,8 +700,7 @@ async function removeTag(tag: TagInfo): Promise<void> {
     await deleteTag(tag.id)
     ElMessage.success('已删除')
     if (selectedTag.value?.id === tag.id) {
-      selectedTag.value = null
-      taggedTabs.value = []
+      clearSelection()
     }
     await Promise.all([loadTags(), loadWorkspaces()])
   } catch (err) {
@@ -649,9 +708,9 @@ async function removeTag(tag: TagInfo): Promise<void> {
   }
 }
 
-onMounted(() => {
-  void loadTags()
-  void loadWorkspaces()
+onMounted(async () => {
+  await Promise.all([loadTags(), loadWorkspaces()])
+  await restoreFromQuery()
 })
 </script>
 
@@ -904,6 +963,9 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 4px;
+}
+.tag-chip {
+  cursor: pointer;
 }
 .scope-readonly {
   font-size: 13px;

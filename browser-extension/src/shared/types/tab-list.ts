@@ -35,6 +35,8 @@ export interface TabListItem {
   /** 行尾来源徽标（工作组名等） */
   badgeText?: string
   badgeColor?: string
+  /** 来源徽标对应的工作组 id（用于点击跳转） */
+  badgeKey?: string
   /** 行内标签（云端标签、来源工作组等） */
   tags?: TabTagDisplay[]
   /** 描述文本 */
@@ -56,6 +58,7 @@ export interface TabListSortEvent {
 export interface TabRowMeta {
   badgeText?: string
   badgeColor?: string
+  badgeKey?: string
   tags?: TabTagDisplay[]
   description?: string
   addedAt?: string
