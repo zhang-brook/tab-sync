@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { CaretRight, Close, Monitor } from '@element-plus/icons-vue'
 import TabList from './TabList.vue'
 import { flattenLocalWindows, type LocalTab, type LocalTabGroup, type LocalTabSegment, type LocalTabWindow } from '../services/local-tabs'
@@ -43,6 +43,22 @@ const emit = defineEmits<{
 }>()
 
 const selectedArray = computed<Array<string | number>>(() => Array.from(props.selected))
+
+const rootRef = ref<HTMLElement | null>(null)
+let located = false
+
+/** 列表首次渲染出激活行时滚入可视区；后续切换由操作方负责滚动，避免刷新数据时打断用户浏览 */
+function locateActiveTab() {
+  if (located || props.activeTabId == null) return
+  nextTick(() => {
+    const el = rootRef.value?.querySelector<HTMLElement>(`[data-tab-id="${props.activeTabId}"]`)
+    if (!el) return
+    located = true
+    el.scrollIntoView({ block: 'center' })
+  })
+}
+
+watch(() => [props.activeTabId, props.windows], locateActiveTab, { immediate: true })
 
 const tabMap = computed(() => {
   const map = new Map<number, LocalTab>()
@@ -106,7 +122,7 @@ function onClose(item: TabListItem) {
 </script>
 
 <template>
-  <div class="local-tab-tree">
+  <div ref="rootRef" class="local-tab-tree">
     <div v-for="win in windows" :key="win.id" class="window-node">
       <div class="node-header window-header" @click="emit('toggle-window', win.id)">
         <el-icon class="expand-icon" :class="{ 'is-expanded': !collapsedWindows.has(win.id) }">

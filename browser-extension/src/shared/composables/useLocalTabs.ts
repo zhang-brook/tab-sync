@@ -210,6 +210,7 @@ export function useLocalTabs(options: { auto?: boolean } = {}) {
       ensureVisible(info.tabId)
     }
     chrome.tabs.onActivated.addListener(onActivated)
+    await syncActiveTab()
   })
 
   onUnmounted(() => {
