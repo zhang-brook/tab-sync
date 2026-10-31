@@ -1,6 +1,6 @@
 export type { Workspace, TabReference, TagInfo } from './workspace'
 export type { Device } from './device'
-export type { AuthState, VerifyTokenResponse, ServerVersionInfo } from './auth'
+export type { AuthState, VerifyTokenResponse, ServerVersionInfo, ServerCheckInfo } from './auth'
 export type {
   MessageAction,
   ExtensionMessage,

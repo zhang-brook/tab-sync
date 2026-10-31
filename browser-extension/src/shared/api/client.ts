@@ -50,8 +50,9 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
+  baseUrlOverride?: string,
 ): Promise<ApiResponse<T>> {
-  const baseUrl = await getBaseUrl()
+  const baseUrl = baseUrlOverride?.trim() || await getBaseUrl()
   if (!baseUrl) {
     return { ok: false, status: 0, error: '未配置后端地址' }
   }
@@ -69,9 +70,12 @@ async function request<T>(
     const json = await res.json().catch(() => null)
 
     if (res.status === 401) {
-      // API Key 风格：401 表示 Token 无效，直接清除认证
-      logger.warn('Token 无效或已过期，清除认证状态')
-      await clearAuth()
+      // 临时指定地址属于连通性测试，401 不应影响当前登录态
+      if (!baseUrlOverride) {
+        // API Key 风格：401 表示 Token 无效，直接清除认证
+        logger.warn('Token 无效或已过期，清除认证状态')
+        await clearAuth()
+      }
       return { ok: false, status: 401, error: 'Token 无效或已过期' }
     }
 
@@ -100,8 +104,8 @@ async function request<T>(
 }
 
 export const apiClient = {
-  get<T>(path: string): Promise<ApiResponse<T>> {
-    return request<T>('GET', path)
+  get<T>(path: string, baseUrl?: string): Promise<ApiResponse<T>> {
+    return request<T>('GET', path, undefined, baseUrl)
   },
   post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
     return request<T>('POST', path, body)

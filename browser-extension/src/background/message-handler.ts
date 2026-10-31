@@ -62,7 +62,7 @@ async function dispatchMessage(message: ExtensionMessage): Promise<MessageRespon
       return handleLogout()
 
     case 'CHECK_VERSION':
-      return handleCheckVersion()
+      return handleCheckVersion(message.payload as { apiBaseUrl?: string } | undefined)
 
     case 'SET_CONNECTION_MODE':
       return handleSetConnectionMode(message.payload)
@@ -239,10 +239,10 @@ async function handleLogout(): Promise<MessageResponse> {
   return { success: true }
 }
 
-/** 版本协商：检查客户端与服务端版本兼容性 */
-async function handleCheckVersion(): Promise<MessageResponse> {
+/** 版本协商：检查客户端与服务端版本兼容性；payload.apiBaseUrl 用于临时测试未保存的地址 */
+async function handleCheckVersion(payload?: { apiBaseUrl?: string }): Promise<MessageResponse> {
   const startedAt = Date.now()
-  const res = await getServerVersion()
+  const res = await getServerVersion(payload?.apiBaseUrl)
   const latencyMs = Date.now() - startedAt
 
   if (!res.ok || !res.data) {
@@ -252,6 +252,7 @@ async function handleCheckVersion(): Promise<MessageResponse> {
         compatible: false,
         serverVersion: '未知',
         reason: res.error || '无法连接服务器',
+        checkedAt: Date.now(),
       },
     }
   }
@@ -279,6 +280,7 @@ async function handleCheckVersion(): Promise<MessageResponse> {
       reason: compatible ? undefined : `扩展版本 ${extVersion} 不在服务器兼容范围 [${minExtVersion}, ${maxExtVersion}]`,
       latencyMs,
       clockDiffMs,
+      checkedAt: Date.now(),
     },
   }
 }

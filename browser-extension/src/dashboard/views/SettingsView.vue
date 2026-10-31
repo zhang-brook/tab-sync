@@ -102,29 +102,60 @@
 
               <!-- API 地址（仅轻量后端模式） -->
               <el-form-item v-if="connectionMode === 'lightweight'" label="API 地址">
-                <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable @blur="saveApiBaseUrl" />
-                <div class="form-tip">
+                <div class="field-row">
+                  <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable />
+                  <el-popover
+                    v-model:visible="connectivityPopoverVisible"
+                    trigger="click"
+                    placement="bottom-end"
+                    :width="460"
+                    popper-class="connectivity-popover"
+                  >
+                    <template #reference>
+                      <el-button :loading="testChecking" :disabled="!apiBaseUrl.trim()" @click="openConnectivityPopover">
+                        测试连通性
+                      </el-button>
+                    </template>
+                    <ServerInfoPanel
+                      :api-base-url="testAddress"
+                      :version-info="testVersionInfo"
+                      :extension-version="extensionVersion"
+                    />
+                    <div class="popover-footer">
+                      <el-button size="small" @click="connectivityPopoverVisible = false">关闭</el-button>
+                    </div>
+                  </el-popover>
+                  <el-button type="primary" :loading="apiSaving" :disabled="!apiBaseUrl.trim() || !addressDirty" @click="handleSaveApiBaseUrl">
+                    保存
+                  </el-button>
+                </div>
+                <div class="form-tip" style="width: 100%">
                   轻量后端的 API 地址，通常为 http://localhost:8080
                 </div>
+                <div class="form-tip" style="width: 100%">当前地址：{{ savedApiBaseUrl || '--' }}</div>
               </el-form-item>
 
               <!-- Token 管理 -->
               <el-form-item label="API Token">
-                <el-input
-                  v-model="tokenInput"
-                  placeholder="粘贴从管理后台获取的 API Token"
-                  type="password"
-                  show-password
-                  clearable
-                >
-                  <template #append>
-                    <el-button @click="handleSetToken" :loading="tokenChecking">
-                      {{ authStatus === 'authenticated' ? '更换' : '设置' }}
-                    </el-button>
-                  </template>
-                </el-input>
-                <div class="form-tip">
+                <div class="field-row">
+                  <el-input
+                    v-model="tokenInput"
+                    placeholder="粘贴从管理后台获取的 API Token"
+                    type="password"
+                    show-password
+                    clearable
+                  />
+                  <el-button type="primary" :loading="tokenChecking" :disabled="!tokenInput.trim()" @click="handleSetToken">
+                    {{ authStatus === 'authenticated' ? '保存（替换已保存Token）' : '保存' }}
+                  </el-button>
+                </div>
+                <div class="form-tip" style="width: 100%">
                   Token 在轻量后端管理后台生成（首次运行后访问 /setup 初始化）
+                </div>
+                <div class="form-tip" style="width: 100%">
+                  当前状态：<span :class="authStatus === 'authenticated' ? 'token-status-on' : 'token-status-off'">
+                    {{ authStatus === 'authenticated' ? '已配置' : '未配置' }}
+                  </span>
                 </div>
               </el-form-item>
 
@@ -148,7 +179,7 @@
                 <el-button
                   size="small"
                   :loading="versionChecking"
-                  :disabled="connectionMode !== 'lightweight' || !apiBaseUrl"
+                  :disabled="connectionMode !== 'lightweight' || !savedApiBaseUrl"
                   @click="checkVersion()"
                 >
                   重新检测
@@ -156,37 +187,11 @@
               </div>
             </template>
 
-            <el-form label-width="120px" label-position="left">
-              <el-form-item label="API 地址">
-                <span class="mono-text">{{ apiBaseUrl || '--' }}</span>
-              </el-form-item>
-              <el-form-item label="服务器版本">
-                <span>{{ versionInfo?.serverVersion ?? '--' }}</span>
-              </el-form-item>
-              <el-form-item label="兼容版本范围">
-                <span>{{ versionInfo?.minExtVersion ?? '--' }} ~ {{ versionInfo?.maxExtVersion ?? '--' }}</span>
-                <div class="form-tip" style="width: 100%">当前服务器支持的扩展版本区间，扩展版本落在此范围内才可用</div>
-              </el-form-item>
-              <el-form-item label="版本兼容性">
-                <template v-if="versionInfo">
-                  <el-tag v-if="versionInfo.compatible" type="success">兼容</el-tag>
-                  <el-tag v-else type="danger">不兼容</el-tag>
-                  <span class="form-tip" style="margin-left: 8px">当前扩展版本 {{ extensionVersion }}</span>
-                  <span v-if="!versionInfo.compatible && versionInfo.reason" class="form-tip" style="margin-left: 8px">
-                    {{ versionInfo.reason }}
-                  </span>
-                </template>
-                <span v-else>--</span>
-              </el-form-item>
-              <el-divider />
-              <el-form-item label="连接时延">
-                <span>{{ versionInfo?.latencyMs != null ? `${versionInfo.latencyMs} ms` : '--' }}</span>
-              </el-form-item>
-              <el-form-item label="时间差">
-                <span>{{ formatClockDiff(versionInfo?.clockDiffMs) }}</span>
-                <div class="form-tip" style="width: 100%">服务端时间减去本地时间，正值表示服务端时间快于本地</div>
-              </el-form-item>
-            </el-form>
+            <ServerInfoPanel
+              :api-base-url="savedApiBaseUrl"
+              :version-info="versionInfo"
+              :extension-version="extensionVersion"
+            />
           </el-card>
 
           <!-- 设备信息 -->
@@ -261,23 +266,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { extensionManageUrl } from '@/shared/utils/pages'
-import type { StateData, WorkspacesData, Workspace } from '@/shared/types'
+import type { StateData, WorkspacesData, Workspace, ServerCheckInfo } from '@/shared/types'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import ServerInfoPanel from '@/dashboard/components/ServerInfoPanel.vue'
 import type { WorkspaceTreeNode as WsNode } from '@/shared/utils/workspace-tree'
 
 const apiBaseUrl = ref('')
+// 已保存的地址（服务端信息卡片与「当前地址」展示以它为准）
+const savedApiBaseUrl = ref('')
+const apiSaving = ref(false)
 const deviceId = ref('')
 const deviceName = ref('')
 const tabCount = ref({ open: 0, frozen: 0 })
 const tokenInput = ref('')
 const tokenChecking = ref(false)
 const versionChecking = ref(false)
+// 连通性测试气泡
+const connectivityPopoverVisible = ref(false)
+// 气泡独立检测：用自己的地址快照与结果，不读写已保存配置
+const testAddress = ref('')
+const testVersionInfo = ref<ServerCheckInfo | null>(null)
+const testChecking = ref(false)
+
+// 地址输入框与已保存值不一致时才允许保存
+const addressDirty = computed(() => apiBaseUrl.value.trim() !== savedApiBaseUrl.value)
 
 // 顶部 tab: extension(扩展设置) | cloud(云端设置) | data(数据管理) | about(关于)
 const activeTab = ref('extension')
@@ -367,19 +385,12 @@ const extensionId = chrome.runtime.id
 
 const connectionMode = ref<'lightweight' | 'zhige'>('lightweight')
 const authStatus = ref<'unknown' | 'authenticated' | 'checking'>('unknown')
-const versionInfo = ref<{
-  compatible?: boolean
-  serverVersion?: string
-  minExtVersion?: string
-  maxExtVersion?: string
-  reason?: string
-  latencyMs?: number
-  clockDiffMs?: number
-} | null>(null)
+const versionInfo = ref<ServerCheckInfo | null>(null)
 
 onMounted(async () => {
   // 从 storage 读取设置
-  apiBaseUrl.value = await storage.get(STORAGE_KEYS.API_BASE_URL)
+  apiBaseUrl.value = (await storage.get(STORAGE_KEYS.API_BASE_URL)) || ''
+  savedApiBaseUrl.value = apiBaseUrl.value
   deviceId.value = (await storage.get(STORAGE_KEYS.DEVICE_ID)) || ''
   deviceName.value = (await storage.get(STORAGE_KEYS.DEVICE_NAME)) || ''
 
@@ -403,7 +414,7 @@ onMounted(async () => {
   await loadShortcuts()
 
   // 进入页面自动静默检测一次版本，结果直接展示在服务端信息卡片，不弹提示
-  if (connectionMode.value === 'lightweight' && apiBaseUrl.value) {
+  if (connectionMode.value === 'lightweight' && savedApiBaseUrl.value) {
     void checkVersion(false)
   }
 })
@@ -413,21 +424,46 @@ async function handleModeChange() {
     action: 'SET_CONNECTION_MODE',
     payload: {
       mode: connectionMode.value,
-      apiBaseUrl: connectionMode.value === 'lightweight' ? apiBaseUrl.value : undefined,
+      // 连接模式切换不保存地址输入框里未保存的修改
+      apiBaseUrl: connectionMode.value === 'lightweight' ? savedApiBaseUrl.value : undefined,
     },
   })
   ElMessage.success(`连接模式已切换为: ${connectionMode.value === 'lightweight' ? '轻量后端' : '织个网'}`)
 }
 
-function saveApiBaseUrl() {
-  storage.set(STORAGE_KEYS.API_BASE_URL, apiBaseUrl.value.trim())
-  // 同时更新连接模式中的地址
-  if (connectionMode.value === 'lightweight') {
-    sendMessage({
-      action: 'SET_CONNECTION_MODE',
-      payload: { mode: 'lightweight', apiBaseUrl: apiBaseUrl.value.trim() },
-    }).catch(() => {})
+async function handleSaveApiBaseUrl() {
+  const nextUrl = apiBaseUrl.value.trim()
+  if (!nextUrl) {
+    ElMessage.warning('请输入 API 地址')
+    return
   }
+
+  apiSaving.value = true
+  try {
+    const previousSaved = savedApiBaseUrl.value
+    const res = await sendMessage({
+      action: 'SET_CONNECTION_MODE',
+      payload: { mode: connectionMode.value, apiBaseUrl: nextUrl },
+    })
+    if (!res.success) {
+      ElMessage.error(res.error || '保存失败')
+      return
+    }
+    apiBaseUrl.value = nextUrl
+    savedApiBaseUrl.value = nextUrl
+    // 地址变了，旧地址的检测结果不再适用
+    if (nextUrl !== previousSaved) versionInfo.value = null
+    ElMessage.success('API 地址已保存')
+  } finally {
+    apiSaving.value = false
+  }
+}
+
+// 每次点击都刷新气泡内容；直接使用输入框里的地址，不要求先保存
+function openConnectivityPopover() {
+  testAddress.value = apiBaseUrl.value.trim()
+  connectivityPopoverVisible.value = true
+  void checkTestVersion(false)
 }
 
 async function handleSetToken() {
@@ -478,47 +514,42 @@ function saveShortcutEnabled() {
   storage.set(STORAGE_KEYS.SHORTCUT_ENABLED, shortcutEnabled.value)
 }
 
-// 时间差展示：正负号 + 带单位的绝对值，避免出现 "0 ms" 这类难读写法
-function formatClockDiff(ms?: number): string {
-  if (ms == null) return '--'
-  if (ms === 0) return '0'
-  const abs = Math.abs(ms)
-  const value = abs < 1000
-    ? `${abs} 毫秒`
-    : abs < 60000
-      ? `${(abs / 1000).toFixed(1)} 秒`
-      : `${(abs / 60000).toFixed(1)} 分钟`
-  return `${ms > 0 ? '+' : '-'}${value}`
-}
-
-async function checkVersion(showToast = true) {
-  versionChecking.value = true
+async function runVersionCheck(
+  target: Ref<ServerCheckInfo | null>,
+  checking: Ref<boolean>,
+  opts: { apiBaseUrl?: string; showToast: boolean },
+) {
+  checking.value = true
   // 先清空上次的检测结果，避免检测期间或失败后仍展示旧记录
-  versionInfo.value = null
-  const res = await sendMessage<{
-    compatible: boolean
-    serverVersion: string
-    minExtVersion: string
-    maxExtVersion: string
-    reason?: string
-    latencyMs?: number
-    clockDiffMs?: number
-  }>({ action: 'CHECK_VERSION' })
+  target.value = null
 
-  versionChecking.value = false
+  const payload = opts.apiBaseUrl ? { apiBaseUrl: opts.apiBaseUrl } : undefined
+  const res = await sendMessage<ServerCheckInfo>({ action: 'CHECK_VERSION', payload })
+
+  checking.value = false
 
   if (res.success && res.data) {
-    versionInfo.value = res.data
-    // 进入设置页时的自动检测只更新卡片内容，不弹提示打扰用户
-    if (!showToast) return
+    target.value = res.data
+    // 自动检测只更新内容，不弹提示打扰用户
+    if (!opts.showToast) return
     if (res.data.compatible) {
       ElMessage.success(`服务器版本 ${res.data.serverVersion}，版本兼容`)
     } else {
       ElMessage.warning(res.data.reason || '版本不兼容')
     }
-  } else if (showToast) {
+  } else if (opts.showToast) {
     ElMessage.error(res.error || '版本检测失败')
   }
+}
+
+// 卡片检测：使用已保存的地址
+function checkVersion(showToast = true) {
+  return runVersionCheck(versionInfo, versionChecking, { showToast })
+}
+
+// 气泡检测：使用打开气泡时记录的地址，不影响卡片结果
+function checkTestVersion(showToast = true) {
+  return runVersionCheck(testVersionInfo, testChecking, { apiBaseUrl: testAddress.value, showToast })
 }
 
 function copyDeviceId() {
@@ -574,6 +605,33 @@ async function handleClearData() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* 输入框与操作按钮同一行 */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.field-row .el-input {
+  flex: 1;
+}
+
+/* 气泡底部操作区 */
+.popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.token-status-on {
+  color: var(--el-color-success);
+}
+
+.token-status-off {
+  color: var(--el-color-info);
 }
 
 .form-tip {

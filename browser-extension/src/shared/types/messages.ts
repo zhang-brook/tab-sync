@@ -59,6 +59,8 @@ export interface LogoutMessage {
 
 export interface CheckVersionMessage {
   action: 'CHECK_VERSION'
+  /** 传入 apiBaseUrl 可临时检测该地址（不落盘），用于测试未保存的地址 */
+  payload?: { apiBaseUrl?: string }
 }
 
 export interface SetConnectionModeMessage {
