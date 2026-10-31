@@ -35,12 +35,12 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 		Count int64
 	}
 	rows := make([]tabCountRow, 0)
-	if err := s.db.Table("tab_tags").
-		Select("tab_tags.tag_id AS tag_id, COUNT(*) AS count").
-		Joins("JOIN tabs ON tabs.id = tab_tags.tab_id").
+	if err := s.db.Table("tab_tags_rel").
+		Select("tab_tags_rel.tag_id AS tag_id, COUNT(*) AS count").
+		Joins("JOIN tabs ON tabs.id = tab_tags_rel.tab_id").
 		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("workspaces.is_deleted = ?", false).
-		Group("tab_tags.tag_id").
+		Group("tab_tags_rel.tag_id").
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -93,10 +93,10 @@ func (s *TagService) Update(id uint, name, color, description string) (*TagRespo
 // Delete 删除标签（事务内清理关联记录）
 func (s *TagService) Delete(id uint) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("tag_id = ?", id).Delete(&model.TabTag{}).Error; err != nil {
+		if err := tx.Where("tag_id = ?", id).Delete(&model.TabTagRelation{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("tag_id = ?", id).Delete(&model.WorkspaceTag{}).Error; err != nil {
+		if err := tx.Where("tag_id = ?", id).Delete(&model.WorkspaceTagRelation{}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&model.Tag{}, id).Error
@@ -115,19 +115,19 @@ func (s *TagService) AddToTab(workspaceID string, tabID, tagID uint) error {
 		return errors.New("标签页不存在或不属于该工作组")
 	}
 	var exist int64
-	s.db.Model(&model.TabTag{}).
+	s.db.Model(&model.TabTagRelation{}).
 		Where("tab_id = ? AND tag_id = ?", tabID, tagID).
 		Count(&exist)
 	if exist > 0 {
 		return nil
 	}
-	return s.db.Create(&model.TabTag{TabID: tabID, WorkspaceID: workspaceID, TagID: tagID}).Error
+	return s.db.Create(&model.TabTagRelation{TabID: tabID, WorkspaceID: workspaceID, TagID: tagID}).Error
 }
 
 // RemoveFromTab 去掉标签页上的标签
 func (s *TagService) RemoveFromTab(workspaceID string, tabID, tagID uint) error {
 	res := s.db.Where("tab_id = ? AND workspace_id = ? AND tag_id = ?", tabID, workspaceID, tagID).
-		Delete(&model.TabTag{})
+		Delete(&model.TabTagRelation{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -144,19 +144,19 @@ func (s *TagService) AddToWorkspace(workspaceID string, tagID uint) error {
 		return err
 	}
 	var exist int64
-	s.db.Model(&model.WorkspaceTag{}).
+	s.db.Model(&model.WorkspaceTagRelation{}).
 		Where("workspace_id = ? AND tag_id = ?", workspaceID, tagID).
 		Count(&exist)
 	if exist > 0 {
 		return nil
 	}
-	return s.db.Create(&model.WorkspaceTag{WorkspaceID: workspaceID, TagID: tagID}).Error
+	return s.db.Create(&model.WorkspaceTagRelation{WorkspaceID: workspaceID, TagID: tagID}).Error
 }
 
 // RemoveFromWorkspace 去掉工作组上的标签
 func (s *TagService) RemoveFromWorkspace(workspaceID string, tagID uint) error {
 	res := s.db.Where("workspace_id = ? AND tag_id = ?", workspaceID, tagID).
-		Delete(&model.WorkspaceTag{})
+		Delete(&model.WorkspaceTagRelation{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -181,11 +181,11 @@ type TagTabItem struct {
 func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
 	items := make([]TagTabItem, 0)
 	err := s.db.
-		Table("tab_tags").
+		Table("tab_tags_rel").
 		Select("tabs.id AS tab_id, tabs.url, tabs.title, tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
-		Joins("JOIN tabs ON tabs.id = tab_tags.tab_id").
+		Joins("JOIN tabs ON tabs.id = tab_tags_rel.tab_id").
 		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
-		Where("tab_tags.tag_id = ? AND workspaces.is_deleted = ?", tagID, false).
+		Where("tab_tags_rel.tag_id = ? AND workspaces.is_deleted = ?", tagID, false).
 		Order("workspaces.name, tabs.sort_order").
 		Scan(&items).Error
 	if err != nil {

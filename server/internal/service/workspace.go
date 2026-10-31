@@ -432,7 +432,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 						}
 					}
 					// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
-					if terr := tx.Where("tab_id = ?", uid).Delete(&model.TabTag{}).Error; terr != nil {
+					if terr := tx.Where("tab_id = ?", uid).Delete(&model.TabTagRelation{}).Error; terr != nil {
 						return terr
 					}
 					if derr := tx.Where("id = ?", uid).Delete(&model.Tab{}).Error; derr != nil {
@@ -502,10 +502,10 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 		for _, wid := range subtree {
 			if err := tx.Where("tab_id IN (?)",
 				tx.Model(&model.Tab{}).Select("id").Where("workspace_id = ?", wid)).
-				Delete(&model.TabTag{}).Error; err != nil {
+				Delete(&model.TabTagRelation{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTag{}).Error; err != nil {
+			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTagRelation{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("workspace_id = ?", wid).Delete(&model.Tab{}).Error; err != nil {
@@ -586,17 +586,17 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 		}
 
 		// 标签页的标签关联按标签页主键加载（而非 workspace_id）：
-		// 标签页被移动到其他工作组后 tab_tags.workspace_id 可能未同步更新（既有隐患），
+		// 标签页被移动到其他工作组后 tab_tags_rel.workspace_id 可能未同步更新（既有隐患），
 		// 按主键关联可保证复制时标签关联不遗漏。
 		srcTabIDs := make([]uint, 0, len(allTabs))
 		for _, t := range allTabs {
 			srcTabIDs = append(srcTabIDs, t.ID)
 		}
-		var tabTagRels []model.TabTag
+		var tabTagRels []model.TabTagRelation
 		if err := tx.Where("tab_id IN ?", srcTabIDs).Find(&tabTagRels).Error; err != nil {
 			return err
 		}
-		var wsTagRels []model.WorkspaceTag
+		var wsTagRels []model.WorkspaceTagRelation
 		if err := tx.Where("workspace_id IN ?", subtree).Find(&wsTagRels).Error; err != nil {
 			return err
 		}
@@ -663,7 +663,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 			}
 
 			// 复制标签页的标签关联（全局标签共享，仅重建关联行并指向新标签页主键。
-			// 归属判断基于 tabs 表推导的 tabWorkspace，而非 tab_tags.workspace_id，
+			// 归属判断基于 tabs 表推导的 tabWorkspace，而非 tab_tags_rel.workspace_id，
 			// 避免标签页被移动后关联行的旧 workspace_id 造成遗漏或重复）
 			for _, rel := range tabTagRels {
 				if tabWorkspace[rel.TabID] != wid {
@@ -673,7 +673,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 				if !ok {
 					continue
 				}
-				if err := tx.Create(&model.TabTag{
+				if err := tx.Create(&model.TabTagRelation{
 					TabID:       newTab,
 					WorkspaceID: newWSID,
 					TagID:       rel.TagID,
@@ -687,7 +687,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 				if rel.WorkspaceID != wid {
 					continue
 				}
-				if err := tx.Create(&model.WorkspaceTag{
+				if err := tx.Create(&model.WorkspaceTagRelation{
 					WorkspaceID: newWSID,
 					TagID:       rel.TagID,
 				}).Error; err != nil {
@@ -885,7 +885,7 @@ func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
 			}
 		}
 		// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
-		if terr := tx.Where("tab_id = ?", uint(uid)).Delete(&model.TabTag{}).Error; terr != nil {
+		if terr := tx.Where("tab_id = ?", uint(uid)).Delete(&model.TabTagRelation{}).Error; terr != nil {
 			return terr
 		}
 		return tx.Where("id = ?", uint(uid)).Delete(&model.Tab{}).Error
@@ -956,11 +956,11 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 			return err
 		}
 
-		// 同步更新标签页标签关联的工作组归属：tab_tags.workspace_id 以 tabs 为准。
+		// 同步更新标签页标签关联的工作组归属：tab_tags_rel.workspace_id 以 tabs 为准。
 		// 若不更新，移动标签页后其标签关联仍指向旧工作组，导致「按组移除标签」删不掉、
 		// 「按标签联查工作组」显示在旧工作组下（旧工作组删除后标签页还会在标签视图中丢失）。
 		if oldWorkspaceID != workspaceID {
-			if err := tx.Model(&model.TabTag{}).
+			if err := tx.Model(&model.TabTagRelation{}).
 				Where("tab_id = ?", tab.ID).
 				Update("workspace_id", workspaceID).Error; err != nil {
 				return err
@@ -1225,7 +1225,7 @@ func tagToResponse(t model.Tag) TagResponse {
 	return TagResponse{ID: t.ID, Name: t.Name, Color: t.Color, Scope: t.Scope}
 }
 
-func tabTagsToResponses(rels []model.TabTag) []TagResponse {
+func tabTagsToResponses(rels []model.TabTagRelation) []TagResponse {
 	out := make([]TagResponse, 0, len(rels))
 	for _, rel := range rels {
 		out = append(out, tagToResponse(rel.Tag))
@@ -1233,7 +1233,7 @@ func tabTagsToResponses(rels []model.TabTag) []TagResponse {
 	return out
 }
 
-func workspaceTagsToResponses(rels []model.WorkspaceTag) []TagResponse {
+func workspaceTagsToResponses(rels []model.WorkspaceTagRelation) []TagResponse {
 	out := make([]TagResponse, 0, len(rels))
 	for _, rel := range rels {
 		out = append(out, tagToResponse(rel.Tag))

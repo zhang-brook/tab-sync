@@ -119,8 +119,16 @@ func dropLegacyTabUUIDColumn(db *gorm.DB) error {
 // dropLegacyTabTagConstraint 删除早期表名产生的外键约束，避免与新约束并存。
 func dropLegacyTabTagConstraint(db *gorm.DB) error {
 	const legacyName = "fk_workspace_tabs_tags"
-	if !db.Migrator().HasConstraint(&model.TabTag{}, legacyName) {
+	if !db.Migrator().HasConstraint(&legacyTabTagTable{}, legacyName) {
 		return nil
 	}
-	return db.Migrator().DropConstraint(&model.TabTag{}, legacyName)
+	return db.Migrator().DropConstraint(&legacyTabTagTable{}, legacyName)
 }
+
+// legacyTabTagTable 指向 v1 阶段的 tab_tags 表。
+// v2 会把它改名为 tab_tags_rel，当前模型已指向新表名，故这里单独声明。
+type legacyTabTagTable struct {
+	ID uint `gorm:"primaryKey"`
+}
+
+func (legacyTabTagTable) TableName() string { return "tab_tags" }

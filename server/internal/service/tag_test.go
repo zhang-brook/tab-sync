@@ -86,7 +86,7 @@ func TestTagService_List_TabCount(t *testing.T) {
 }
 
 // TestTagService_TabRemoval_CleansAssociations 删除标签页时同步清理标签关联，
-// 避免标签计数（tab_tags）与详情（JOIN 存活标签页）出现不一致。
+// 避免标签计数（tab_tags_rel）与详情（JOIN 存活标签页）出现不一致。
 func TestTagService_TabRemoval_CleansAssociations(t *testing.T) {
 	db, _ := setupTestDB(t)
 	tagSvc := NewTagService(db)

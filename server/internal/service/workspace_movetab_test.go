@@ -8,7 +8,7 @@ import (
 )
 
 // TestWorkspaceService_MoveTab_SyncTabTag 移动标签页到其他工作组时，
-// 其标签关联 tab_tags.workspace_id 应同步更新为新归属：
+// 其标签关联 tab_tags_rel.workspace_id 应同步更新为新归属：
 // 按新组移除标签应能删掉关联行，按标签联查工作组应显示新归属。
 func TestWorkspaceService_MoveTab_SyncTabTag(t *testing.T) {
 	db, _ := setupTestDB(t)
@@ -42,8 +42,8 @@ func TestWorkspaceService_MoveTab_SyncTabTag(t *testing.T) {
 		t.Fatalf("移动标签页失败: %v", err)
 	}
 
-	// 1. tab_tags.workspace_id 已同步为新归属 B
-	var rel model.TabTag
+	// 1. tab_tags_rel.workspace_id 已同步为新归属 B
+	var rel model.TabTagRelation
 	if err := db.Where("tab_id = ?", tabID).First(&rel).Error; err != nil {
 		t.Fatalf("查询标签关联失败: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestWorkspaceService_MoveTab_SameWorkspace(t *testing.T) {
 		t.Fatalf("组内移动失败: %v", err)
 	}
 
-	var rel model.TabTag
+	var rel model.TabTagRelation
 	if err := db.Where("tab_id = ?", tabID).First(&rel).Error; err != nil {
 		t.Fatalf("查询标签关联失败: %v", err)
 	}

@@ -2,6 +2,7 @@ package database
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"gorm.io/gorm"
@@ -42,8 +43,8 @@ func initTestDB(t *testing.T) *DB {
 }
 
 // TestMigrateLegacyTabTable 构造旧版表结构，验证启动迁移把
-// workspace_tabs / tab_tags.workspace_tab_id 升级为 tabs / tab_tags.tab_id，
-// 同时保留数据、修正外键引用并清理旧索引。
+// workspace_tabs / tab_tags 升级为 tabs / tab_tags_rel，
+// 同时保留数据、修正外键引用并清理旧索引与旧约束。
 func TestMigrateLegacyTabTable(t *testing.T) {
 	db := initBareDB(t)
 
@@ -96,14 +97,20 @@ func TestMigrateLegacyTabTable(t *testing.T) {
 		t.Errorf("标签页数据未完整保留: %+v", tab)
 	}
 
-	if !columnExists(db.DB, "tab_tags", "tab_id") {
-		t.Error("tab_tags.tab_id 列不存在")
+	if tableExists(db.DB, "tab_tags") {
+		t.Error("旧表 tab_tags 仍然存在")
 	}
-	if columnExists(db.DB, "tab_tags", "workspace_tab_id") {
-		t.Error("tab_tags.workspace_tab_id 旧列仍然存在")
+	if !tableExists(db.DB, "tab_tags_rel") {
+		t.Fatal("新表 tab_tags_rel 不存在")
+	}
+	if !columnExists(db.DB, "tab_tags_rel", "tab_id") {
+		t.Error("tab_tags_rel.tab_id 列不存在")
+	}
+	if columnExists(db.DB, "tab_tags_rel", "workspace_tab_id") {
+		t.Error("tab_tags_rel.workspace_tab_id 旧列仍然存在")
 	}
 
-	var rel model.TabTag
+	var rel model.TabTagRelation
 	if err := db.First(&rel, 1).Error; err != nil {
 		t.Fatalf("查询迁移后的标签关联失败: %v", err)
 	}
@@ -125,14 +132,20 @@ func TestMigrateLegacyTabTable(t *testing.T) {
 	if indexExists(db, "tabs", "idx_workspace_tabs_workspace_id") {
 		t.Error("旧索引 idx_workspace_tabs_workspace_id 未被清理")
 	}
-	if !indexExists(db, "tab_tags", "uniq_tab_tag") {
+	if !indexExists(db, "tab_tags_rel", "uniq_tab_tag") {
 		t.Error("唯一索引 uniq_tab_tag 不存在")
 	}
-	if !indexExists(db, "tab_tags", "idx_tab_tags_tab_id") {
-		t.Error("新索引 idx_tab_tags_tab_id 不存在")
+	if !indexExists(db, "tab_tags_rel", "idx_tab_tags_rel_tab_id") {
+		t.Error("新索引 idx_tab_tags_rel_tab_id 不存在")
 	}
-	if indexExists(db, "tab_tags", "idx_tab_tags_workspace_tab_id") {
+	if indexExists(db, "tab_tags_rel", "idx_tab_tags_workspace_tab_id") {
 		t.Error("旧索引 idx_tab_tags_workspace_tab_id 未被清理")
+	}
+	if constraintExists(t, db.DB, "tab_tags_rel", "fk_tab_tags_tag", "fk_workspace_tabs_tags") {
+		t.Error("tab_tags_rel 上仍存在旧外键约束")
+	}
+	if !constraintExists(t, db.DB, "tab_tags_rel", "fk_tab_tags_rel_tag") {
+		t.Error("tab_tags_rel 缺少按新表名生成的外键约束")
 	}
 
 	if err := AutoMigrate(db); err != nil {
@@ -141,12 +154,12 @@ func TestMigrateLegacyTabTable(t *testing.T) {
 
 	var migrationCount int64
 	if err := db.Table("schema_migrations").
-		Where("version = ? AND name = ?", 1, "tabs_rename").
+		Where("version IN ?", []int{1, 2}).
 		Count(&migrationCount).Error; err != nil {
 		t.Fatalf("查询迁移记录失败: %v", err)
 	}
-	if migrationCount != 1 {
-		t.Errorf("tabs_rename 迁移应恰好登记一次: got %d", migrationCount)
+	if migrationCount != 2 {
+		t.Errorf("v1、v2 迁移应各登记一次: got %d", migrationCount)
 	}
 }
 
@@ -166,6 +179,21 @@ func columnExists(db *gorm.DB, table, column string) bool {
 	var count int64
 	db.Raw("SELECT count(*) FROM pragma_table_info(\""+table+"\") WHERE name = ?", column).Scan(&count)
 	return count > 0
+}
+
+// constraintExists 判断表的建表语句中是否存在指定的约束名。
+func constraintExists(t *testing.T, db *gorm.DB, table string, names ...string) bool {
+	t.Helper()
+	var ddl string
+	if err := db.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", table).Scan(&ddl).Error; err != nil {
+		t.Fatalf("读取建表语句失败: %v", err)
+	}
+	for _, name := range names {
+		if strings.Contains(ddl, "CONSTRAINT `"+name+"`") {
+			return true
+		}
+	}
+	return false
 }
 
 // TestFixTabTagWorkspaceID 构造存量脏数据（标签关联的 workspace_id 残留旧归属），
@@ -190,7 +218,7 @@ func TestFixTabTagWorkspaceID(t *testing.T) {
 	if err := db.Create(&tag).Error; err != nil {
 		t.Fatalf("创建标签失败: %v", err)
 	}
-	rel := model.TabTag{TabID: tab.ID, WorkspaceID: "ws-a", TagID: tag.ID}
+	rel := model.TabTagRelation{TabID: tab.ID, WorkspaceID: "ws-a", TagID: tag.ID}
 	if err := db.Create(&rel).Error; err != nil {
 		t.Fatalf("创建标签关联失败: %v", err)
 	}
@@ -204,7 +232,7 @@ func TestFixTabTagWorkspaceID(t *testing.T) {
 		t.Fatalf("修复失败: %v", err)
 	}
 
-	var fixed model.TabTag
+	var fixed model.TabTagRelation
 	if err := db.First(&fixed, rel.ID).Error; err != nil {
 		t.Fatalf("查询标签关联失败: %v", err)
 	}
@@ -260,24 +288,24 @@ func TestCleanupOrphanTagAssociations(t *testing.T) {
 		t.Fatalf("创建已删除工作组下的标签页失败: %v", err)
 	}
 
-	liveRel := model.TabTag{TabID: liveTab.ID, WorkspaceID: "ws-live", TagID: tag.ID}
+	liveRel := model.TabTagRelation{TabID: liveTab.ID, WorkspaceID: "ws-live", TagID: tag.ID}
 	if err := db.Create(&liveRel).Error; err != nil {
 		t.Fatalf("创建存活标签页标签关联失败: %v", err)
 	}
-	orphanRel := model.TabTag{TabID: 99999, WorkspaceID: "ws-live", TagID: tag.ID}
+	orphanRel := model.TabTagRelation{TabID: 99999, WorkspaceID: "ws-live", TagID: tag.ID}
 	if err := db.Create(&orphanRel).Error; err != nil {
 		t.Fatalf("创建孤儿标签页标签关联失败: %v", err)
 	}
-	deletedWSRel := model.TabTag{TabID: deletedTab.ID, WorkspaceID: "ws-deleted", TagID: tag.ID}
+	deletedWSRel := model.TabTagRelation{TabID: deletedTab.ID, WorkspaceID: "ws-deleted", TagID: tag.ID}
 	if err := db.Create(&deletedWSRel).Error; err != nil {
 		t.Fatalf("创建已删除工作组下的标签页标签关联失败: %v", err)
 	}
 
-	liveWSRel := model.WorkspaceTag{WorkspaceID: "ws-live", TagID: tag.ID}
+	liveWSRel := model.WorkspaceTagRelation{WorkspaceID: "ws-live", TagID: tag.ID}
 	if err := db.Create(&liveWSRel).Error; err != nil {
 		t.Fatalf("创建存活工作组标签关联失败: %v", err)
 	}
-	deletedWSRel2 := model.WorkspaceTag{WorkspaceID: "ws-deleted", TagID: tag.ID}
+	deletedWSRel2 := model.WorkspaceTagRelation{WorkspaceID: "ws-deleted", TagID: tag.ID}
 	if err := db.Create(&deletedWSRel2).Error; err != nil {
 		t.Fatalf("创建已删除工作组标签关联失败: %v", err)
 	}
@@ -287,13 +315,13 @@ func TestCleanupOrphanTagAssociations(t *testing.T) {
 	}
 
 	var tabTagCount int64
-	if err := db.Model(&model.TabTag{}).Count(&tabTagCount).Error; err != nil {
+	if err := db.Model(&model.TabTagRelation{}).Count(&tabTagCount).Error; err != nil {
 		t.Fatalf("统计标签页标签关联失败: %v", err)
 	}
 	if tabTagCount != 1 {
 		t.Errorf("清理后标签页标签关联数量不匹配: got %d, want 1", tabTagCount)
 	}
-	var remainingTabTag model.TabTag
+	var remainingTabTag model.TabTagRelation
 	if err := db.First(&remainingTabTag).Error; err != nil {
 		t.Fatalf("查询剩余关联失败: %v", err)
 	}
@@ -302,7 +330,7 @@ func TestCleanupOrphanTagAssociations(t *testing.T) {
 	}
 
 	var wsTagCount int64
-	if err := db.Model(&model.WorkspaceTag{}).Count(&wsTagCount).Error; err != nil {
+	if err := db.Model(&model.WorkspaceTagRelation{}).Count(&wsTagCount).Error; err != nil {
 		t.Fatalf("统计工作组标签关联失败: %v", err)
 	}
 	if wsTagCount != 1 {

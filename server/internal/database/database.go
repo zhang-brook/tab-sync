@@ -51,8 +51,8 @@ var models = []interface{}{
 	&model.Tab{},
 	&model.SyncEvent{},
 	&model.Tag{},
-	&model.TabTag{},
-	&model.WorkspaceTag{},
+	&model.TabTagRelation{},
+	&model.WorkspaceTagRelation{},
 	&model.RecycleBinTab{},
 }
 
@@ -144,18 +144,18 @@ func nameSortKey(name string) string {
 	return name
 }
 
-// tabTagWorkspaceIDMetaKey 标记「修复 tab_tags.workspace_id」已完成，只需执行一次
+// tabTagWorkspaceIDMetaKey 标记「修复 tab_tags_rel.workspace_id」已完成，只需执行一次
 const tabTagWorkspaceIDMetaKey = "tab_tag_workspace_id_fix_v1"
 
-// FixTabTagWorkspaceID 一次性修复存量 tab_tags.workspace_id 与实际归属不一致的数据。
+// FixTabTagWorkspaceID 一次性修复存量 tab_tags_rel.workspace_id 与实际归属不一致的数据。
 //
-// 背景：早期 MoveTab 只更新 tabs.workspace_id，未同步 tab_tags.workspace_id，
+// 背景：早期 MoveTab 只更新 tabs.workspace_id，未同步 tab_tags_rel.workspace_id，
 // 导致标签页被移动后其标签关联仍指向旧工作组，进而引发：
 //   - RemoveFromTab 按「标签页 + 工作组」删除时找不到行（在新工作组下去不掉标签）；
-//   - GetTabsByTag 按 tab_tags.workspace_id 联查工作组时显示在旧工作组下，
+//   - GetTabsByTag 按 tab_tags_rel.workspace_id 联查工作组时显示在旧工作组下，
 //     旧工作组被删除后该标签页还会在标签视图中直接丢失。
 //
-// 修复以 tabs 表为唯一权威，将每行 tab_tags 的 workspace_id 校正为
+// 修复以 tabs 表为唯一权威，将每行 tab_tags_rel 的 workspace_id 校正为
 // 对应标签页的实际归属；只更新确实不一致的行，避免全表写入。
 // 仅在首次执行（标记不存在）时运行。
 func FixTabTagWorkspaceID(db *DB) error {
@@ -170,17 +170,17 @@ func FixTabTagWorkspaceID(db *DB) error {
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		res := tx.Exec(`
-			UPDATE tab_tags
+			UPDATE tab_tags_rel
 			SET workspace_id = (
 				SELECT tabs.workspace_id
 				FROM tabs
-				WHERE tabs.id = tab_tags.tab_id
+				WHERE tabs.id = tab_tags_rel.tab_id
 			)
 			WHERE EXISTS (
 				SELECT 1
 				FROM tabs
-				WHERE tabs.id = tab_tags.tab_id
-				  AND tabs.workspace_id <> tab_tags.workspace_id
+				WHERE tabs.id = tab_tags_rel.tab_id
+				  AND tabs.workspace_id <> tab_tags_rel.workspace_id
 			)`)
 		if res.Error != nil {
 			return res.Error
@@ -195,8 +195,8 @@ const tagAssociationCleanupMetaKey = "tag_association_cleanup_v1"
 // CleanupOrphanTagAssociations 一次性清理指向已不存在标签页/工作组的标签关联。
 //
 // 背景：早期删除工作组内标签页时（整组更新时移除、单页删除、删除工作组）只删除了
-// tabs，未同步删除 tab_tags / workspace_tags，留下孤儿关联。标签列表按
-// tab_tags 计数会显示非 0，按标签联查标签页时却 JOIN 不到任何行，出现
+// tabs，未同步删除 tab_tags_rel / workspace_tags_rel，留下孤儿关联。标签列表按
+// tab_tags_rel 计数会显示非 0，按标签联查标签页时却 JOIN 不到任何行，出现
 // 「计数 2 却提示暂无标签页」的不一致。
 func CleanupOrphanTagAssociations(db *DB) error {
 	var meta model.SchemaMeta
@@ -211,7 +211,7 @@ func CleanupOrphanTagAssociations(db *DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		// 关联只保留「标签页仍存在且所属工作组未删除」的行
 		if err := tx.Exec(`
-			DELETE FROM tab_tags
+			DELETE FROM tab_tags_rel
 			WHERE tab_id NOT IN (
 				SELECT tabs.id
 				FROM tabs
@@ -222,7 +222,7 @@ func CleanupOrphanTagAssociations(db *DB) error {
 		}
 		// 工作组标签关联只保留未删除的工作组
 		if err := tx.Exec(`
-			DELETE FROM workspace_tags
+			DELETE FROM workspace_tags_rel
 			WHERE workspace_id NOT IN (
 				SELECT workspace_id FROM workspaces WHERE is_deleted = 0
 			)`).Error; err != nil {

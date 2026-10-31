@@ -44,6 +44,7 @@ func (Record) TableName() string { return "schema_migrations" }
 func All() []Migration {
 	return []Migration{
 		migrationV1TabsRename,
+		migrationV2AssociationTableRename,
 	}
 }
 

@@ -80,8 +80,8 @@ type Workspace struct {
 	UpdatedAt   time.Time
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
 	// 关联
-	Tabs []Tab          `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
-	Tags []WorkspaceTag `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
+	Tabs []Tab                  `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
+	Tags []WorkspaceTagRelation `gorm:"foreignKey:WorkspaceID;references:WorkspaceID"`
 }
 
 // Tab 工作组内标签页（tabs 表）
@@ -98,7 +98,7 @@ type Tab struct {
 	Description string `gorm:"size:500"` // 标签页描述（仅用户主动设置时保存）
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	Tags        []TabTag `gorm:"foreignKey:TabID"`
+	Tags        []TabTagRelation `gorm:"foreignKey:TabID"`
 }
 
 // TableName 固定表名
@@ -131,8 +131,8 @@ type Tag struct {
 	CreatedAt   time.Time
 }
 
-// TabTag 标签页与标签的关联（关联 Tab）
-type TabTag struct {
+// TabTagRelation 标签页与标签的关联（tab_tags_rel 表）
+type TabTagRelation struct {
 	ID          uint   `gorm:"primaryKey;autoIncrement"`
 	TabID       uint   `gorm:"uniqueIndex:uniq_tab_tag;index"`
 	WorkspaceID string `gorm:"index;size:64"`
@@ -140,13 +140,19 @@ type TabTag struct {
 	Tag         Tag    `gorm:"foreignKey:TagID"`
 }
 
-// WorkspaceTag 工作组与标签的关联
-type WorkspaceTag struct {
+// TableName 固定表名
+func (TabTagRelation) TableName() string { return "tab_tags_rel" }
+
+// WorkspaceTagRelation 工作组与标签的关联（workspace_tags_rel 表）
+type WorkspaceTagRelation struct {
 	ID          uint   `gorm:"primaryKey;autoIncrement"`
 	WorkspaceID string `gorm:"uniqueIndex:uniq_ws_tag;index;size:64"`
 	TagID       uint   `gorm:"uniqueIndex:uniq_ws_tag;index"`
 	Tag         Tag    `gorm:"foreignKey:TagID"`
 }
+
+// TableName 固定表名
+func (WorkspaceTagRelation) TableName() string { return "workspace_tags_rel" }
 
 // ===================== 回收站 =====================
 
