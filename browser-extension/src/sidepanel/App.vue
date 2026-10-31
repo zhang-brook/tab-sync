@@ -56,6 +56,15 @@
         <el-tooltip content="定位到当前激活的标签页" placement="top">
           <el-button size="small" :icon="Aim" @click="focusActiveTab">定位</el-button>
         </el-tooltip>
+        <el-tooltip content="刷新标签页与已保存标记" placement="top">
+          <el-button
+            size="small"
+            :icon="Refresh"
+            circle
+            :loading="refreshing"
+            @click="refreshAll"
+          />
+        </el-tooltip>
       </div>
 
       <!-- 选择操作栏 -->
@@ -100,6 +109,12 @@
           @command="(cmd, tab) => run(cmd, tab)"
         />
       </div>
+
+      <div class="sidepanel-footer">
+        <el-button link type="primary" size="small" :icon="TopRight" @click="openDashboardTabs">
+          在后台管理页面中查看
+        </el-button>
+      </div>
     </template>
 
     <!-- 工作组选择弹窗：加入 / 加入并关闭 -->
@@ -118,7 +133,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton } from '@element-plus/icons-vue'
+import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton, Refresh, TopRight } from '@element-plus/icons-vue'
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import LocalSaveTabsDialog from '@/shared/components/LocalSaveTabsDialog.vue'
@@ -169,6 +184,22 @@ function onHeaderCommand(command: string) {
   if (command === 'dashboard') openDashboard()
   else if (command === 'settings') openSettings()
   else if (command === 'logout') void logout()
+}
+
+function openDashboardTabs() {
+  void openTabAfterActive(DASHBOARD_URL + '#/tabs')
+}
+
+/** 刷新本地标签页列表与「已保存到工作组」索引（色块/标签按 URL 匹配，同样需要重新拉取） */
+const refreshing = ref(false)
+async function refreshAll() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    await Promise.all([reload({ silent: true }), loadWorkspaceIndex()])
+  } finally {
+    refreshing.value = false
+  }
 }
 
 // ============ 标签页管理 ============
@@ -328,6 +359,12 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 4px 8px 12px;
+}
+
+.sidepanel-footer {
+  padding: 6px 12px 10px;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
 }
 
 .hint-state {

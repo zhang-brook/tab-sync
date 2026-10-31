@@ -8,10 +8,11 @@ export type {
 </script>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, nextTick } from 'vue'
 import { MoreFilled } from '@element-plus/icons-vue'
 import LazyFavicon from './LazyFavicon.vue'
 import EntityTag from './EntityTag.vue'
+import { hideEntityTooltip, showEntityTooltip } from '../composables/entity-tooltip'
 import draggable from 'vuedraggable'
 import { formatDateTime } from '../utils/format'
 import type {
@@ -110,6 +111,19 @@ function savedStyle(item: TabListItem) {
   return { '--tab-saved-accent': savedAccent(colors) }
 }
 
+/** 悬浮提示：列出该标签页已保存到的全部工作组 */
+function savedTip(item: TabListItem): string {
+  const names = (item.tags ?? []).map((tag) => tag.name).filter(Boolean)
+  return names.length ? `此页面已保存至工作组：${names.join('、')}` : '此页面已保存至工作组'
+}
+
+/** 弹层由页面级单例统一渲染，多个色块共用一套虚拟触发 */
+function onMarkerEnter(event: MouseEvent, item: TabListItem) {
+  showEntityTooltip(event.currentTarget as HTMLElement, savedTip(item))
+}
+
+onBeforeUnmount(hideEntityTooltip)
+
 /** 整个列表共用一个下拉菜单，避免每行各挂一套弹出层组件（大列表会撑爆渲染进程） */
 const menuRef = ref<{ handleOpen: () => void; handleClose: () => void } | null>(null)
 const menuVirtualRef = ref<{ getBoundingClientRect: () => DOMRect } | undefined>(undefined)
@@ -169,12 +183,18 @@ function onSharedMenuCommand(command: string) {
     <template #item="{ element }">
       <div
         class="tab-item"
-        :class="{ 'is-active': element.id === activeId, 'is-saved': element.saved }"
-        :style="savedStyle(element)"
+        :class="{ 'is-active': element.id === activeId }"
         :data-tab-id="element.id"
         @click="emit('click', element)"
         @contextmenu="onRowContextMenu($event, element)"
       >
+        <span
+          v-if="element.saved"
+          class="tab-saved-marker"
+          :style="savedStyle(element)"
+          @mouseenter="onMarkerEnter($event, element)"
+          @mouseleave="hideEntityTooltip"
+        />
         <span v-if="sortable" class="tab-drag-handle" title="拖拽排序">⋮⋮</span>
         <el-checkbox
           v-if="selectable"
@@ -260,7 +280,16 @@ function onSharedMenuCommand(command: string) {
   transition: background-color 0.15s;
 }
 
-.tab-item.is-saved::before {
+.tab-saved-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: help;
+}
+
+.tab-saved-marker::before {
   content: '';
   position: absolute;
   left: 0;
@@ -269,7 +298,6 @@ function onSharedMenuCommand(command: string) {
   width: 3px;
   border-radius: 3px;
   background: var(--tab-saved-accent, var(--el-color-success));
-  pointer-events: none;
 }
 
 .tab-item:hover {
