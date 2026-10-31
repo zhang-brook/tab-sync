@@ -17,45 +17,48 @@
       <el-button :icon="Refresh" @click="load">刷新</el-button>
     </div>
 
-    <div v-if="loading" class="empty-state">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>加载中…</span>
-    </div>
-    <div v-else-if="items.length === 0" class="empty-state">
-      <el-empty :description="searchKeyword ? '没有匹配的标签页' : '云端还没有同步的标签页'" />
-    </div>
+    <!-- 列表内容统一放在白色块中 -->
+    <div class="list-pane">
+      <div v-if="loading" class="empty-state">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载中…</span>
+      </div>
+      <div v-else-if="items.length === 0" class="empty-state">
+        <el-empty :description="searchKeyword ? '没有匹配的标签页' : '云端还没有同步的标签页'" />
+      </div>
 
-    <div v-else class="tab-scroll">
-      <TabList
-        :items="listItems"
-        :menu-items="tabMenu"
-        @click="onTabClick"
-        @command="onCommand"
-      >
-        <template #actions="{ item }">
-          <el-button
-            class="row-action"
-            text
-            type="danger"
-            :icon="Delete"
-            title="移动到回收站"
-            :loading="(item as any).source.removing"
-            @click="remove((item as any).source)"
-          >删除</el-button>
-        </template>
-      </TabList>
-    </div>
+      <div v-else class="tab-scroll">
+        <TabList
+          :items="listItems"
+          :menu-items="tabMenu"
+          @click="onTabClick"
+          @command="onCommand"
+        >
+          <template #actions="{ item }">
+            <el-button
+              class="row-action"
+              text
+              type="danger"
+              :icon="Delete"
+              title="移动到回收站"
+              :loading="(item as any).source.removing"
+              @click="remove((item as any).source)"
+            >删除</el-button>
+          </template>
+        </TabList>
+      </div>
 
-    <div class="pagination">
-      <span class="total-count">共 {{ total }} 个已同步标签页</span>
-      <el-pagination
-        layout="prev, pager, next, jumper"
-        :total="total"
-        :page-size="pageSize"
-        :current-page="page"
-        @current-change="onPageChange"
-        :disabled="total <= pageSize"
-      />
+      <div class="pagination">
+        <span class="total-count">共 {{ total }} 个已同步标签页</span>
+        <el-pagination
+          layout="prev, pager, next, jumper"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="onPageChange"
+          :disabled="total <= pageSize"
+        />
+      </div>
     </div>
 
     <CloudTabDialogs v-model:mode="tabDialogMode" :target="tabDialogTarget" @saved="load" />
@@ -238,15 +241,14 @@ onMounted(load)
 .synced-view {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   height: 100%;
-  padding: 16px;
   box-sizing: border-box;
 }
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
 }
 .search-input {
   width: 320px;
@@ -257,6 +259,17 @@ onMounted(load)
 .total-count {
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+.list-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
 }
 .empty-state {
   flex: 1;
@@ -269,13 +282,17 @@ onMounted(load)
 }
 .tab-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  margin-top: 12px;
   padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 .pagination .total-count {
   font-size: 13px;

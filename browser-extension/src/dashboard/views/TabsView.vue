@@ -22,55 +22,58 @@
       <el-button :icon="View" @click="showSavedLocalTabs">查看已保存的本地标签页</el-button>
     </div>
 
-    <!-- 批量操作栏 -->
-    <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="batch-bar">
-      <el-button @click="clearSelection">取消选择</el-button>
-      <el-button type="primary" :icon="FolderAdd" @click="openSavePicker('add', selectedTabs)">
-        加入工作组
-      </el-button>
-      <el-button type="primary" plain :icon="FolderChecked" @click="openSavePicker('add-close', selectedTabs)">
-        加入并关闭
-      </el-button>
-      <el-button type="success" plain :icon="FolderChecked" @click="saveDefaultAndClose">
-        保存到默认分组并关闭
-      </el-button>
-      <el-button type="success" plain :icon="FolderOpened" @click="saveUngroupedAndClose">
-        保存到未分组并关闭
-      </el-button>
-      <el-button type="danger" :icon="Close" :loading="closing" @click="closeSelectedTabs">
-        关闭选中
-      </el-button>
-    </SelectionBar>
+    <!-- 列表内容统一放在白色块中 -->
+    <div class="list-pane">
+      <!-- 批量操作栏 -->
+      <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="batch-bar">
+        <el-button @click="clearSelection">取消选择</el-button>
+        <el-button type="primary" :icon="FolderAdd" @click="openSavePicker('add', selectedTabs)">
+          加入工作组
+        </el-button>
+        <el-button type="primary" plain :icon="FolderChecked" @click="openSavePicker('add-close', selectedTabs)">
+          加入并关闭
+        </el-button>
+        <el-button type="success" plain :icon="FolderChecked" @click="saveDefaultAndClose">
+          保存到默认分组并关闭
+        </el-button>
+        <el-button type="success" plain :icon="FolderOpened" @click="saveUngroupedAndClose">
+          保存到未分组并关闭
+        </el-button>
+        <el-button type="danger" :icon="Close" :loading="closing" @click="closeSelectedTabs">
+          关闭选中
+        </el-button>
+      </SelectionBar>
 
-    <div v-if="loading" class="empty-state">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>加载中…</span>
-    </div>
+      <div v-if="loading" class="empty-state">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载中…</span>
+      </div>
 
-    <div v-else-if="visibleWindows.length === 0" class="empty-state">
-      <el-empty :description="keyword ? '没有匹配的标签页' : '当前没有打开的标签页'" />
-    </div>
+      <div v-else-if="visibleWindows.length === 0" class="empty-state">
+        <el-empty :description="keyword ? '没有匹配的标签页' : '当前没有打开的标签页'" />
+      </div>
 
-    <!-- 树形：窗口 → 分组 → 标签页 -->
-    <div v-else class="tree-scroll">
-      <LocalTabTree
-        :windows="visibleWindows"
-        :selected="selectedIds"
-        :active-tab-id="activeTabId"
-        :collapsed-windows="collapsedWindows"
-        :collapsed-groups="collapsedGroups"
-        :menu-items="menuItems"
-        :meta-for-tab="metaForTab"
-        @update:selected="setSelection"
-        @toggle-window="toggleWindow"
-        @toggle-group="toggleGroupCollapse"
-        @group-selection="toggleGroupSelection"
-        @activate="activate"
-        @close="closeTab"
-        @sort="onSort"
-        @command="(cmd, tab) => run(cmd, tab)"
-        @tag-click="onTagClick"
-      />
+      <!-- 树形：窗口 → 分组 → 标签页 -->
+      <div v-else class="tree-scroll">
+        <LocalTabTree
+          :windows="visibleWindows"
+          :selected="selectedIds"
+          :active-tab-id="activeTabId"
+          :collapsed-windows="collapsedWindows"
+          :collapsed-groups="collapsedGroups"
+          :menu-items="menuItems"
+          :meta-for-tab="metaForTab"
+          @update:selected="setSelection"
+          @toggle-window="toggleWindow"
+          @toggle-group="toggleGroupCollapse"
+          @group-selection="toggleGroupSelection"
+          @activate="activate"
+          @close="closeTab"
+          @sort="onSort"
+          @command="(cmd, tab) => run(cmd, tab)"
+          @tag-click="onTagClick"
+        />
+      </div>
     </div>
 
     <!-- 工作组选择弹窗：加入 / 加入并关闭 -->
@@ -332,15 +335,26 @@ async function handleBatchCloseSavedTabs() {
 .tabs-view {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   height: 100%;
-  padding: 16px;
   box-sizing: border-box;
 }
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+}
+.list-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
 }
 .window-filter {
   width: 200px;
@@ -352,7 +366,7 @@ async function handleBatchCloseSavedTabs() {
   flex: 1;
 }
 .batch-bar {
-  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 .empty-state {
   flex: 1;
@@ -365,6 +379,7 @@ async function handleBatchCloseSavedTabs() {
 }
 .tree-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .saved-list-header {

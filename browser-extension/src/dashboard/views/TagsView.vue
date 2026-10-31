@@ -657,16 +657,21 @@ onMounted(() => {
 <style scoped>
 .tags-view {
   display: flex;
+  gap: 16px;
   height: 100%;
   box-sizing: border-box;
 }
 .tags-left {
   width: 240px;
-  border-right: 1px solid var(--el-border-color);
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 .left-header {
   display: flex;
@@ -825,9 +830,13 @@ onMounted(() => {
 }
 .tags-right {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 16px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
   box-sizing: border-box;
   overflow: hidden;
 }
