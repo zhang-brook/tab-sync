@@ -1,6 +1,6 @@
 <template>
   <div class="settings-view">
-    <el-tabs v-model="activeTab" class="settings-tabs">
+    <el-tabs v-model="activeTab" class="settings-tabs" @tab-change="onTabChange">
       <!-- 扩展设置: 扩展管理 + 快捷键 -->
       <el-tab-pane label="扩展设置" name="extension">
         <div class="settings-pane">
@@ -93,7 +93,7 @@
                   <el-radio value="lightweight">轻量后端 (tab-sync-server)</el-radio>
                   <el-radio value="zhige">织个网 (预留)</el-radio>
                 </el-radio-group>
-                <div class="form-tip">
+                <div class="form-tip" style="width: 100%">
                   {{ connectionMode === 'lightweight'
                     ? '连接自建轻量后端，手动输入 API Token 认证'
                     : '连接织个网云端服务（暂未开放）' }}
@@ -294,8 +294,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, type Ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Close } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type TabPaneName } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
@@ -332,8 +333,49 @@ watch(apiBaseUrl, () => {
   connectivityPopoverVisible.value = false
 })
 
+const route = useRoute()
+const router = useRouter()
+
 // 顶部 tab: extension(扩展设置) | cloud(云端设置) | data(数据管理) | about(关于)
-const activeTab = ref('extension')
+// URL 为 tab 的唯一来源：无参数或非法值时落到扩展设置，顶部登录入口仍可用 ?tab=cloud 直达
+const SETTINGS_TABS = ['extension', 'cloud', 'data', 'about'] as const
+type SettingsTab = (typeof SETTINGS_TABS)[number]
+
+function isSettingsTab(value: unknown): value is SettingsTab {
+  return typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value)
+}
+
+const routeTab = computed<SettingsTab>(() => (isSettingsTab(route.query.tab) ? route.query.tab : 'extension'))
+const activeTab = ref<string>(routeTab.value)
+
+// 已发起但路由尚未更新的 tab：避免 activeTab watcher 把刚 push 的历史记录又替换掉
+let pendingTabQuery: SettingsTab | null = null
+
+/** tab 同步到 URL：用户点选用 push（浏览器返回可逐个回到之前的 tab），其余场景替换当前记录 */
+function syncTabToQuery(tab: SettingsTab, mode: 'push' | 'replace' = 'replace') {
+  if (tab === routeTab.value || tab === pendingTabQuery) return
+  pendingTabQuery = tab
+  void router[mode]({ query: { ...route.query, tab } }).finally(() => {
+    if (pendingTabQuery === tab) pendingTabQuery = null
+  })
+}
+
+/** 用户点击 tab：写入历史记录，浏览器返回可逐个回到之前的 tab */
+function onTabChange(name: TabPaneName) {
+  if (!isSettingsTab(name)) return
+  syncTabToQuery(name, 'push')
+}
+
+// 浏览器前进/后退或外部带参数进入时，反向同步当前 tab
+watch(routeTab, (tab) => {
+  if (tab === activeTab.value) return
+  activeTab.value = tab
+})
+
+// 非用户触发的 tab 变化（如未登录默认落到云端设置）替换当前记录，不写历史
+watch(activeTab, (tab) => {
+  if (isSettingsTab(tab)) syncTabToQuery(tab)
+})
 
 // 快捷键「加入并关闭」默认工作组
 const defaultWorkspaceId = ref('')
