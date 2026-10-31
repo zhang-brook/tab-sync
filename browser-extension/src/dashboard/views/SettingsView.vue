@@ -135,7 +135,7 @@
                       />
                     </div>
                   </el-popover>
-                  <el-button type="primary" :loading="apiSaving" :disabled="!apiBaseUrl.trim() || !addressDirty" @click="handleSaveApiBaseUrl">
+                  <el-button type="primary" :loading="apiSaving" :disabled="!apiBaseUrl.trim() || !addressDirty" @click="handleSaveApiBaseUrl" style="margin-left: 0;">
                     保存
                   </el-button>
                 </div>
