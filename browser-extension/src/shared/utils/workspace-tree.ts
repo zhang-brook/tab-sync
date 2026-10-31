@@ -117,6 +117,27 @@ export function getDeleteImpact(workspaces: Workspace[], id: string): { childCou
   return { childCount, tabCount }
 }
 
+/**
+ * 构建工作组路径：沿 parentId 链向上回溯。
+ * fullPath 为完整路径（含当前层级，如 /根组/子组/孙组）；
+ * parentPath 为父级路径（不含当前层级，根级为 /）。
+ */
+export function getWorkspacePath(workspaces: Workspace[], id: string): { fullPath: string; parentPath: string } {
+  const names: string[] = []
+  const seen = new Set<string>()
+  let cur: Workspace | undefined = workspaces.find((w) => w.id === id)
+  while (cur && !seen.has(cur.id)) {
+    const node = cur
+    seen.add(node.id)
+    names.unshift(node.name)
+    cur = node.parentId ? workspaces.find((w) => w.id === node.parentId) : undefined
+  }
+  return {
+    fullPath: '/' + names.join('/'),
+    parentPath: names.length > 1 ? '/' + names.slice(0, -1).join('/') : '/',
+  }
+}
+
 /** 将工作组树节点拍平为原始工作组列表 */
 export function flattenWorkspaces(nodes: WorkspaceTreeNode[]): Workspace[] {
   const out: Workspace[] = []

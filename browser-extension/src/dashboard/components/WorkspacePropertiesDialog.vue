@@ -49,6 +49,7 @@ import { ref, computed, watch } from 'vue'
 import { CopyDocument } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { getWorkspacePath } from '@/shared/utils/workspace-tree'
 import type { Workspace, WorkspaceTabsGroupsData } from '@/shared/types'
 
 const props = defineProps<{
@@ -95,24 +96,6 @@ interface WorkspaceProperties {
 
 const data = ref<WorkspaceProperties | null>(null)
 
-/** 构建工作组所在路径：沿 parentId 链向上回溯。
- * fullPath 为完整路径（含当前层级，如 /根组/子组/孙组）；
- * parentPath 为父级路径（不含当前层级，根级为 /） */
-function buildPaths(id: string): { fullPath: string; parentPath: string } {
-  const names: string[] = []
-  const seen = new Set<string>()
-  let cur: Workspace | undefined = props.workspaces.find((w) => w.id === id)
-  while (cur && !seen.has(cur.id)) {
-    const node = cur
-    seen.add(node.id)
-    names.unshift(node.name)
-    cur = node.parentId ? props.workspaces.find((w) => w.id === node.parentId) : undefined
-  }
-  const fullPath = '/' + names.join('/')
-  const parentPath = names.length > 1 ? '/' + names.slice(0, -1).join('/') : '/'
-  return { fullPath, parentPath }
-}
-
 function formatDateTime(iso: string): string {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -134,7 +117,7 @@ async function copyPath() {
 
 /** 打开属性弹窗：先展示本地已知元信息，再按需拉取整棵子树标签页计算数量 */
 async function load(ws: Workspace) {
-  const { fullPath, parentPath } = buildPaths(ws.id)
+  const { fullPath, parentPath } = getWorkspacePath(props.workspaces, ws.id)
   data.value = {
     id: ws.id,
     name: ws.name,
