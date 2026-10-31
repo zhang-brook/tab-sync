@@ -1,6 +1,6 @@
 <template>
   <div class="tags-view">
-    <!-- 左侧：标签列表 -->
+    <!-- 左侧：标签列表（按作用域分组） -->
     <div class="tags-left">
       <div class="left-header">
         <span class="left-title">标签</span>
@@ -17,93 +17,210 @@
         </div>
       </div>
 
+      <el-segmented
+        v-model="scopeFilter"
+        :options="scopeOptions"
+        block
+        class="scope-filter"
+      />
+
       <div v-if="tagsLoading" class="left-loading">
         <el-icon class="is-loading"><Loading /></el-icon>
       </div>
-      <el-empty v-else-if="tags.length === 0" description="还没有标签" :image-size="60" />
+      <el-empty
+        v-else-if="visibleTags.length === 0"
+        :description="scopeFilter === 'all' ? '还没有标签' : '该分类下还没有标签'"
+        :image-size="60"
+      />
       <div v-else class="tag-list">
-        <div
-          v-for="tag in tags"
-          :key="tag.id"
-          class="tag-item"
-          :class="{ active: selectedTag?.id === tag.id }"
-          @click="selectTag(tag)"
-        >
-          <span class="tag-dot" :style="{ backgroundColor: tag.color || '#909399' }" />
-          <span class="tag-name">{{ tag.name }}</span>
-          <span v-if="tag.description" class="tag-desc" :title="tag.description">{{ tag.description }}</span>
-          <div class="tag-meta">
-            <span v-if="tag.scope === 'tab'" class="tag-count" title="包含的标签页数">
-              {{ tag.tabCount ?? 0 }}
-            </span>
-            <div class="tag-actions">
-              <el-button
-                class="tag-action"
-                text
-                size="small"
-                :icon="Edit"
-                title="重命名"
-                @click.stop="openEdit(tag)"
-              />
-              <el-button
-                class="tag-del"
-                text
-                size="small"
-                :icon="Delete"
-                title="删除"
-                @click.stop="deleteTag(tag)"
-              />
+        <template v-if="visibleTabTags.length > 0">
+          <div v-if="scopeFilter === 'all'" class="tag-section">标签页标签</div>
+          <div
+            v-for="tag in visibleTabTags"
+            :key="tag.id"
+            class="tag-item"
+            :class="{ active: selectedTag?.id === tag.id }"
+            @click="selectTag(tag)"
+          >
+            <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
+            <span class="tag-name">{{ tag.name }}</span>
+            <div class="tag-meta">
+              <span class="tag-count" title="包含的标签页数">{{ tag.tabCount ?? 0 }}</span>
+              <div class="tag-actions">
+                <el-button
+                  class="tag-action"
+                  text
+                  size="small"
+                  :icon="Edit"
+                  title="编辑"
+                  @click.stop="openEdit(tag)"
+                />
+                <el-button
+                  class="tag-del"
+                  text
+                  size="small"
+                  :icon="Delete"
+                  title="删除"
+                  @click.stop="removeTag(tag)"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </template>
+
+        <template v-if="visibleWorkspaceTags.length > 0">
+          <div v-if="scopeFilter === 'all'" class="tag-section">工作组标签</div>
+          <div
+            v-for="tag in visibleWorkspaceTags"
+            :key="tag.id"
+            class="tag-item"
+            :class="{ active: selectedTag?.id === tag.id }"
+            @click="selectTag(tag)"
+          >
+            <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
+            <span class="tag-name">{{ tag.name }}</span>
+            <div class="tag-meta">
+              <span class="tag-count" title="包含的工作组数">{{ workspaceCountOf(tag.id) }}</span>
+              <div class="tag-actions">
+                <el-button
+                  class="tag-action"
+                  text
+                  size="small"
+                  :icon="Edit"
+                  title="编辑"
+                  @click.stop="openEdit(tag)"
+                />
+                <el-button
+                  class="tag-del"
+                  text
+                  size="small"
+                  :icon="Delete"
+                  title="删除"
+                  @click.stop="removeTag(tag)"
+                />
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
-    <!-- 右侧：含该标签的标签页 -->
+    <!-- 右侧：标签页标签 → 标签页；工作组标签 → 工作组 -->
     <div class="tags-right">
       <div v-if="!selectedTag" class="right-empty">
-        <el-empty description="选择左侧标签查看包含的标签页" />
+        <el-empty description="选择左侧标签查看关联内容" />
       </div>
 
       <template v-else>
         <div class="right-header">
           <span class="right-title">
-            <span class="tag-dot" :style="{ backgroundColor: selectedTag.color || '#909399' }" />
+            <span class="tag-dot" :style="{ backgroundColor: normalizeColor(selectedTag.color) }" />
             {{ selectedTag.name }}
+            <el-tag size="small" effect="plain" type="info">
+              {{ selectedTag.scope === 'workspace' ? '工作组标签' : '标签页标签' }}
+            </el-tag>
           </span>
-          <span class="right-count">{{ tabs.length }} 个标签页</span>
+          <span class="right-count">
+            {{ selectedTag.scope === 'workspace'
+              ? `${taggedWorkspaces.length} 个工作组`
+              : `${taggedTabs.length} 个标签页` }}
+          </span>
         </div>
 
-        <div v-if="tabsLoading" class="right-loading">
+        <div v-if="detailLoading" class="right-loading">
           <el-icon class="is-loading"><Loading /></el-icon>
         </div>
-        <el-empty v-else-if="tabs.length === 0" description="该标签下暂无标签页" :image-size="60" />
-        <div v-else class="tab-list">
-          <TabList
-            :items="listItems"
-            @click="(item: any) => openTab(item.source)"
-          >
-            <template #actions="{ item }">
+
+        <!-- 工作组标签 -->
+        <template v-else-if="selectedTag.scope === 'workspace'">
+          <el-empty
+            v-if="taggedWorkspaces.length === 0"
+            description="该标签下暂无工作组"
+            :image-size="60"
+          />
+          <div v-else class="workspace-list">
+            <div
+              v-for="ws in taggedWorkspaces"
+              :key="ws.id"
+              class="workspace-item"
+              :style="{ paddingLeft: `${10 + workspaceDepth(ws.id) * 16}px` }"
+              @click="openWorkspace(ws.id)"
+            >
+              <span class="tag-dot" :style="{ backgroundColor: normalizeColor(ws.color) }" />
+              <div class="workspace-info">
+                <div class="workspace-name">
+                  {{ ws.name }}
+                  <el-tag v-if="ws.isSystem" size="small" type="info" effect="plain">系统</el-tag>
+                </div>
+                <div v-if="ws.description" class="workspace-desc" :title="ws.description">
+                  {{ ws.description }}
+                </div>
+                <div v-if="ws.tags?.length" class="workspace-tags">
+                  <el-tag
+                    v-for="t in ws.tags"
+                    :key="t.id"
+                    size="small"
+                    effect="plain"
+                    :style="t.color ? { borderColor: normalizeColor(t.color), color: normalizeColor(t.color) } : {}"
+                  >{{ t.name }}</el-tag>
+                </div>
+              </div>
               <el-button
                 text
                 :icon="Delete"
                 title="移除该标签"
-                @click="removeTagFromTab((item as any).source)"
+                @click.stop="removeTagFromWorkspace(ws.id)"
               >移除</el-button>
-            </template>
-          </TabList>
-        </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- 标签页标签 -->
+        <template v-else>
+          <el-empty
+            v-if="taggedTabs.length === 0"
+            description="该标签下暂无标签页"
+            :image-size="60"
+          />
+          <div v-else class="tab-list">
+            <TabList
+              :items="tabItems"
+              :menu-items="tabMenu"
+              @click="openTab"
+              @command="onTabCommand"
+            />
+          </div>
+        </template>
       </template>
     </div>
 
     <!-- 新建/编辑标签对话框 -->
-    <el-dialog v-model="dialogVisible" :title="dialogMode === 'create' ? '新建标签' : '编辑标签'" width="380px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogMode === 'create' ? '新建标签' : '编辑标签'"
+      width="380px"
+    >
       <el-form label-width="64px">
         <el-form-item label="名称">
           <el-input v-model="tagForm.name" placeholder="标签名称" maxlength="32" show-word-limit />
         </el-form-item>
+        <el-form-item v-if="dialogMode === 'create'" label="用途">
+          <el-radio-group v-model="tagForm.scope">
+            <el-radio value="tab">标签页</el-radio>
+            <el-radio value="workspace">工作组</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-else label="用途">
+          <span class="scope-readonly">
+            {{ tagForm.scope === 'workspace' ? '工作组标签' : '标签页标签' }}
+          </span>
+        </el-form-item>
         <el-form-item label="颜色">
-          <el-color-picker v-model="tagForm.color" color-format="hex" @active-change="onColorActiveChange" />
+          <el-color-picker
+            v-model="tagForm.color"
+            color-format="hex"
+            @active-change="onColorActiveChange"
+          />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -119,237 +236,361 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!tagForm.name.trim()" @click="submitTag">确定</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!tagForm.name.trim()" @click="submitTag">
+          确定
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Loading, Refresh, Edit, Delete } from '@element-plus/icons-vue'
-import { sendMessage } from '@/shared/composables/useMessage'
+import { Delete, Edit, Loading, Plus, Refresh } from '@element-plus/icons-vue'
+import TabList from '@/shared/components/TabList.vue'
+import { taggedTabMenu } from '@/shared/actions/tab-actions'
+import {
+  deleteTag,
+  listTagTabs,
+  listTags,
+  listWorkspaces,
+  removeTabTag,
+  removeWorkspaceTag,
+  createTag,
+  updateTag,
+  reportServiceError,
+  type TagScope,
+} from '@/shared/services'
+import { DEFAULT_WORKSPACE_COLOR, normalizeColor } from '@/shared/constants/theme'
+import { copyText } from '@/shared/utils/clipboard'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
-import { DEFAULT_WORKSPACE_COLOR } from '@/shared/constants/theme'
-import type { TagInfo } from '@/shared/types/workspace'
-import type { TagTabItem, TagsData, TagTabsData } from '@/shared/types/messages'
+import type { TagInfo, TagTabItem, Workspace } from '@/shared/types'
+import type { TabListItem } from '@/shared/types/tab-list'
+
+const router = useRouter()
 
 const tags = ref<TagInfo[]>([])
+const workspaces = ref<Workspace[]>([])
 const tagsLoading = ref(false)
 const selectedTag = ref<TagInfo | null>(null)
-const tabs = ref<TagTabItem[]>([])
-const tabsLoading = ref(false)
+const taggedTabs = ref<TagTabItem[]>([])
+const detailLoading = ref(false)
 
-interface TagListItem extends TabListItem {
-  source: TagTabItem
+const tabTags = computed(() => tags.value.filter((t) => t.scope === 'tab'))
+const workspaceTags = computed(() => tags.value.filter((t) => t.scope === 'workspace'))
+
+// 左侧筛选：全部 / 标签页标签 / 工作组标签
+const scopeFilter = ref<'all' | TagScope>('all')
+const scopeOptions: Array<{ label: string; value: 'all' | TagScope }> = [
+  { label: '全部', value: 'all' },
+  { label: '标签页', value: 'tab' },
+  { label: '工作组', value: 'workspace' },
+]
+
+const visibleTabTags = computed(() =>
+  scopeFilter.value === 'workspace' ? [] : tabTags.value,
+)
+const visibleWorkspaceTags = computed(() =>
+  scopeFilter.value === 'tab' ? [] : workspaceTags.value,
+)
+const visibleTags = computed(() => [...visibleTabTags.value, ...visibleWorkspaceTags.value])
+
+// 切换筛选后，若当前选中的标签不属于该分类，则清空右侧详情
+watch(scopeFilter, (scope) => {
+  const tag = selectedTag.value
+  if (scope !== 'all' && tag && tag.scope !== scope) {
+    selectedTag.value = null
+    taggedTabs.value = []
+  }
+})
+const taggedWorkspaces = computed(() =>
+  selectedTag.value?.scope === 'workspace'
+    ? workspaces.value.filter((w) => w.tags?.some((t) => t.id === selectedTag.value?.id))
+    : [],
+)
+
+const workspaceCounts = computed(() => {
+  const counts = new Map<number, number>()
+  for (const ws of workspaces.value) {
+    for (const t of ws.tags ?? []) counts.set(t.id, (counts.get(t.id) ?? 0) + 1)
+  }
+  return counts
+})
+
+function workspaceCountOf(tagId: number): number {
+  return workspaceCounts.value.get(tagId) ?? 0
 }
 
-/** 标签下标签页 → 公共列表组件数据 */
-const listItems = computed<TagListItem[]>(() =>
-  tabs.value.map((t) => ({
+const workspaceDepthMap = computed(() => {
+  const byId = new Map(workspaces.value.map((w) => [w.id, w]))
+  const depths = new Map<string, number>()
+  const depthOf = (id: string, seen: Set<string>): number => {
+    const cached = depths.get(id)
+    if (cached !== undefined) return cached
+    const ws = byId.get(id)
+    if (!ws?.parentId || !byId.has(ws.parentId) || seen.has(id)) {
+      depths.set(id, 0)
+      return 0
+    }
+    seen.add(id)
+    const depth = depthOf(ws.parentId, seen) + 1
+    depths.set(id, depth)
+    return depth
+  }
+  for (const ws of workspaces.value) depthOf(ws.id, new Set())
+  return depths
+})
+
+function workspaceDepth(id: string): number {
+  return workspaceDepthMap.value.get(id) ?? 0
+}
+
+const tabMenu = taggedTabMenu({ labels: { openWorkspace: '打开所在工作组' } })
+
+const tabItems = computed<TabListItem[]>(() =>
+  taggedTabs.value.map((t) => ({
     id: `${t.workspaceId}-${t.tabId}`,
     title: t.title || t.url,
     url: t.url,
     favIconUrl: t.favIconUrl,
     badgeText: t.workspaceName,
-    source: t,
   })),
 )
 
-// 新建/编辑标签对话框
+const tabById = computed(() => {
+  const map = new Map<string, TagTabItem>()
+  for (const t of taggedTabs.value) map.set(`${t.workspaceId}-${t.tabId}`, t)
+  return map
+})
+
+// ============ 数据加载 ============
+async function loadTags(): Promise<void> {
+  tagsLoading.value = true
+  try {
+    tags.value = await listTags()
+    // 刷新后按 id 重新指向最新对象，避免编辑后的颜色/名称滞后
+    if (selectedTag.value) {
+      selectedTag.value =
+        tags.value.find((t) => t.id === selectedTag.value?.id) ?? null
+      if (!selectedTag.value) taggedTabs.value = []
+    }
+  } catch (err) {
+    tags.value = []
+    reportServiceError(err, { fallback: '获取标签失败' })
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
+async function loadWorkspaces(): Promise<void> {
+  try {
+    workspaces.value = await listWorkspaces({ includeSystem: true })
+  } catch {
+    // 工作组标签计数/列表不可用时不影响标签页标签视图
+    workspaces.value = []
+  }
+}
+
+async function loadTagTabs(tagId: number): Promise<void> {
+  detailLoading.value = true
+  taggedTabs.value = []
+  try {
+    taggedTabs.value = await listTagTabs(tagId)
+  } catch (err) {
+    reportServiceError(err, { fallback: '获取标签页失败' })
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+async function selectTag(tag: TagInfo): Promise<void> {
+  selectedTag.value = tag
+  if (tag.scope === 'tab') {
+    await loadTagTabs(tag.id)
+  } else {
+    taggedTabs.value = []
+  }
+}
+
+async function refresh(): Promise<void> {
+  await Promise.all([loadTags(), loadWorkspaces()])
+  if (selectedTag.value) {
+    await selectTag(selectedTag.value)
+  }
+  ElMessage.success('已刷新')
+}
+
+// ============ 行操作 ============
+async function openTab(item: TabListItem): Promise<void> {
+  const tab = tabById.value.get(String(item.id))
+  if (tab?.url) await openTabAfterActive(tab.url)
+}
+
+function openWorkspace(id: string): void {
+  router.push({ path: '/workspaces', query: { workspaceId: id } })
+}
+
+async function copyWithFeedback(text: string, label: string): Promise<void> {
+  if (!text) return
+  const ok = await copyText(text)
+  if (ok) ElMessage.success(`已复制${label}`)
+  else ElMessage.error('复制失败')
+}
+
+async function onTabCommand(command: string, item: TabListItem): Promise<void> {
+  const tab = tabById.value.get(String(item.id))
+  if (!tab) return
+  switch (command) {
+    case 'open':
+      await openTab(item)
+      return
+    case 'copyTitle':
+      await copyWithFeedback(tab.title || tab.url, '标题')
+      return
+    case 'copyLink':
+      await copyWithFeedback(tab.url, '链接')
+      return
+    case 'openWorkspace':
+      openWorkspace(tab.workspaceId)
+      return
+    case 'removeTag':
+      await removeTagFromTab(tab)
+      return
+  }
+}
+
+async function removeTagFromTab(tab: TagTabItem): Promise<void> {
+  const tag = selectedTag.value
+  if (!tag) return
+  try {
+    await removeTabTag(tab.workspaceId, String(tab.tabId), tag.id)
+    ElMessage.success('已移除标签')
+    await Promise.all([loadTagTabs(tag.id), loadTags()])
+  } catch (err) {
+    reportServiceError(err, { fallback: '移除标签失败' })
+  }
+}
+
+async function removeTagFromWorkspace(workspaceId: string): Promise<void> {
+  const tag = selectedTag.value
+  if (!tag) return
+  try {
+    await removeWorkspaceTag(workspaceId, tag.id)
+    ElMessage.success('已移除标签')
+    await Promise.all([loadWorkspaces(), loadTags()])
+  } catch (err) {
+    reportServiceError(err, { fallback: '移除标签失败' })
+  }
+}
+
+// ============ 标签增删改 ============
 const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
+const saving = ref(false)
 const editingTag = ref<TagInfo | null>(null)
-const tagForm = reactive({ name: '', color: DEFAULT_WORKSPACE_COLOR, description: '' })
+const tagForm = reactive({
+  name: '',
+  color: DEFAULT_WORKSPACE_COLOR,
+  scope: 'tab' as TagScope,
+  description: '',
+})
 
 // 颜色面板失焦关闭时会回退到关闭前的值，实时同步预览色使选色直接生效
 function onColorActiveChange(color: string | null) {
   if (color && color !== tagForm.color) tagForm.color = color
 }
 
-async function loadTags() {
-  tagsLoading.value = true
-  try {
-    const res = await sendMessage<TagsData>({ action: 'GET_TAGS' })
-    if (res.success && res.data) {
-      tags.value = res.data.tags ?? []
-    } else if (res.authError) {
-      tags.value = []
-    } else {
-      ElMessage.error(res.error || '获取标签失败')
-    }
-  } finally {
-    tagsLoading.value = false
-  }
-}
-
-async function selectTag(tag: TagInfo) {
-  selectedTag.value = tag
-  await loadTagTabs(tag.id)
-}
-
-async function loadTagTabs(tagId: number) {
-  tabsLoading.value = true
-  tabs.value = []
-  try {
-    const res = await sendMessage<TagTabsData>({ action: 'GET_TAG_TABS', payload: { tagId } })
-    if (res.success && res.data) {
-      tabs.value = res.data.tabs ?? []
-    } else if (!res.authError) {
-      ElMessage.error(res.error || '获取标签页失败')
-    }
-  } finally {
-    tabsLoading.value = false
-  }
-}
-
-function openCreate() {
+function openCreate(): void {
   dialogMode.value = 'create'
   editingTag.value = null
   tagForm.name = ''
-  tagForm.color = '#409EFF'
+  tagForm.color = DEFAULT_WORKSPACE_COLOR
+  tagForm.scope = scopeFilter.value === 'all' ? (selectedTag.value?.scope ?? 'tab') : scopeFilter.value
   tagForm.description = ''
   dialogVisible.value = true
 }
 
-async function createTag() {
-  const name = tagForm.name.trim()
-  if (!name) return
-  try {
-    const res = await sendMessage({
-      action: 'CREATE_TAG',
-      payload: { name, color: tagForm.color, scope: 'tab', description: tagForm.description },
-    })
-    if (res.success) {
-      ElMessage.success('已创建标签')
-      dialogVisible.value = false
-      await loadTags()
-    } else if (res.authError) {
-      ElMessage.warning('未连接到后端')
-    } else {
-      ElMessage.error(res.error || '创建标签失败')
-    }
-  } catch (e) {
-    ElMessage.error('创建标签失败：' + (e as Error).message)
-  }
-}
-
-async function deleteTag(tag: TagInfo) {
-  try {
-    await ElMessageBox.confirm(
-      `确定删除标签「${tag.name}」吗？该标签将从相关标签页与工作组上移除，对应的记录不会被删除。`,
-      '删除标签',
-      {
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    const res = await sendMessage({ action: 'DELETE_TAG', payload: { tagId: tag.id } })
-    if (res.success) {
-      ElMessage.success('已删除')
-      if (selectedTag.value?.id === tag.id) {
-        selectedTag.value = null
-        tabs.value = []
-      }
-      await loadTags()
-    } else if (res.authError) {
-      ElMessage.warning('未连接到后端')
-    } else {
-      ElMessage.error(res.error || '删除标签失败')
-    }
-  } catch (e) {
-    ElMessage.error('删除标签失败：' + (e as Error).message)
-  }
-}
-
-function openEdit(tag: TagInfo) {
+function openEdit(tag: TagInfo): void {
   dialogMode.value = 'edit'
   editingTag.value = tag
   tagForm.name = tag.name
   // 无颜色时保持为空，避免编辑未设置颜色的标签时被默认蓝色覆盖
   tagForm.color = tag.color || ''
+  tagForm.scope = tag.scope
   tagForm.description = tag.description || ''
   dialogVisible.value = true
 }
 
-async function saveTag() {
+async function submitTag(): Promise<void> {
   const name = tagForm.name.trim()
-  if (!name || !editingTag.value) return
-  // 清空颜色时 picker 值为 undefined，归一化为空字符串以告知后端清除颜色
-  const color = tagForm.color || ''
+  if (!name) return
+  saving.value = true
   try {
-    const res = await sendMessage({
-      action: 'UPDATE_TAG',
-      payload: { tagId: editingTag.value.id, name, color, description: tagForm.description },
-    })
-    if (res.success) {
+    if (dialogMode.value === 'create') {
+      const created = await createTag({
+        name,
+        color: tagForm.color,
+        scope: tagForm.scope,
+        description: tagForm.description,
+      })
+      ElMessage.success('已创建标签')
+      dialogVisible.value = false
+      await Promise.all([loadTags(), loadWorkspaces()])
+      const tag = tags.value.find((t) => t.id === created.id)
+      if (tag) {
+        // 新建的标签不在当前筛选分类时，切到对应分类再选中
+        if (scopeFilter.value !== 'all' && scopeFilter.value !== tag.scope) {
+          scopeFilter.value = tag.scope
+        }
+        await selectTag(tag)
+      }
+    } else if (editingTag.value) {
+      // 清空颜色时 picker 值为 undefined，归一化为空字符串以告知后端清除颜色
+      await updateTag(editingTag.value.id, {
+        name,
+        color: tagForm.color || '',
+        description: tagForm.description,
+      })
       ElMessage.success('已更新标签')
       dialogVisible.value = false
-      // 更新本地列表中的标签信息
-      const idx = tags.value.findIndex(t => t.id === editingTag.value!.id)
-      if (idx !== -1) {
-        tags.value[idx] = { ...tags.value[idx], name, color, description: tagForm.description }
-      }
-      // 更新右侧选中的标签信息
-      if (selectedTag.value?.id === editingTag.value!.id) {
-        selectedTag.value = { ...selectedTag.value, name, color, description: tagForm.description }
-      }
-    } else if (res.authError) {
-      ElMessage.warning('未连接到后端')
-    } else {
-      ElMessage.error(res.error || '更新标签失败')
+      await Promise.all([loadTags(), loadWorkspaces()])
     }
-  } catch (e) {
-    ElMessage.error('更新标签失败：' + (e as Error).message)
+  } catch (err) {
+    reportServiceError(err, { fallback: dialogMode.value === 'create' ? '创建标签失败' : '更新标签失败' })
+  } finally {
+    saving.value = false
   }
 }
 
-async function submitTag() {
-  if (dialogMode.value === 'create') {
-    await createTag()
-  } else {
-    await saveTag()
-  }
-}
-
-async function openTab(tab: TagTabItem) {
-  if (tab.url) await openTabAfterActive(tab.url)
-}
-
-async function removeTagFromTab(tab: TagTabItem) {
-  if (!selectedTag.value) return
+async function removeTag(tag: TagInfo): Promise<void> {
   try {
-    const res = await sendMessage({ action: 'REMOVE_TAB_TAG', payload: {
-      workspaceId: tab.workspaceId,
-      tabId: String(tab.tabId),
-      tagId: selectedTag.value.id,
-    } })
-    if (res.success) {
-      ElMessage.success('已移除标签')
-      await loadTagTabs(selectedTag.value.id)
-    } else if (res.authError) {
-      ElMessage.warning('未连接到后端')
-    } else {
-      ElMessage.error(res.error || '移除标签失败')
+    await ElMessageBox.confirm(
+      `确定删除标签「${tag.name}」吗？该标签将从相关标签页与工作组上移除，对应的记录不会被删除。`,
+      '删除标签',
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteTag(tag.id)
+    ElMessage.success('已删除')
+    if (selectedTag.value?.id === tag.id) {
+      selectedTag.value = null
+      taggedTabs.value = []
     }
-  } catch (e) {
-    ElMessage.error('移除标签失败：' + (e as Error).message)
+    await Promise.all([loadTags(), loadWorkspaces()])
+  } catch (err) {
+    reportServiceError(err, { fallback: '删除标签失败' })
   }
 }
 
-async function refresh() {
-  await loadTags()
-  if (selectedTag.value) {
-    await loadTagTabs(selectedTag.value.id)
-  }
-  ElMessage.success('已刷新')
-}
-
-onMounted(loadTags)
+onMounted(() => {
+  void loadTags()
+  void loadWorkspaces()
+})
 </script>
 
 <style scoped>
@@ -381,6 +622,9 @@ onMounted(loadTags)
   align-items: center;
   gap: 4px;
 }
+.scope-filter {
+  margin-bottom: 8px;
+}
 .left-loading,
 .right-loading {
   flex: 1;
@@ -392,6 +636,11 @@ onMounted(loadTags)
 .tag-list {
   flex: 1;
   overflow-y: auto;
+}
+.tag-section {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
 }
 .tag-item {
   display: flex;
@@ -500,8 +749,49 @@ onMounted(loadTags)
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.tab-list {
+.tab-list,
+.workspace-list {
   flex: 1;
   overflow-y: auto;
+}
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.workspace-item:hover {
+  background: var(--el-fill-color-light);
+}
+.workspace-info {
+  flex: 1;
+  min-width: 0;
+}
+.workspace-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+.workspace-desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.scope-readonly {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 </style>

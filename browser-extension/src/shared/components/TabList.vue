@@ -1,27 +1,24 @@
+<script lang="ts">
+export type {
+  TabListItem,
+  TabListMenuEntry,
+  TabListSortEvent,
+  TabTagDisplay,
+} from '../types/tab-list'
+</script>
+
 <script setup lang="ts">
-import { ref, computed, watch, useSlots } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
+import { MoreFilled } from '@element-plus/icons-vue'
 import LazyFavicon from './LazyFavicon.vue'
-import ContextMenu from './ContextMenu.vue'
 import draggable from 'vuedraggable'
-
-/** 标签页列表项：各页面将自身数据结构映射为统一结构后传入 */
-export interface TabListItem {
-  /** 行唯一标识（选择与渲染 key 用），跨分组来源需组合保证唯一 */
-  id: string | number
-  title: string
-  url: string
-  favIconUrl?: string
-  /** 重命名后的原始标题（用于悬浮提示「xx（原：yy）」） */
-  originalTitle?: string
-  /** 行尾徽标（来源工作组等） */
-  badgeText?: string
-  badgeColor?: string
-}
-
-/** 拖拽排序事件（vuedraggable update 事件的简化形态） */
-export interface TabListSortEvent {
-  moved?: { element: TabListItem; oldIndex: number; newIndex: number }
-}
+import { formatDateTime } from '../utils/format'
+import type {
+  TabListItem,
+  TabListMenuEntry,
+  TabListSortEvent,
+  TabTagDisplay,
+} from '../types/tab-list'
 
 const props = withDefaults(
   defineProps<{
@@ -34,8 +31,19 @@ const props = withDefaults(
     selected?: Array<string | number>
     /** 高亮行 id（如浏览器当前激活的标签页） */
     activeId?: string | number | null
+    /** 行右键菜单与 ⋮ 菜单（同一份描述） */
+    menuItems?: TabListMenuEntry[]
+    /** 是否显示行尾 ⋮ 菜单按钮，默认显示（有菜单项时） */
+    showMenuButton?: boolean
   }>(),
-  { selectable: false, sortable: false, selected: () => [], activeId: null },
+  {
+    selectable: false,
+    sortable: false,
+    selected: () => [],
+    activeId: null,
+    menuItems: () => [],
+    showMenuButton: true,
+  },
 )
 
 const emit = defineEmits<{
@@ -43,10 +51,8 @@ const emit = defineEmits<{
   (e: 'click', item: TabListItem): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
   (e: 'command', command: string, item: TabListItem): void
+  (e: 'tag-click', tag: TabTagDisplay, item: TabListItem): void
 }>()
-
-const slots = useSlots()
-const hasContextMenu = computed(() => !!slots['context-menu'])
 
 /** 组件内可变列表：拖拽就地排序，父组件通过 sort 事件持久化 */
 const localItems = ref<TabListItem[]>([])
@@ -58,8 +64,10 @@ watch(
   { immediate: true },
 )
 
+const selectedSet = computed(() => new Set(props.selected))
+
 function isSelected(id: string | number): boolean {
-  return props.selected.includes(id)
+  return selectedSet.value.has(id)
 }
 
 function onToggle(id: string | number, checked: boolean) {
@@ -67,10 +75,6 @@ function onToggle(id: string | number, checked: boolean) {
   if (checked) next.add(id)
   else next.delete(id)
   emit('update:selected', Array.from(next))
-}
-
-function onClick(item: TabListItem) {
-  emit('click', item)
 }
 
 /** @change 才会携带 moved（含 element/oldIndex/newIndex）；@update 仅含原始索引，无 moved */
@@ -83,6 +87,59 @@ function onChange(evt: { moved?: { element: TabListItem; oldIndex: number; newIn
 /** 悬浮提示：重命名时展示「xx（原：yy）」 */
 function titleAttr(item: TabListItem): string {
   return item.originalTitle ? `${item.title}（原：${item.originalTitle}）` : item.title
+}
+
+function tagStyle(tag: TabTagDisplay) {
+  return tag.color ? { borderColor: tag.color, color: tag.color } : {}
+}
+
+function onTagClick(tag: TabTagDisplay, item: TabListItem) {
+  if (tag.clickable) emit('tag-click', tag, item)
+}
+
+/** 整个列表共用一个下拉菜单，避免每行各挂一套弹出层组件（大列表会撑爆渲染进程） */
+const menuRef = ref<{ handleOpen: () => void; handleClose: () => void } | null>(null)
+const menuVirtualRef = ref<{ getBoundingClientRect: () => DOMRect } | undefined>(undefined)
+const menuTarget = ref<TabListItem | null>(null)
+
+function virtualElAt(left: number, top: number) {
+  const rect = {
+    x: left,
+    y: top,
+    top,
+    left,
+    right: left,
+    bottom: top,
+    width: 0,
+    height: 0,
+    toJSON: () => ({}),
+  } as DOMRect
+  return { getBoundingClientRect: () => rect }
+}
+
+function openMenu(left: number, top: number, item: TabListItem) {
+  if (props.menuItems.length === 0) return
+  menuTarget.value = item
+  menuVirtualRef.value = virtualElAt(left, top)
+  menuRef.value?.handleClose()
+  nextTick(() => menuRef.value?.handleOpen())
+}
+
+/** 行右键：菜单定位到鼠标位置；无菜单项时保留浏览器默认菜单 */
+function onRowContextMenu(event: MouseEvent, item: TabListItem) {
+  if (props.menuItems.length === 0) return
+  event.preventDefault()
+  openMenu(event.clientX, event.clientY, item)
+}
+
+/** 行尾 ⋮：菜单定位到按钮下方 */
+function onMenuButtonClick(event: MouseEvent, item: TabListItem) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  openMenu(rect.left, rect.bottom, item)
+}
+
+function onSharedMenuCommand(command: string) {
+  if (menuTarget.value) emit('command', command, menuTarget.value)
 }
 </script>
 
@@ -97,67 +154,40 @@ function titleAttr(item: TabListItem): string {
     @change="onChange"
   >
     <template #item="{ element }">
-      <ContextMenu
-        v-if="hasContextMenu"
-        block
-        @command="(cmd: string) => emit('command', cmd, element)"
-      >
-        <div
-          class="tab-item"
-          :class="{ 'is-active': element.id === activeId }"
-          :data-tab-id="element.id"
-          @click="onClick(element)"
-        >
-          <span v-if="sortable" class="tab-drag-handle" title="拖拽排序">⋮⋮</span>
-          <el-checkbox
-            v-if="selectable"
-            :model-value="isSelected(element.id)"
-            @change="(v: any) => onToggle(element.id, Boolean(v))"
-            @click.stop
-          />
-          <LazyFavicon :favIconUrl="element.favIconUrl" :size="16" class="tab-favicon" />
-          <div class="tab-info">
-            <div class="tab-title" :title="titleAttr(element)">{{ element.title || '(无标题)' }}</div>
-            <div class="tab-url" :title="element.url">{{ element.url }}</div>
-            <div v-if="slots.extra" class="tab-extra">
-              <slot name="extra" :item="element" />
-            </div>
-          </div>
-          <el-tag
-            v-if="element.badgeText"
-            size="small"
-            effect="plain"
-            class="tab-badge"
-            :style="element.badgeColor ? { borderColor: element.badgeColor, color: element.badgeColor } : {}"
-          >{{ element.badgeText }}</el-tag>
-          <div class="tab-actions" @click.stop>
-            <slot name="actions" :item="element" />
-          </div>
-        </div>
-        <template #menu>
-          <slot name="context-menu" :item="element" />
-        </template>
-      </ContextMenu>
-
       <div
-        v-else
         class="tab-item"
         :class="{ 'is-active': element.id === activeId }"
         :data-tab-id="element.id"
-        @click="onClick(element)"
+        @click="emit('click', element)"
+        @contextmenu="onRowContextMenu($event, element)"
       >
         <span v-if="sortable" class="tab-drag-handle" title="拖拽排序">⋮⋮</span>
         <el-checkbox
           v-if="selectable"
           :model-value="isSelected(element.id)"
-          @change="(v: any) => onToggle(element.id, Boolean(v))"
+          @change="(v: string | number | boolean) => onToggle(element.id, Boolean(v))"
           @click.stop
         />
         <LazyFavicon :favIconUrl="element.favIconUrl" :size="16" class="tab-favicon" />
         <div class="tab-info">
           <div class="tab-title" :title="titleAttr(element)">{{ element.title || '(无标题)' }}</div>
           <div class="tab-url" :title="element.url">{{ element.url }}</div>
-          <div v-if="slots.extra" class="tab-extra">
+          <div
+            v-if="element.description || element.tags?.length || element.addedAt || $slots.extra"
+            class="tab-extra"
+          >
+            <el-tag
+              v-for="tag in element.tags"
+              :key="tag.id ?? tag.name"
+              size="small"
+              effect="plain"
+              class="tab-tag"
+              :class="{ 'is-clickable': tag.clickable }"
+              :style="tagStyle(tag)"
+              @click.stop="onTagClick(tag, element)"
+            >{{ tag.name }}</el-tag>
+            <span v-if="element.addedAt" class="tab-time">{{ formatDateTime(element.addedAt) }}</span>
+            <span v-if="element.description" class="tab-desc" :title="element.description">{{ element.description }}</span>
             <slot name="extra" :item="element" />
           </div>
         </div>
@@ -170,10 +200,44 @@ function titleAttr(item: TabListItem): string {
         >{{ element.badgeText }}</el-tag>
         <div class="tab-actions" @click.stop>
           <slot name="actions" :item="element" />
+          <button
+            v-if="showMenuButton && menuItems.length > 0"
+            type="button"
+            class="tab-menu-trigger"
+            title="更多操作"
+            @click.stop="onMenuButtonClick($event, element)"
+          >
+            <MoreFilled />
+          </button>
         </div>
       </div>
     </template>
   </draggable>
+
+  <el-dropdown
+    v-if="menuItems.length > 0"
+    ref="menuRef"
+    :virtual-ref="menuVirtualRef"
+    virtual-triggering
+    trigger="click"
+    @command="onSharedMenuCommand"
+  >
+    <span style="display: none"></span>
+    <template #dropdown>
+      <el-dropdown-menu>
+        <el-dropdown-item
+          v-for="entry in menuItems"
+          :key="entry.command"
+          :command="entry.command"
+          :icon="entry.icon"
+          :divided="entry.divided"
+          :disabled="entry.disabled"
+          :class="{ 'danger-dropdown-item': entry.danger }"
+          :style="entry.danger ? 'color: var(--el-color-danger)' : undefined"
+        >{{ entry.label }}</el-dropdown-item>
+      </el-dropdown-menu>
+    </template>
+  </el-dropdown>
 </template>
 
 <style scoped>
@@ -181,7 +245,6 @@ function titleAttr(item: TabListItem): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* padding: 6px 8px; */
   padding: 6px 4px;
   border-radius: 6px;
   cursor: pointer;
@@ -245,7 +308,32 @@ function titleAttr(item: TabListItem): string {
 }
 
 .tab-extra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   margin-top: 4px;
+}
+
+.tab-tag {
+  flex-shrink: 0;
+}
+
+.tab-tag.is-clickable {
+  cursor: pointer;
+}
+
+.tab-time,
+.tab-desc {
+  font-size: 11px;
+  color: #c0c4cc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-desc {
+  color: #909399;
 }
 
 .tab-badge {
@@ -255,12 +343,35 @@ function titleAttr(item: TabListItem): string {
 .tab-actions {
   margin-left: auto;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
 .tab-item:hover .tab-actions {
   opacity: 1;
+}
+
+.tab-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #909399;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tab-menu-trigger:hover {
+  color: #409eff;
+  background: #ecf5ff;
 }
 
 .tab-ghost {

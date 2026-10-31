@@ -28,7 +28,9 @@
     <div v-else class="tab-scroll">
       <TabList
         :items="listItems"
-        @click="(item: any) => openTab(item.source.tab.url)"
+        :menu-items="tabMenu"
+        @click="onTabClick"
+        @command="onCommand"
       >
         <template #actions="{ item }">
           <el-button
@@ -55,6 +57,8 @@
         :disabled="total <= pageSize"
       />
     </div>
+
+    <CloudTabDialogs v-model:mode="tabDialogMode" :target="tabDialogTarget" @saved="load" />
   </div>
 </template>
 
@@ -62,12 +66,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TabList, { type TabListItem } from '@/shared/components/TabList.vue'
+import CloudTabDialogs, { type CloudTabDialogMode } from '@/shared/components/CloudTabDialogs.vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Search, Refresh, Delete, Loading } from '@element-plus/icons-vue'
-import { sendMessage } from '@/shared/composables/useMessage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { copyText } from '@/shared/utils/clipboard'
+import { syncedTabMenu } from '@/shared/actions/tab-actions'
+import { listSyncedTabs, removeWorkspaceTab, reportServiceError } from '@/shared/services'
 import type { TabReference } from '@/shared/types/workspace'
-import type { SyncedTabPageData } from '@/shared/types/messages'
 
 interface SyncedItem {
   workspaceId: string
@@ -91,18 +97,73 @@ interface SyncedListItem extends TabListItem {
   source: SyncedItem
 }
 
+const tabMenu = syncedTabMenu()
+
+const tabDialogMode = ref<CloudTabDialogMode | null>(null)
+const tabDialogTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
+
 /** 已同步标签页 → 公共列表组件数据 */
 const listItems = computed<SyncedListItem[]>(() =>
   items.value.map((i) => ({
     id: `${i.workspaceId}-${i.tab.tabId}`,
-    title: i.tab.title || i.tab.url,
+    title: i.tab.displayName || i.tab.title || i.tab.url,
+    originalTitle: i.tab.displayName ? i.tab.title : undefined,
     url: i.tab.url,
     favIconUrl: i.tab.favIconUrl,
     badgeText: i.name,
     badgeColor: i.color,
+    tags: (i.tab.tags ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color })),
+    description: i.tab.description,
+    addedAt: i.tab.addedAt,
     source: i,
   })),
 )
+
+function findItem(item: TabListItem): SyncedItem | undefined {
+  return items.value.find((i) => `${i.workspaceId}-${i.tab.tabId}` === String(item.id))
+}
+
+function onTabClick(item: TabListItem) {
+  const target = findItem(item)
+  if (target?.tab.url) void openTabAfterActive(target.tab.url)
+}
+
+function onCommand(command: string, item: TabListItem) {
+  const target = findItem(item)
+  if (!target) return
+  switch (command) {
+    case 'open':
+      if (target.tab.url) void openTabAfterActive(target.tab.url)
+      return
+    case 'copyTitle':
+      void copyTitle(target.tab)
+      return
+    case 'copyLink':
+      void copyLink(target.tab.url)
+      return
+    case 'openWorkspace':
+      void router.push({ path: '/workspaces', query: { workspaceId: target.workspaceId } })
+      return
+    case 'remove':
+      void remove(target)
+      return
+    default:
+      tabDialogTarget.value = { workspaceId: target.workspaceId, tab: target.tab }
+      tabDialogMode.value = command as CloudTabDialogMode
+  }
+}
+
+async function copyTitle(tab: TabReference) {
+  const ok = await copyText(tab.displayName || tab.title || tab.url)
+  if (ok) ElMessage.success('标题已复制')
+  else ElMessage.error('复制失败')
+}
+
+async function copyLink(url: string) {
+  const ok = await copyText(url)
+  if (ok) ElMessage.success('链接已复制')
+  else ElMessage.error('复制失败')
+}
 
 // 点击「查询」或回车：回到第一页后重新拉取（服务端搜索）
 function onSearch() {
@@ -113,31 +174,25 @@ function onSearch() {
 async function load() {
   loading.value = true
   try {
-    // 「已同步标签页」页改用专门的聚合分页接口（GET_SYNCED_TABS），直接跨所有工作组扁平返回，
+    // 「已同步标签页」页改用专门的聚合分页接口，直接跨所有工作组扁平返回，
     // 无需先取工作组树再拍平；搜索与分页均在服务端完成。
-    const res = await sendMessage<SyncedTabPageData>({
-      action: 'GET_SYNCED_TABS',
-      payload: {
-        page: page.value,
-        pageSize: pageSize.value,
-        keyword: searchKeyword.value.trim(),
-        includeSystem: true,
-      },
+    const data = await listSyncedTabs({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: searchKeyword.value.trim(),
+      includeSystem: true,
     })
-    if (res.success && res.data) {
-      items.value = res.data.items.map((it) => ({
-        workspaceId: it.workspaceId,
-        name: it.name,
-        color: it.color,
-        tab: it.tab,
-      }))
-      total.value = res.data.total
-    } else if (res.authError) {
-      items.value = []
-      total.value = 0
-    } else {
-      ElMessage.error(res.error || '获取已同步标签页失败')
-    }
+    items.value = data.items.map((it) => ({
+      workspaceId: it.workspaceId,
+      name: it.name,
+      color: it.color,
+      tab: it.tab,
+    }))
+    total.value = data.total
+  } catch (err) {
+    items.value = []
+    total.value = 0
+    reportServiceError(err, { fallback: '获取已同步标签页失败' })
   } finally {
     loading.value = false
   }
@@ -146,10 +201,6 @@ async function load() {
 function onPageChange(p: number) {
   page.value = p
   void load()
-}
-
-async function openTab(url?: string) {
-  if (url) await openTabAfterActive(url)
 }
 
 async function remove(item: SyncedItem) {
@@ -164,26 +215,17 @@ async function remove(item: SyncedItem) {
   }
   item.removing = true
   try {
-    const res = await sendMessage({ action: 'REMOVE_WORKSPACE_TAB', payload: {
-      workspaceId: item.workspaceId,
-      tabId: item.tab.tabId,
-    } })
-    if (res.success) {
-      ElNotification({
-        title: '已移至回收站',
-        message: `「${item.tab.title || item.tab.url}」已移动到回收站，可前往回收站恢复或彻底删除`,
-        type: 'success',
-        duration: 3500,
-        onClick: () => router.push('/recyclebin'),
-      })
-      await load()
-    } else if (res.authError) {
-      ElMessage.warning('未连接到后端')
-    } else {
-      ElMessage.error(res.error || '移除失败')
-    }
-  } catch (e) {
-    ElMessage.error('移除失败：' + (e as Error).message)
+    await removeWorkspaceTab(item.workspaceId, item.tab.tabId)
+    ElNotification({
+      title: '已移至回收站',
+      message: `「${item.tab.title || item.tab.url}」已移动到回收站，可前往回收站恢复或彻底删除`,
+      type: 'success',
+      duration: 3500,
+      onClick: () => router.push('/recyclebin'),
+    })
+    await load()
+  } catch (err) {
+    reportServiceError(err, { fallback: '移除失败' })
   } finally {
     item.removing = false
   }

@@ -1,3 +1,28 @@
+<script lang="ts">
+/** 模块级共享观察器：列表可能同时挂载上千个图标，逐个创建 IntersectionObserver 开销过大 */
+const pending = new Map<Element, () => void>()
+let sharedObserver: IntersectionObserver | null = null
+
+function getObserver(): IntersectionObserver {
+  if (!sharedObserver) {
+    sharedObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const load = pending.get(entry.target)
+          if (!load) continue
+          pending.delete(entry.target)
+          sharedObserver?.unobserve(entry.target)
+          load()
+        }
+      },
+      { rootMargin: '120px' },
+    )
+  }
+  return sharedObserver
+}
+</script>
+
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
@@ -14,7 +39,6 @@ const props = withDefaults(
 const imgSrc = ref('')
 const failed = ref(false)
 const root = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
 
 function boxStyle() {
   return {
@@ -42,22 +66,16 @@ function onError() {
 
 onMounted(() => {
   if (typeof IntersectionObserver !== 'undefined' && root.value) {
-    observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          load()
-          observer?.disconnect()
-        }
-      },
-      { rootMargin: '120px' },
-    )
-    observer.observe(root.value)
+    pending.set(root.value, load)
+    getObserver().observe(root.value)
   } else {
     load()
   }
 })
 
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  if (root.value && pending.delete(root.value)) sharedObserver?.unobserve(root.value)
+})
 
 watch(
   () => props.favIconUrl,

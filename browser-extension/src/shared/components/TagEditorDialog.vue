@@ -73,10 +73,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { Search, Close } from '@element-plus/icons-vue'
-import { sendMessage } from '@/shared/composables/useMessage'
-import type { TagInfo, TagsData } from '@/shared/types'
+import { createTag, deleteTag as deleteTagService, listTags, reportServiceError } from '../services'
+import type { TagInfo } from '../types'
 
 const props = defineProps<{
   modelValue: boolean
@@ -197,15 +197,15 @@ watch(
 )
 
 async function loadTags() {
-  const res = await sendMessage<TagsData>({ action: 'GET_TAGS', payload: { scope: props.scope } })
-  if (res.success && res.data) {
-    allTags.value = res.data.tags
+  try {
+    const tags = await listTags(props.scope)
+    allTags.value = tags
     // 弹窗可能在 tags 返回前已用 props 初始化，这里补一次名称映射
     selectedNames.value = props.selectedIds
-      .map((id) => res.data!.tags.find((t) => t.id === id)?.name)
+      .map((id) => tags.find((t) => t.id === id)?.name)
       .filter((n): n is string => n != null)
-  } else if (res.error) {
-    ElMessage.error(res.error)
+  } catch (err) {
+    reportServiceError(err, { fallback: '获取标签失败' })
   }
 }
 
@@ -220,14 +220,12 @@ async function deleteTag(tag: TagInfo) {
   } catch {
     return
   }
-  const res = await sendMessage({ action: 'DELETE_TAG', payload: { tagId: tag.id } })
-  if (res.success) {
+  try {
+    await deleteTagService(tag.id)
     allTags.value = allTags.value.filter((t) => t.id !== tag.id)
     selectedNames.value = selectedNames.value.filter((n) => n.toLowerCase() !== tag.name.toLowerCase())
-  } else if (res.authError) {
-    ElMessage.warning('未连接到后端')
-  } else {
-    ElMessage.error(res.error || '删除标签失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '删除标签失败' })
   }
 }
 
@@ -249,18 +247,12 @@ async function onConfirm() {
       let id = existing?.id
       if (!id) {
         // 后端会按 名称+scope 去重：若已存在同名则复用其 ID，不会落库重复
-        const res = await sendMessage<TagInfo>({
-          action: 'CREATE_TAG',
-          payload: { name, scope: props.scope },
-        })
-        if (res.success && res.data) {
-          allTags.value.push(res.data)
-          id = res.data.id
-        } else if (res.authError) {
-          ElMessage.warning('未连接到后端')
-          return
-        } else {
-          ElMessage.error(res.error || '创建标签失败')
+        try {
+          const created = await createTag({ name, scope: props.scope })
+          allTags.value.push(created)
+          id = created.id
+        } catch (err) {
+          reportServiceError(err, { fallback: '创建标签失败' })
           return
         }
       }

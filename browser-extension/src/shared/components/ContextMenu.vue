@@ -2,10 +2,11 @@
   <div
     class="context-menu-wrapper"
     :class="{ 'is-block': block }"
-    @contextmenu.prevent="handleContextMenu"
+    @contextmenu="handleContextMenu"
   >
     <slot />
     <el-dropdown
+      v-if="!disabled"
       ref="dropdownRef"
       :trigger="['contextmenu']"
       :virtual-ref="virtualRef"
@@ -40,7 +41,7 @@ const menuInstances = new Set<{ handleOpen: () => void; handleClose: () => void 
 <script setup lang="ts">
 import { ref, nextTick, onBeforeUnmount } from 'vue'
 
-defineProps<{ block?: boolean }>()
+const props = defineProps<{ block?: boolean; disabled?: boolean }>()
 
 const emit = defineEmits<{
   (e: 'command', command: string): void
@@ -67,6 +68,8 @@ function createVirtualEl(x: number, y: number) {
 }
 
 function handleContextMenu(event: MouseEvent) {
+  if (props.disabled) return
+  event.preventDefault()
   if (dropdownRef.value) menuInstances.add(dropdownRef.value)
 
   // 关闭其它已打开的右键菜单

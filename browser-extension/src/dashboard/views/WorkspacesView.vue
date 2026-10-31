@@ -6,7 +6,7 @@
         <el-input v-model="searchKeyword" placeholder="搜索工作组..." clearable style="width: 220px" :prefix-icon="Search" />
       </div>
       <div class="toolbar-right">
-        <el-button @click="loadWorkspaces" :icon="Refresh">
+        <el-button @click="loadWorkspaces()" :icon="Refresh">
           刷新
         </el-button>
       </div>
@@ -175,15 +175,16 @@
           </div>
 
           <!-- 批量操作工具条（勾选标签页后出现，操作与行右键菜单一致） -->
-          <div v-if="selectedTabIds.length > 0" class="batch-bar">
-            <span class="batch-count">已选 {{ selectedTabIds.length }} 项</span>
-            <el-button size="small" type="primary" @click="openBatchMoveDialog">移动到工作组</el-button>
+          <SelectionBar v-if="selectedTabIds.length > 0" :count="selectedTabIds.length" class="batch-bar">
             <el-button size="small" @click="openSelectedTabs">打开</el-button>
             <el-button size="small" @click="copySelectedLinks">复制链接</el-button>
+            <el-button size="small" type="primary" @click="openBatchMoveDialog">移动到工作组</el-button>
             <el-button size="small" type="danger" plain @click="removeSelectedTabs">移除</el-button>
-            <el-button size="small" text @click="toggleSelectAll">{{ allDisplayedSelected ? '取消全选' : '全选本列表' }}</el-button>
+            <el-button size="small" text @click="toggleSelectAll">
+              {{ allDisplayedSelected ? '取消全选' : '全选本列表' }}
+            </el-button>
             <el-button size="small" text @click="clearSelection">取消选择</el-button>
-          </div>
+          </SelectionBar>
 
           <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标） -->
           <div class="detail-body">
@@ -193,44 +194,16 @@
             <TabList
               v-else
               :items="tabListItems"
+              :menu-items="tabMenu"
               :sortable="tabScope === 'current' && tagFilter == null"
-              :selectable="true"
+              selectable
               :selected="selectedTabIds"
               @update:selected="onTabSelectionChange"
               @sort="onTabSort"
-              @click="(item: any) => openSingleTab(item.tab.url)"
-              @command="(cmd: string, item: any) => onTabMenuCommand(cmd, item.workspaceId, item.tab)"
-            >
-              <template #extra="{ item }">
-                <div v-if="(item as any).tab.tags && (item as any).tab.tags.length" class="tab-tags">
-                  <el-tag v-for="tg in (item as any).tab.tags" :key="tg.id" size="small" effect="plain"
-                    :style="tg.color ? { color: tg.color, borderColor: tg.color } : {}">{{ tg.name }}</el-tag>
-                </div>
-                <div v-if="(item as any).tab.description"
-                  class="tab-description" :title="(item as any).tab.description">
-                  {{ (item as any).tab.description }}
-                </div>
-                <span class="tab-added" :title="'添加于 ' + formatAddedAtFull((item as any).tab.addedAt)">{{
-                  formatAddedAt((item as any).tab.addedAt) }}</span>
-              </template>
-              <template #context-menu>
-                <TabDropdownMenu />
-              </template>
-              <template #actions="{ item }">
-                <el-dropdown trigger="click"
-                  @command="(cmd: string) => onTabMenuCommand(cmd, (item as any).workspaceId, (item as any).tab)"
-                  @click.stop>
-                  <el-button size="small" text class="tab-more-btn" @click.stop>
-                    <el-icon class="dots-vertical">
-                      <MoreFilled />
-                    </el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <TabDropdownMenu />
-                  </template>
-                </el-dropdown>
-              </template>
-            </TabList>
+              @click="onTabClick"
+              @command="onTabMenuCommand"
+              @tag-click="onTagClick"
+            />
           </div>
         </template>
       </div>
@@ -280,84 +253,20 @@
       </template>
     </el-dialog>
 
-    <!-- 修改添加时间对话框 -->
-    <el-dialog v-model="timeDialogVisible" title="修改添加时间" width="450px" destroy-on-close>
-      <el-form label-width="90px" label-position="left">
-        <el-form-item label="添加时间">
-          <div style="display: flex; align-items: center; gap: 8px; width: 100%">
-            <el-date-picker v-model="timeValue" type="datetime" placeholder="选择日期时间" :clearable="false"
-              style="flex: 1;" />
-            <el-link type="primary" underline="never" @click="setTimeToNow" style="margin-left: 15px; margin-right: 10px;">
-              设为当前时间
-            </el-link>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="timeDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="timeSaving" @click="handleSaveAddedTime">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 标签页行操作弹窗（编辑/移动/标签） -->
+    <CloudTabDialogs v-model:mode="tabDialogMode" :target="tabDialogTarget" @saved="onTabDialogSaved" />
 
-    <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名标签页" width="420px" destroy-on-close>
-      <el-form label-width="80px" label-position="left">
-        <el-form-item label="名称">
-          <el-input v-model="renameValue" placeholder="输入新的显示名称（留空则恢复原始标题）" maxlength="500" show-word-limit clearable
-            @keyup.enter="handleSaveRename" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="renameDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="renameSaving" @click="handleSaveRename">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 编辑链接对话框 -->
-    <el-dialog v-model="editUrlDialogVisible" title="编辑链接" width="520px" destroy-on-close>
-      <el-form label-width="70px" label-position="left">
-        <el-form-item label="标题">
-          {{ editUrlTitleValue }}
-        </el-form-item>
-        <el-form-item label="链接" required>
-          <el-input v-model="editUrlValue" placeholder="https://example.com" clearable @keyup.enter="handleSaveEditUrl">
-            <template #prepend>
-              <el-icon>
-                <Link />
-              </el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editUrlDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editUrlSaving" :disabled="!editUrlValue.trim()" @click="handleSaveEditUrl">
-          保存
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 编辑描述对话框 -->
-    <el-dialog v-model="editDescDialogVisible" title="编辑描述" width="520px" destroy-on-close>
-      <el-form label-width="70px" label-position="left">
-        <el-form-item label="描述">
-          <el-input v-model="editDescValue" type="textarea" :rows="4" maxlength="500" show-word-limit
-            placeholder="可选，仅当你填写时才会保存；清空则移除描述" clearable @keyup.ctrl.enter="handleSaveEditDesc" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editDescDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editDescSaving" @click="handleSaveEditDesc">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 标签编辑对话框 -->
+    <!-- 工作组标签编辑 -->
     <TagEditorDialog v-model="tagEditorVisible" :scope="tagEditorScope" :selected-ids="tagEditorSelectedIds"
       @confirm="onTagEditorConfirm" />
 
-    <!-- 移动到其他工作组 -->
-    <WorkspacePickerDialog v-model="movePickerVisible" title="移动到工作组" :disabled-ids="moveDisabledIds"
-      @select="handleMoveToWorkspace" />
+    <!-- 批量移动到其他工作组 -->
+    <WorkspacePickerDialog
+      v-model="batchMovePickerVisible"
+      title="移动到工作组"
+      :disabled-ids="batchMoveDisabledIds"
+      @select="handleBatchMoveToWorkspace"
+    />
 
     <!-- 选择父工作组 -->
     <WorkspacePickerDialog v-model="parentPickerVisible" title="选择父工作组" :disabled-ids="parentDisabledIds"
@@ -394,22 +303,45 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
-import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
+import TabList, { type TabListItem, type TabListSortEvent, type TabTagDisplay } from '@/shared/components/TabList.vue'
+import SelectionBar from '@/shared/components/SelectionBar.vue'
+import CloudTabDialogs, { type CloudTabDialogMode } from '@/shared/components/CloudTabDialogs.vue'
+import TagEditorDialog from '@/shared/components/TagEditorDialog.vue'
+import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
-import TabDropdownMenu from '../components/TabDropdownMenu.vue'
 import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { sendMessage } from '@/shared/composables/useMessage'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
-import type { Workspace, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, TabReference, TagInfo, TagsData } from '@/shared/types'
-import TagEditorDialog from '../components/TagEditorDialog.vue'
-import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
+import { copyText } from '@/shared/utils/clipboard'
+import { cloudTabMenu } from '@/shared/actions/tab-actions'
+import {
+  addWorkspaceTag,
+  addWorkspaceTabByUrl,
+  createWorkspace,
+  duplicateWorkspace,
+  getDefaultWorkspaceId,
+  listTags,
+  listWorkspaceTabGroups,
+  listWorkspaceTabs,
+  listWorkspaces,
+  moveWorkspace,
+  moveWorkspaceTab,
+  openWorkspace,
+  removeWorkspaceTab,
+  removeWorkspaceTag,
+  reportServiceError,
+  updateWorkspace,
+} from '@/shared/services'
+import type { Workspace, TabReference, TagInfo } from '@/shared/types'
+
+const route = useRoute()
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
@@ -424,30 +356,24 @@ const loadingTabs = ref(false)
 // 拉取单个工作组的标签页并写入缓存
 async function fetchWorkspaceTabs(id: string, force = false): Promise<TabReference[]> {
   if (!force && tabsCache.has(id)) return tabsCache.get(id)!
-  const res = await sendMessage<WorkspaceTabsData>({ action: 'GET_WORKSPACE_TABS', payload: { workspaceId: id } })
-  if (res.success && res.data) {
-    tabsCache.set(id, res.data.tabs)
-    return res.data.tabs
+  try {
+    const tabs = await listWorkspaceTabs(id)
+    tabsCache.set(id, tabs)
+    return tabs
+  } catch (err) {
+    tabsCache.delete(id)
+    throw err
   }
-  tabsCache.delete(id)
-  throw new Error(res.error || '加载标签页失败')
 }
 
 // 以根工作组 id 一次拉取该组及整棵子树的标签页（recursive=true），并分别写入每个工作组的缓存。
 // 用于「包含子工作组」模式，避免逐个工作组批量请求。
 async function fetchWorkspaceTabsTree(rootId: string, force = false): Promise<void> {
   if (!force && rootId && tabsCache.has(rootId)) return
-  const res = await sendMessage<WorkspaceTabsGroupsData>({
-    action: 'GET_WORKSPACE_TABS',
-    payload: { workspaceId: rootId, recursive: true },
-  })
-  if (res.success && res.data && 'groups' in res.data) {
-    for (const g of res.data.groups) {
-      tabsCache.set(g.workspaceId, g.tabs)
-    }
-    return
+  const groups = await listWorkspaceTabGroups(rootId)
+  for (const g of groups) {
+    tabsCache.set(g.workspaceId, g.tabs)
   }
-  throw new Error(res.error || '加载标签页失败')
 }
 
 /**
@@ -468,15 +394,6 @@ async function loadTabs(ids: string[], recursiveRoot?: string, force = false) {
   } finally {
     loadingTabs.value = false
   }
-}
-
-// 确保给定工作组均已加载标签页（仅用于读取场景，命中缓存即跳过）
-async function ensureTabsLoaded(ids: string[], recursiveRoot?: string) {
-  const pending = recursiveRoot
-    ? [recursiveRoot]
-    : ids.filter((id) => !tabsCache.has(id))
-  if (pending.length === 0) return
-  await loadTabs(pending, recursiveRoot, false)
 }
 
 // 刷新指定工作组的标签页：有缓存时先展示旧数据，再强制从后端获取最新数据覆盖缓存；
@@ -504,9 +421,6 @@ const tagEditorTarget = ref<{ workspaceId: string; tabId?: string } | null>(null
 const treeRef = ref()
 const treeProps = { label: 'name', children: 'children' }
 
-// 快捷键「加入并关闭」的默认收藏分组 ID（本地存储）；空值回退到「未分组」
-// 「未分组」系统工作组的固定标识（见 background/index.ts UNGROUPED_WORKSPACE_ID）
-const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 const defaultWorkspaceId = ref('')
 
 const { confirmDeleteWorkspace } = useWorkspaceActions()
@@ -657,10 +571,45 @@ const tabListItems = computed<WsTabListItem[]>(() =>
       tabScope.value === 'all' && it.workspaceId !== selectedWorkspace.value?.id
         ? it.workspaceColor
         : undefined,
+    tags: (it.tab.tags ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      color: t.color,
+      clickable: true,
+    })),
+    description: it.tab.description,
+    addedAt: it.tab.addedAt,
     tab: it.tab,
     workspaceId: it.workspaceId,
   })),
 )
+
+const tabMenu = cloudTabMenu()
+
+const tabDialogMode = ref<CloudTabDialogMode | null>(null)
+const tabDialogTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
+
+function openTabDialog(mode: CloudTabDialogMode, workspaceId: string, tab: TabReference) {
+  tabDialogTarget.value = { workspaceId, tab }
+  tabDialogMode.value = mode
+}
+
+/** 行内操作已写入后端：刷新对应工作组标签页，并同步工作组标签/计数 */
+function onTabDialogSaved(workspaceId: string) {
+  void refreshTabs([workspaceId])
+  void loadWorkspaces({ silent: true })
+}
+
+function onTabClick(item: TabListItem) {
+  const target = tabListItems.value.find((i) => i.id === item.id)
+  if (target) void openSingleTab(target.tab.url)
+}
+
+/** 点击行内标签：切换「按标签筛选」，与顶部筛选下拉联动 */
+function onTagClick(tag: TabTagDisplay) {
+  if (tag.id == null) return
+  tagFilter.value = tagFilter.value === tag.id ? null : tag.id
+}
 
 watch(searchKeyword, (val) => {
   treeRef.value?.filter(val)
@@ -689,46 +638,66 @@ onMounted(async () => {
 })
 
 async function loadDefaultWorkspaceId() {
-  defaultWorkspaceId.value = (await storage.get(STORAGE_KEYS.DEFAULT_WORKSPACE_ID)) || UNGROUPED_WORKSPACE_ID
+  defaultWorkspaceId.value = await getDefaultWorkspaceId()
 }
 
-/** 是否已完成首次加载：首次加载选中默认分组，刷新/后续加载保持当前选中 */
+/** 路由带入的目标工作组（从标签页/标签页面跳转过来时定位） */
+const routeWorkspaceId = computed(() => {
+  const v = route.query.workspaceId
+  return typeof v === 'string' ? v : ''
+})
+
+/** 是否已完成首次加载：首次加载优先定位路由指定分组，其次默认分组 */
 let initialized = false
 
-async function loadWorkspaces() {
-  loading.value = true
-  const res = await sendMessage<WorkspacesData>({ action: 'GET_WORKSPACES', payload: { includeSystem: true, includeTabs: false } })
-  if (res.success && res.data) {
-    workspaces.value = res.data.workspaces
-    // 首次进入页面：若设置了默认分组则选中它（刷新等后续加载保持当前选中）
-    if (!initialized) {
-      initialized = true
-      if (defaultWorkspaceId.value && workspaces.value.some((w) => w.id === defaultWorkspaceId.value)) {
-        selectedId.value = defaultWorkspaceId.value
-      }
-    }
-    // 保持/初始化选中项
-    if (!selectedId.value || !workspaces.value.some((w) => w.id === selectedId.value)) {
-      selectedId.value = workspaces.value[0]?.id ?? ''
-    }
-    await nextTick()
-    if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
-    // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
-    if (selectedId.value) {
-      const isAll = tabScope.value === 'all'
-      const ids = isAll ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)] : [selectedId.value]
-      void refreshTabs(ids, isAll ? selectedId.value : undefined)
+async function loadWorkspaces(options: { silent?: boolean } = {}) {
+  if (!options.silent) loading.value = true
+  try {
+    workspaces.value = await listWorkspaces({ includeSystem: true })
+  } catch (err) {
+    reportServiceError(err, { fallback: '获取工作组失败' })
+  } finally {
+    if (!options.silent) loading.value = false
+  }
+  // 首次进入页面：优先定位路由指定的工作组，其次默认分组（刷新等后续加载保持当前选中）
+  if (!initialized) {
+    initialized = true
+    const target = routeWorkspaceId.value
+    if (target && workspaces.value.some((w) => w.id === target)) {
+      selectedId.value = target
+    } else if (defaultWorkspaceId.value && workspaces.value.some((w) => w.id === defaultWorkspaceId.value)) {
+      selectedId.value = defaultWorkspaceId.value
     }
   }
-  loading.value = false
+  // 保持/初始化选中项
+  if (!selectedId.value || !workspaces.value.some((w) => w.id === selectedId.value)) {
+    selectedId.value = workspaces.value[0]?.id ?? ''
+  }
+  await nextTick()
+  if (selectedId.value) treeRef.value?.setCurrentKey(selectedId.value)
+  // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
+  if (selectedId.value) {
+    const isAll = tabScope.value === 'all'
+    const ids = isAll ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)] : [selectedId.value]
+    void refreshTabs(ids, isAll ? selectedId.value : undefined)
+  }
 }
+
+// 从其他页面带 workspaceId 跳转进来（同一路由仅 query 变化）时定位到目标工作组
+watch(routeWorkspaceId, (id) => {
+  if (id && workspaces.value.some((w) => w.id === id)) {
+    selectedId.value = id
+    void nextTick(() => treeRef.value?.setCurrentKey(id))
+  }
+})
 
 // ============ 标签相关 ============
 
 async function loadTabTags() {
-  const res = await sendMessage<TagsData>({ action: 'GET_TAGS', payload: { scope: 'tab' } })
-  if (res.success && res.data) {
-    allTabTags.value = res.data.tags
+  try {
+    allTabTags.value = await listTags('tab')
+  } catch {
+    allTabTags.value = []
   }
 }
 
@@ -739,57 +708,31 @@ function openWorkspaceTagEditor(ws: Workspace) {
   tagEditorVisible.value = true
 }
 
-function openTabTagEditor(workspaceId: string, tab: TabReference) {
-  tagEditorTarget.value = { workspaceId, tabId: tab.tabId }
-  tagEditorScope.value = 'tab'
-  tagEditorSelectedIds.value = (tab.tags ?? []).map((t) => t.id)
-  tagEditorVisible.value = true
-}
-
 async function onTagEditorConfirm(ids: number[]) {
   const target = tagEditorTarget.value
   if (!target) return
-  const isTab = !!target.tabId
-  // 标签页现在按需从后端拉取，需先确保目标工作组标签页已加载再读取现有标签
-  await ensureTabsLoaded([target.workspaceId])
   const ws = workspaces.value.find((w) => w.id === target.workspaceId)
-  const existingIds = isTab
-    ? (tabsCache.get(target.workspaceId)?.find((t) => t.tabId === target.tabId)?.tags ?? []).map((t) => t.id)
-    : (ws?.tags ?? []).map((t) => t.id)
+  const existingIds = (ws?.tags ?? []).map((t) => t.id)
   const toAdd = ids.filter((id) => !existingIds.includes(id))
   const toRemove = existingIds.filter((id) => !ids.includes(id))
-  for (const id of toAdd) {
-    if (isTab) {
-      await sendMessage({ action: 'ADD_TAB_TAG', payload: { workspaceId: target.workspaceId, tabId: target.tabId!, tagId: id } })
-    } else {
-      await sendMessage({ action: 'ADD_WORKSPACE_TAG', payload: { workspaceId: target.workspaceId, tagId: id } })
-    }
+  try {
+    for (const id of toAdd) await addWorkspaceTag(target.workspaceId, id)
+    for (const id of toRemove) await removeWorkspaceTag(target.workspaceId, id)
+    await loadWorkspaces({ silent: true })
+    await loadTabTags()
+  } catch (err) {
+    reportServiceError(err, { fallback: '更新标签失败' })
   }
-  for (const id of toRemove) {
-    if (isTab) {
-      await sendMessage({ action: 'REMOVE_TAB_TAG', payload: { workspaceId: target.workspaceId, tabId: target.tabId!, tagId: id } })
-    } else {
-      await sendMessage({ action: 'REMOVE_WORKSPACE_TAG', payload: { workspaceId: target.workspaceId, tagId: id } })
-    }
-  }
-  await loadWorkspaces()
-  await loadTabTags()
 }
 
 function onSelectNode(node: WorkspaceTreeNode) {
   selectedId.value = node.id
-  // 选中工作组后，先展示缓存、再强制从后端拉取最新标签页（而非随工作组树全量返回）。
-  // 「包含子工作组」模式下以根 id 一次拉取整棵子树，避免逐个工作组请求。
-  const isAll = tabScope.value === 'all'
-  void refreshTabs([node.id], isAll ? node.id : undefined)
 }
 
 /** 右键节点：选中该节点，由 ContextMenu 负责打开操作菜单 */
 function onNodeContextMenu(data: WorkspaceTreeNode) {
   selectedId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
-  const isAll = tabScope.value === 'all'
-  void refreshTabs([data.id], isAll ? data.id : undefined)
 }
 
 // ============ 工作组树拖拽（调整层级 / 同级顺序） ============
@@ -839,20 +782,20 @@ function allowDropNode(dragging: TreeDragNode, drop: TreeDragNode, type: TreeDro
  */
 async function onNodeDrop(dragging: TreeDragNode, drop: TreeDragNode, type: TreeDropType) {
   if (type === 'none') return
-  const res = await sendMessage({
-    action: 'MOVE_WORKSPACE',
-    payload: { id: nodeData(dragging).id, targetId: nodeData(drop).id, position: type },
-  })
-  if (!res.success) {
-    if (res.authError) ElMessage.warning('未连接后端，无法调整顺序')
-    else ElMessage.error(res.error || '调整顺序失败')
+  try {
+    await moveWorkspace(nodeData(dragging).id, nodeData(drop).id, type)
+  } catch (err) {
+    reportServiceError(err, { fallback: '调整顺序失败' })
   }
   // el-tree 内部已按拖拽结果重排，无论成败都要重新拉取，以服务端数据为准确认或复原
   await loadWorkspaces()
 }
 
-/** 标签页操作菜单命令分发 */
-function onTabMenuCommand(command: string, workspaceId: string, tab: TabReference) {
+/** 标签页操作菜单命令分发（行菜单与右键菜单共用一个描述） */
+function onTabMenuCommand(command: string, item: TabListItem) {
+  const target = tabListItems.value.find((i) => i.id === item.id)
+  if (!target) return
+  const { workspaceId, tab } = target
   switch (command) {
     case 'open':
       openSingleTab(tab.url)
@@ -863,38 +806,19 @@ function onTabMenuCommand(command: string, workspaceId: string, tab: TabReferenc
     case 'copyLink':
       copyToClipboard(tab.url, '链接已复制')
       break
-    case 'editTime':
-      openEditTimeDialog(workspaceId, tab)
-      break
-    case 'rename':
-      openRenameDialog(workspaceId, tab)
-      break
-    case 'editUrl':
-      openEditUrlDialog(workspaceId, tab)
-      break
-    case 'editDesc':
-      openEditDescDialog(workspaceId, tab)
-      break
-    case 'tag':
-      openTabTagEditor(workspaceId, tab)
-      break
-    case 'move':
-      openMoveDialog(workspaceId, tab.tabId)
-      break
     case 'remove':
-      handleRemoveTab(workspaceId, tab.tabId)
+      void handleRemoveTab(workspaceId, tab.tabId)
       break
+    default:
+      openTabDialog(command as CloudTabDialogMode, workspaceId, tab)
   }
 }
 
 /** 复制文本到剪贴板 */
 async function copyToClipboard(text: string, successMsg: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    ElMessage.success(successMsg)
-  } catch {
-    ElMessage.error('复制失败')
-  }
+  const ok = await copyText(text)
+  if (ok) ElMessage.success(successMsg)
+  else ElMessage.error('复制失败')
 }
 
 /**
@@ -996,18 +920,12 @@ async function handleSetDefaultWorkspace(ws: Workspace) {
 /** 右键菜单「默认展开/默认折叠」快捷切换：提交 collapsed 取反并刷新树 */
 async function handleToggleCollapsed(ws: Workspace) {
   const next = !ws.collapsed
-  const res = await sendMessage({
-    action: 'UPDATE_WORKSPACE',
-    payload: {
-      id: ws.id,
-      collapsed: next,
-    },
-  })
-  if (res.success) {
+  try {
+    await updateWorkspace({ id: ws.id, collapsed: next })
     ElMessage.success(`已将该工作组设为「${next ? '默认折叠' : '默认展开'}」`)
     await loadWorkspaces()
-  } else {
-    ElMessage.error(res.error || '切换失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '切换失败' })
   }
 }
 
@@ -1018,11 +936,9 @@ async function handleSave() {
   }
 
   saving.value = true
-
-  if (isEditing.value) {
-    const res = await sendMessage({
-      action: 'UPDATE_WORKSPACE',
-      payload: {
+  try {
+    if (isEditing.value) {
+      await updateWorkspace({
         id: editingId.value,
         name: formData.value.name.trim(),
         // 清空颜色时 picker 值为 undefined，归一化为空字符串以告知后端清除颜色
@@ -1030,32 +946,26 @@ async function handleSave() {
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
         collapsed: formData.value.collapsed,
-      },
-    })
-    if (res.success) ElMessage.success('工作组已更新')
-    else ElMessage.error(res.error || '更新失败')
-  } else {
-    // 创建不携带标签页；后续通过「标签页」页或侧边栏加入
-    const res = await sendMessage<{ workspace: Workspace }>({
-      action: 'CREATE_WORKSPACE',
-      payload: {
+      })
+      ElMessage.success('工作组已更新')
+    } else {
+      // 创建不携带标签页；后续通过「标签页」页或侧边栏加入
+      const created = await createWorkspace({
         name: formData.value.name.trim(),
         color: formData.value.color || '',
         description: formData.value.description.trim(),
         parentId: formData.value.parentId || '',
         collapsed: formData.value.collapsed,
-      },
-    })
-    if (res.success) {
+      })
       ElMessage.success('工作组已创建')
-      if (res.data?.workspace?.id) selectedId.value = res.data.workspace.id
-    } else {
-      ElMessage.error(res.error || '创建失败')
+      if (created.id) selectedId.value = created.id
     }
+    dialogVisible.value = false
+  } catch (err) {
+    reportServiceError(err, { fallback: isEditing.value ? '更新失败' : '创建失败' })
+  } finally {
+    saving.value = false
   }
-
-  saving.value = false
-  dialogVisible.value = false
   await loadWorkspaces()
 }
 
@@ -1073,37 +983,32 @@ async function handleDuplicate(ws: Workspace) {
     ElMessage.warning('系统分组不可复制')
     return
   }
-  const res = await sendMessage<{ workspace: Workspace }>({
-    action: 'DUPLICATE_WORKSPACE',
-    payload: { id: ws.id },
-  })
-  if (res.success && res.data?.workspace) {
-    ElMessage.success(`已创建副本「${res.data.workspace.name}」`)
-    selectedId.value = res.data.workspace.id
+  try {
+    const copy = await duplicateWorkspace(ws.id)
+    ElMessage.success(`已创建副本「${copy.name}」`)
+    selectedId.value = copy.id
     await loadWorkspaces()
-  } else if (res.authError) {
-    ElMessage.warning('未连接后端，无法复制工作组')
-  } else {
-    ElMessage.error(res.error || '复制工作组失败')
+  } catch (err) {
+    reportServiceError(err, { fallback: '复制工作组失败' })
   }
 }
 
 async function handleOpenWorkspace(id: string, newWindow: boolean) {
-  const res = await sendMessage<{ opened: number }>({
-    action: 'OPEN_WORKSPACE',
-    payload: { id, newWindow },
-  })
-  if (res.success) ElMessage.success(`已打开 ${res.data?.opened ?? 0} 个标签页`)
-  else ElMessage.error(res.error || '打开失败')
+  try {
+    const opened = await openWorkspace(id, { newWindow })
+    ElMessage.success(`已打开 ${opened} 个标签页`)
+  } catch (err) {
+    reportServiceError(err, { fallback: '打开失败' })
+  }
 }
 
 async function handleOpenAsTabGroup(id: string) {
-  const res = await sendMessage<{ opened: number }>({
-    action: 'OPEN_WORKSPACE',
-    payload: { id, asTabGroup: true },
-  })
-  if (res.success) ElMessage.success(`已打开 ${res.data?.opened ?? 0} 个标签页并归入标签组`)
-  else ElMessage.error(res.error || '打开失败')
+  try {
+    const opened = await openWorkspace(id, { asTabGroup: true })
+    ElMessage.success(`已打开 ${opened} 个标签页并归入标签组`)
+  } catch (err) {
+    reportServiceError(err, { fallback: '打开失败' })
+  }
 }
 
 async function openSingleTab(url: string) {
@@ -1111,193 +1016,19 @@ async function openSingleTab(url: string) {
 }
 
 async function handleRemoveTab(workspaceId: string, tabId: string) {
-  const res = await sendMessage({
-    action: 'REMOVE_WORKSPACE_TAB',
-    payload: { workspaceId, tabId },
-  })
-  if (res.success) {
+  try {
+    await removeWorkspaceTab(workspaceId, tabId)
     ElMessage.success('标签页已从工作组移除')
-    await loadWorkspaces()
-  } else {
-    ElMessage.error(res.error || '移除失败')
+    await refreshTabs([workspaceId])
+    await loadWorkspaces({ silent: true })
+  } catch (err) {
+    reportServiceError(err, { fallback: '移除失败' })
   }
 }
-
-// ============ 修改添加时间 ============
-
-const timeDialogVisible = ref(false)
-const timeSaving = ref(false)
-const timeValue = ref<Date | null>(null)
-const timeTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
-
-// 重命名标签页
-const renameDialogVisible = ref(false)
-const renameSaving = ref(false)
-const renameValue = ref('')
-const renameTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
-
-// 编辑链接
-const editUrlDialogVisible = ref(false)
-const editUrlSaving = ref(false)
-const editUrlValue = ref('')
-const editUrlTitleValue = ref('')
-const editUrlTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
 
 /** 列表中优先展示重命名后的显示名，否则回退到原始标题 */
 function displayTitle(tab: TabReference): string {
   return tab.displayName || tab.title || '(无标题)'
-}
-
-/** 列表内展示：如 07-28 或 2025-12-31 */
-function formatAddedAt(addedAt: string): string {
-  if (!addedAt) return ''
-  const d = new Date(addedAt)
-  if (isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const md = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}-${md}`
-}
-
-/** 悬浮提示：完整日期时间 */
-function formatAddedAtFull(addedAt: string): string {
-  if (!addedAt) return '未知'
-  const d = new Date(addedAt)
-  if (isNaN(d.getTime())) return '未知'
-  return d.toLocaleString()
-}
-
-function setTimeToNow() {
-  timeValue.value = new Date()
-}
-
-function openEditTimeDialog(workspaceId: string, tab: TabReference) {
-  timeTarget.value = { workspaceId, tabId: tab.tabId }
-  const d = new Date(tab.addedAt)
-  timeValue.value = isNaN(d.getTime()) ? new Date() : d
-  timeDialogVisible.value = true
-}
-
-async function handleSaveAddedTime() {
-  const target = timeTarget.value
-  if (!target || !timeValue.value) return
-  timeSaving.value = true
-  const res = await sendMessage({
-    action: 'UPDATE_WORKSPACE_TAB',
-    payload: {
-      workspaceId: target.workspaceId,
-      tabId: target.tabId,
-      addedAt: timeValue.value.toISOString(),
-    },
-  })
-  timeSaving.value = false
-  if (res.success) {
-    ElMessage.success('添加时间已更新')
-    timeDialogVisible.value = false
-    await loadWorkspaces()
-  } else {
-    ElMessage.error(res.error || '更新失败')
-  }
-}
-
-function openRenameDialog(workspaceId: string, tab: TabReference) {
-  renameTarget.value = { workspaceId, tabId: tab.tabId }
-  renameValue.value = tab.displayName || tab.title || ''
-  renameDialogVisible.value = true
-}
-
-async function handleSaveRename() {
-  const target = renameTarget.value
-  if (!target) return
-  // 允许留空以清除重命名，恢复使用原始标题
-  const name = renameValue.value.trim()
-  renameSaving.value = true
-  const res = await sendMessage({
-    action: 'UPDATE_WORKSPACE_TAB',
-    payload: {
-      workspaceId: target.workspaceId,
-      tabId: target.tabId,
-      displayName: name,
-    },
-  })
-  renameSaving.value = false
-  if (res.success) {
-    ElMessage.success(name ? '已重命名' : '已恢复原始标题')
-    renameDialogVisible.value = false
-    await loadWorkspaces()
-  } else {
-    ElMessage.error(res.error || '更新失败')
-  }
-}
-
-function openEditUrlDialog(workspaceId: string, tab: TabReference) {
-  editUrlTarget.value = { workspaceId, tabId: tab.tabId }
-  editUrlValue.value = tab.url
-  editUrlTitleValue.value = tab.displayName || tab.title || ''
-  editUrlDialogVisible.value = true
-}
-
-async function handleSaveEditUrl() {
-  const target = editUrlTarget.value
-  const url = editUrlValue.value.trim()
-  if (!target || !url) {
-    ElMessage.warning('请输入链接地址')
-    return
-  }
-  editUrlSaving.value = true
-  const res = await sendMessage({
-    action: 'UPDATE_WORKSPACE_TAB',
-    payload: {
-      workspaceId: target.workspaceId,
-      tabId: target.tabId,
-      url,
-    },
-  })
-  editUrlSaving.value = false
-  if (res.success) {
-    ElMessage.success('链接已更新')
-    editUrlDialogVisible.value = false
-    await loadWorkspaces()
-  } else if (res.authError) {
-    ElMessage.warning('未连接后端，无法更新')
-  } else {
-    ElMessage.error(res.error || '更新失败')
-  }
-}
-
-// 编辑标签页描述
-const editDescDialogVisible = ref(false)
-const editDescSaving = ref(false)
-const editDescValue = ref('')
-const editDescTarget = ref<{ workspaceId: string; tabId: string } | null>(null)
-
-function openEditDescDialog(workspaceId: string, tab: TabReference) {
-  editDescTarget.value = { workspaceId, tabId: tab.tabId }
-  editDescValue.value = tab.description || ''
-  editDescDialogVisible.value = true
-}
-
-async function handleSaveEditDesc() {
-  const target = editDescTarget.value
-  if (!target) return
-  editDescSaving.value = true
-  const res = await sendMessage({
-    action: 'UPDATE_WORKSPACE_TAB',
-    payload: {
-      workspaceId: target.workspaceId,
-      tabId: target.tabId,
-      description: editDescValue.value,
-    },
-  })
-  editDescSaving.value = false
-  if (res.success) {
-    ElMessage.success('描述已更新')
-    editDescDialogVisible.value = false
-    await loadWorkspaces()
-  } else if (res.authError) {
-    ElMessage.warning('未连接后端，无法更新')
-  } else {
-    ElMessage.error(res.error || '更新失败')
-  }
 }
 
 /** 同组内拖拽排序（以当前展示列表为准，映射回原数组索引） */
@@ -1318,13 +1049,10 @@ function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
 
 async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {
   try {
-    const res = await sendMessage({
-      action: 'MOVE_WORKSPACE_TAB',
-      payload: { workspaceId: targetWsId, tabId, newIndex },
-    })
-    if (!res.success) await loadWorkspaces()
-  } catch {
-    await loadWorkspaces()
+    await moveWorkspaceTab(targetWsId, tabId, newIndex)
+  } catch (err) {
+    reportServiceError(err, { fallback: '调整顺序失败' })
+    await loadWorkspaces({ silent: true })
   }
 }
 
@@ -1334,21 +1062,17 @@ async function handleAddTabByUrl() {
   if (!url || !selectedWorkspace.value) return
 
   addingByUrl.value = true
-  const res = await sendMessage({
-    action: 'ADD_WORKSPACE_TAB_BY_URL',
-    payload: { workspaceId: selectedWorkspace.value.id, url },
-  })
-  addingByUrl.value = false
-
-  if (res.success) {
+  try {
+    await addWorkspaceTabByUrl(selectedWorkspace.value.id, url)
     ElMessage.success('标签页已添加')
     newTabUrl.value = ''
     addUrlDialogVisible.value = false
-    await loadWorkspaces()
-  } else if (res.authError) {
-    ElMessage.warning('未连接后端，无法添加')
-  } else {
-    ElMessage.error(res.error || '添加失败')
+    await refreshTabs([selectedWorkspace.value.id])
+    await loadWorkspaces({ silent: true })
+  } catch (err) {
+    reportServiceError(err, { fallback: '添加失败' })
+  } finally {
+    addingByUrl.value = false
   }
 }
 
@@ -1391,12 +1115,9 @@ async function copySelectedLinks() {
     const tab = tabsCache.get(m.workspaceId)?.find((t) => t.tabId === m.tabId)
     if (tab?.url) urls.push(tab.url)
   }
-  try {
-    await navigator.clipboard.writeText(urls.join('\n'))
-    ElMessage.success(`已复制 ${urls.length} 个链接`)
-  } catch {
-    ElMessage.error('复制失败')
-  }
+  const ok = await copyText(urls.join('\n'))
+  if (ok) ElMessage.success(`已复制 ${urls.length} 个链接`)
+  else ElMessage.error('复制失败')
 }
 /** 批量从工作组移除（移至回收站） */
 async function removeSelectedTabs() {
@@ -1413,96 +1134,64 @@ async function removeSelectedTabs() {
   }
   let ok = 0
   for (const m of metas) {
-    const res = await sendMessage({ action: 'REMOVE_WORKSPACE_TAB', payload: { workspaceId: m.workspaceId, tabId: m.tabId } })
-    if (res.success) ok++
+    try {
+      await removeWorkspaceTab(m.workspaceId, m.tabId)
+      ok++
+    } catch {
+      // 单个失败不阻断其余标签页
+    }
   }
   if (ok > 0) {
     ElMessage.success(`已移除 ${ok} 个标签页`)
     await refreshTabs([...new Set(metas.map((m) => m.workspaceId))])
-    await loadWorkspaces()
+    await loadWorkspaces({ silent: true })
   }
   clearSelection()
 }
 
-// ============ 移动到其他工作组 ============
+// ============ 批量移动到其他工作组 ============
 
-const movePickerVisible = ref(false)
-const moveSource = ref<{ workspaceId: string; tabId: string } | null>(null)
-/** 是否为批量移动模式：决定禁用项来源与提交逻辑 */
-const moveBatchMode = ref(false)
+const batchMovePickerVisible = ref(false)
 
-/** 选择目标时禁用：单条模式禁用源工作组；批量模式禁用所有源工作组 */
-const moveDisabledIds = computed<string[]>(() => {
-  if (moveBatchMode.value) {
-    return [...new Set(selectedTabMeta().map((m) => m.workspaceId))]
-  }
-  return moveSource.value ? [moveSource.value.workspaceId] : []
-})
+/** 批量移动时禁用所有源工作组（已在新分组里的标签页无需再移入） */
+const batchMoveDisabledIds = computed<string[]>(() => [
+  ...new Set(selectedTabMeta().map((m) => m.workspaceId)),
+])
 
-function openMoveDialog(workspaceId: string, tabId: string) {
-  moveBatchMode.value = false
-  moveSource.value = { workspaceId, tabId }
-  movePickerVisible.value = true
-}
-
-/** 批量移动到工作组：打开选择弹窗（复用同一弹窗） */
 function openBatchMoveDialog() {
   if (selectedTabIds.value.length === 0) return
-  moveBatchMode.value = true
-  movePickerVisible.value = true
-}
-
-async function handleMoveToWorkspace(node: WorkspaceTreeNode) {
-  if (moveBatchMode.value) {
-    await handleBatchMoveToWorkspace(node)
-    return
-  }
-  const src = moveSource.value
-  if (!src) return
-  // 确保目标工作组的标签页已加载，以计算追加位置（标签页按需拉取，node.workspace.tabs 不再全量包含）
-  await ensureTabsLoaded([node.id])
-  // 追加到目标分组的最后一项（源分组已在选择器中 disabled，不会选到同组）
-  const newIndex = tabsCache.get(node.id)?.length ?? 0
-  const res = await sendMessage({
-    action: 'MOVE_WORKSPACE_TAB',
-    payload: { workspaceId: node.id, tabId: src.tabId, newIndex },
-  })
-  if (res.success) {
-    ElMessage.success(`已移动到「${node.name}」`)
-    // 先展示旧缓存，再强制刷新源分组与目标分组的最新标签页数据（多设备可能并发修改）
-    await refreshTabs([src.workspaceId, node.id].filter(Boolean) as string[])
-    await loadWorkspaces()
-  } else if (res.authError) {
-    ElMessage.warning('未连接后端，无法移动')
-  } else {
-    ElMessage.error(res.error || '移动失败')
-  }
+  batchMovePickerVisible.value = true
 }
 
 /** 批量移动：依次将选中标签页追加到目标工作组末尾 */
 async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   const metas = selectedTabMeta()
   if (metas.length === 0) return
-  await ensureTabsLoaded([node.id])
-  const base = tabsCache.get(node.id)?.length ?? 0
+  let base = 0
+  try {
+    base = (await listWorkspaceTabs(node.id)).length
+  } catch (err) {
+    reportServiceError(err, { fallback: '获取目标工作组失败' })
+    return
+  }
   let ok = 0
   let fail = 0
   for (const m of metas) {
-    const res = await sendMessage({
-      action: 'MOVE_WORKSPACE_TAB',
-      payload: { workspaceId: node.id, tabId: m.tabId, newIndex: base + ok },
-    })
-    if (res.success) ok++
-    else fail++
+    try {
+      await moveWorkspaceTab(node.id, m.tabId, base + ok)
+      ok++
+    } catch {
+      fail++
+    }
   }
   if (ok > 0) {
     ElMessage.success(`已移动 ${ok} 个标签页到「${node.name}」`)
     const srcIds = [...new Set(metas.map((m) => m.workspaceId))]
-    await refreshTabs([...srcIds, node.id].filter(Boolean) as string[])
-    await loadWorkspaces()
+    await refreshTabs([...srcIds, node.id].filter(Boolean))
+    await loadWorkspaces({ silent: true })
   }
   if (fail > 0) ElMessage.error(`有 ${fail} 个标签页移动失败`)
-  moveBatchMode.value = false
+  batchMovePickerVisible.value = false
   clearSelection()
 }
 </script>
@@ -1708,56 +1397,11 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
 }
 
 .batch-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
   margin-bottom: 4px;
-  background: #eef2ff;
-  border: 1px solid #e0e7ff;
-  border-radius: 8px;
-}
-
-.batch-count {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4338ca;
-  margin-right: 4px;
 }
 
 .detail-body {
   flex: 1;
-}
-
-.tab-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.tab-added {
-  font-size: 11px;
-  color: #909399;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.tab-description {
-  width: 100%;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #606266;
-  background: #f4f4f5;
-  border-radius: 4px;
-  padding: 2px 8px;
-  margin-top: 2px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .dialog-hint {
@@ -1777,18 +1421,6 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* 标签页项的竖三点按钮 */
-.tab-more-btn {
-  margin-left: auto;
-  padding: 2px 4px;
-  color: #909399;
-  flex-shrink: 0;
-}
-
-.tab-more-btn:hover {
-  color: #606266;
 }
 </style>
 
