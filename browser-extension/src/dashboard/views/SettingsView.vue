@@ -249,7 +249,10 @@
             </template>
             <el-form label-width="120px" label-position="left">
               <el-form-item label="本地标签页">
-                <span>{{ tabCount.open }} 个打开，其中 {{ tabCount.frozen }} 个已冻结</span>
+                <span>
+                  {{ tabCount.open }} 个打开，其中 {{ tabCount.frozen }} 个已冻结
+                  ({{ (100 * tabCount.frozen / tabCount.open).toFixed(0) }}%)
+                </span>
               </el-form-item>
 
               <el-form-item label="清除数据">
