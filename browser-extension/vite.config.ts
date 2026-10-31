@@ -4,10 +4,12 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import zip from 'vite-plugin-zip-pack'
 import manifest from './manifest.config.ts'
-import { name, version } from './package.json' with { type: 'json' }
+import packageJson from './package.json' with { type: 'json' }
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+
+const { name, version } = packageJson
 
 export default defineConfig({
   resolve: {
