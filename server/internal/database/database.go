@@ -79,6 +79,10 @@ func AutoMigrate(db *DB) error {
 		return err
 	}
 
+	if err := CleanupOrphanTagAssociations(db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -190,5 +194,48 @@ func FixTabTagWorkspaceID(db *DB) error {
 			return res.Error
 		}
 		return tx.Create(&model.SchemaMeta{MetaKey: tabTagWorkspaceIDMetaKey, MetaValue: "done"}).Error
+	})
+}
+
+// tagAssociationCleanupMetaKey 标记「清理孤儿标签关联」已完成，只需执行一次
+const tagAssociationCleanupMetaKey = "tag_association_cleanup_v1"
+
+// CleanupOrphanTagAssociations 一次性清理指向已不存在标签页/工作组的标签关联。
+//
+// 背景：早期删除工作组内标签页时（整组更新时移除、单页删除、删除工作组）只删除了
+// workspace_tabs，未同步删除 tab_tags / workspace_tags，留下孤儿关联。标签列表按
+// tab_tags 计数会显示非 0，按标签联查标签页时却 JOIN 不到任何行，出现
+// 「计数 2 却提示暂无标签页」的不一致。
+func CleanupOrphanTagAssociations(db *DB) error {
+	var meta model.SchemaMeta
+	err := db.Where("meta_key = ?", tagAssociationCleanupMetaKey).First(&meta).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		// 关联只保留「标签页仍存在且所属工作组未删除」的行
+		if err := tx.Exec(`
+			DELETE FROM tab_tags
+			WHERE workspace_tab_id NOT IN (
+				SELECT workspace_tabs.id
+				FROM workspace_tabs
+				JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id
+				WHERE workspaces.is_deleted = 0
+			)`).Error; err != nil {
+			return err
+		}
+		// 工作组标签关联只保留未删除的工作组
+		if err := tx.Exec(`
+			DELETE FROM workspace_tags
+			WHERE workspace_id NOT IN (
+				SELECT workspace_id FROM workspaces WHERE is_deleted = 0
+			)`).Error; err != nil {
+			return err
+		}
+		return tx.Create(&model.SchemaMeta{MetaKey: tagAssociationCleanupMetaKey, MetaValue: "done"}).Error
 	})
 }

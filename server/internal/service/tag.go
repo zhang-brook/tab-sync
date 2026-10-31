@@ -29,14 +29,18 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 		return nil, err
 	}
 	// 统计每个标签关联的标签页数量（仅 tab 类标签有实际关联）
+	// 以 workspace_tabs 为准联查存活标签页，避免历史残留的孤儿关联行把计数算大
 	type tabCountRow struct {
 		TagID uint
 		Count int64
 	}
 	rows := make([]tabCountRow, 0)
-	if err := s.db.Model(&model.TabTag{}).
-		Select("tag_id, COUNT(*) AS count").
-		Group("tag_id").
+	if err := s.db.Table("tab_tags").
+		Select("tab_tags.tag_id AS tag_id, COUNT(*) AS count").
+		Joins("JOIN workspace_tabs ON workspace_tabs.id = tab_tags.workspace_tab_id").
+		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+		Where("workspaces.is_deleted = ?", false).
+		Group("tab_tags.tag_id").
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -180,8 +184,8 @@ func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
 		Table("tab_tags").
 		Select("workspace_tabs.id AS tab_id, workspace_tabs.url, workspace_tabs.title, workspace_tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
 		Joins("JOIN workspace_tabs ON workspace_tabs.id = tab_tags.workspace_tab_id").
-		Joins("JOIN workspaces ON workspaces.workspace_id = tab_tags.workspace_id").
-		Where("tab_tags.tag_id = ?", tagID).
+		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+		Where("tab_tags.tag_id = ? AND workspaces.is_deleted = ?", tagID, false).
 		Order("workspaces.name, workspace_tabs.sort_order").
 		Scan(&items).Error
 	if err != nil {

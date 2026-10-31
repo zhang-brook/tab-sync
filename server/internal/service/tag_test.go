@@ -85,6 +85,78 @@ func TestTagService_List_TabCount(t *testing.T) {
 	}
 }
 
+// TestTagService_TabRemoval_CleansAssociations 删除标签页时同步清理标签关联，
+// 避免标签计数（tab_tags）与详情（JOIN 存活标签页）出现不一致。
+func TestTagService_TabRemoval_CleansAssociations(t *testing.T) {
+	db, _ := setupTestDB(t)
+	tagSvc := NewTagService(db)
+	wsSvc := NewWorkspaceService(db, nil)
+
+	tag, err := tagSvc.Create("清理测试", "#409EFF", "tab", "")
+	if err != nil {
+		t.Fatalf("创建标签失败: %v", err)
+	}
+	ws, err := wsSvc.Create(CreateWorkspacePayload{Name: "清理测试工作组"})
+	if err != nil {
+		t.Fatalf("创建工作组失败: %v", err)
+	}
+	updated, err := wsSvc.Update(ws.Workspace.ID, UpdateWorkspacePayload{
+		Tabs: []WorkspaceTabData{
+			{URL: "https://a.example.com", Title: "A"},
+			{URL: "https://b.example.com", Title: "B"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("添加标签页失败: %v", err)
+	}
+	tabA := updated.Tabs[0].TabID
+	tabB := updated.Tabs[1].TabID
+	for _, tabID := range []string{tabA, tabB} {
+		uid, _ := strconv.ParseUint(tabID, 10, 64)
+		if err := tagSvc.AddToTab(ws.Workspace.ID, uint(uid), tag.ID); err != nil {
+			t.Fatalf("打标签失败: %v", err)
+		}
+	}
+
+	check := func(want int, scene string) {
+		t.Helper()
+		tags, lerr := tagSvc.List("tab")
+		if lerr != nil {
+			t.Fatalf("%s: 列出标签失败: %v", scene, lerr)
+		}
+		var count int64 = -1
+		for _, item := range tags {
+			if item.ID == tag.ID {
+				count = item.TabCount
+			}
+		}
+		if count != int64(want) {
+			t.Errorf("%s: 标签计数不匹配: got %d, want %d", scene, count, want)
+		}
+		items, gerr := tagSvc.GetTabsByTag(tag.ID)
+		if gerr != nil {
+			t.Fatalf("%s: 按标签联查失败: %v", scene, gerr)
+		}
+		if len(items) != want {
+			t.Errorf("%s: 标签页数量不匹配: got %d, want %d", scene, len(items), want)
+		}
+	}
+
+	// 单页删除：关联同步清理
+	if err := wsSvc.DeleteTab(ws.Workspace.ID, tabA); err != nil {
+		t.Fatalf("删除标签页失败: %v", err)
+	}
+	check(1, "单页删除后")
+
+	// 整组更新移除剩余标签页：关联同样清理
+	if _, err := wsSvc.Update(ws.Workspace.ID, UpdateWorkspacePayload{
+		Tabs: []WorkspaceTabData{},
+	}); err != nil {
+		t.Fatalf("清空标签页失败: %v", err)
+	}
+	check(0, "清空标签页后")
+}
+
 func TestTagService_Update_ClearColor(t *testing.T) {
 	db, _ := setupTestDB(t)
 	tagSvc := NewTagService(db)

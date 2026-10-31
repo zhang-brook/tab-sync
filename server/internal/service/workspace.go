@@ -66,8 +66,8 @@ type UpdateWorkspacePayload struct {
 	Color       *string            `json:"color,omitempty"`
 	Icon        *string            `json:"icon,omitempty"`
 	Description *string            `json:"description,omitempty"`
-	ParentID    *string            `json:"parentId,omitempty"`    // 移动到新父工作组（空字符串表示移到根级）
-	Collapsed   *bool              `json:"collapsed,omitempty"`   // 默认折叠状态：true=默认折叠，false=默认展开
+	ParentID    *string            `json:"parentId,omitempty"`  // 移动到新父工作组（空字符串表示移到根级）
+	Collapsed   *bool              `json:"collapsed,omitempty"` // 默认折叠状态：true=默认折叠，false=默认展开
 	Tabs        []WorkspaceTabData `json:"tabs,omitempty"`
 }
 
@@ -93,21 +93,21 @@ type MoveWorkspacePayload struct {
 
 // WorkspaceResponse 工作组响应（给前端）
 type WorkspaceResponse struct {
-	ID          string         `json:"id"`
-	ParentID    string         `json:"parentId"`
-	Name        string         `json:"name"`
-	Color       string         `json:"color"`
-	Icon        string         `json:"icon"`
-	Description string         `json:"description"`
-	IsSystem    bool           `json:"isSystem"`
+	ID          string `json:"id"`
+	ParentID    string `json:"parentId"`
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Icon        string `json:"icon"`
+	Description string `json:"description"`
+	IsSystem    bool   `json:"isSystem"`
 	// Collapsed 默认折叠状态：true=默认折叠，false=默认展开
-	Collapsed   bool           `json:"collapsed"`
+	Collapsed bool `json:"collapsed"`
 	// SortOrder 同级排序序号（前端按 sortOrder 排序，同值时按名称回退）
-	SortOrder   int            `json:"sortOrder"`
-	Tabs        []TabReference `json:"tabs"`
-	Tags        []TagResponse  `json:"tags"`
-	CreatedAt   string         `json:"createdAt"`
-	UpdatedAt   string         `json:"updatedAt"`
+	SortOrder int            `json:"sortOrder"`
+	Tabs      []TabReference `json:"tabs"`
+	Tags      []TagResponse  `json:"tags"`
+	CreatedAt string         `json:"createdAt"`
+	UpdatedAt string         `json:"updatedAt"`
 }
 
 // TabReference 标签页引用
@@ -431,6 +431,10 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 							return aerr
 						}
 					}
+					// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
+					if terr := tx.Where("workspace_tab_id = ?", uid).Delete(&model.TabTag{}).Error; terr != nil {
+						return terr
+					}
 					if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
 						return derr
 					}
@@ -494,8 +498,16 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 		}
 		visit(id)
 
-		// 物理删除子树内每个工作组的标签页（从叶子到父级）
+		// 物理删除子树内每个工作组的标签页（从叶子到父级）及其标签关联
 		for _, wid := range subtree {
+			if err := tx.Where("workspace_tab_id IN (?)",
+				tx.Model(&model.WorkspaceTab{}).Select("id").Where("workspace_id = ?", wid)).
+				Delete(&model.TabTag{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTag{}).Error; err != nil {
+				return err
+			}
 			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTab{}).Error; err != nil {
 				return err
 			}
@@ -871,6 +883,10 @@ func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
 			if aerr := s.RecycleBin.Add(tx, workspaceID, ws.Name, tab); aerr != nil {
 				return aerr
 			}
+		}
+		// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
+		if terr := tx.Where("workspace_tab_id = ?", uint(uid)).Delete(&model.TabTag{}).Error; terr != nil {
+			return terr
 		}
 		return tx.Where("id = ?", uint(uid)).Delete(&model.WorkspaceTab{}).Error
 	})
