@@ -12,7 +12,7 @@
             <el-form label-width="96px" label-position="left">
               <el-form-item label="管理扩展">
                 <el-button size="small" @click="openExtensionsPage">管理扩展</el-button>
-                <div class="form-tip">在浏览器扩展管理页查看权限、编辑快捷键并重新加载</div>
+                <div class="form-tip" style="width: 100%">在浏览器扩展管理页查看权限、编辑快捷键并重新加载</div>
               </el-form-item>
               <el-form-item label="重新加载">
                 <el-button size="small" type="primary" @click="reloadExtension">重新加载扩展</el-button>
@@ -54,19 +54,19 @@
               </template>
               <el-form-item label="启用快捷键">
                 <el-switch v-model="shortcutEnabled" @change="saveShortcutEnabled" />
-                <div class="form-tip">关闭后「加入并关闭」快捷键将不再触发收藏</div>
+                <div class="form-tip" style="width: 100%">关闭后「加入并关闭」快捷键将不再触发收藏</div>
               </el-form-item>
               <el-form-item label="默认工作组">
                 <div class="ws-picker-row">
                   <span class="ws-current">{{ defaultWorkspaceName }}</span>
                   <el-button size="small" @click="defaultPickerVisible = true">修改</el-button>
                 </div>
-                <div class="form-tip">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
+                <div class="form-tip" style="width: 100%">「加入并关闭」快捷键与右键菜单「保存到 默认分组」将标签页收藏到该工作组</div>
               </el-form-item>
               <el-form-item>
                 <el-button size="small" @click="openShortcutsPage">打开 Chrome 快捷键设置页</el-button>
-                <div class="form-tip">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
-                <div class="form-tip" v-if="true/* Chrome 浏览器 */">
+                <div class="form-tip" style="width: 100%">未显示按键的功能需在 Chrome 快捷键设置页手动绑定</div>
+                <div class="form-tip" style="width: 100%" v-if="true/* Chrome 浏览器 */">
                   Chrome 修改快捷键后，需<el-link type="primary" size="small" style="font-size: inherit; vertical-align: baseline;" underline="never" @click="reloadExtension">
                     重新加载扩展
                   </el-link>后生效
@@ -206,7 +206,7 @@
                 <el-button type="danger" @click="handleClearData">
                   清除所有本地数据
                 </el-button>
-                <div class="form-tip">清除本地存储的所有标签页记录、同步状态等（不影响后端数据）</div>
+                <div class="form-tip" style="width: 100%">清除本地存储的所有标签页记录、同步状态等（不影响后端数据）</div>
               </el-form-item>
             </el-form>
           </el-card>
