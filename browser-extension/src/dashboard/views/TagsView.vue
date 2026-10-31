@@ -26,18 +26,46 @@
 
       <div class="sort-row">
         <span class="sort-label">排序</span>
-        <el-radio-group v-model="sortMode" size="small">
-          <el-radio-button value="name">按名称</el-radio-button>
-          <el-radio-button value="count">按数量</el-radio-button>
-        </el-radio-group>
+        <div class="sort-toggle">
+          <button
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'name' }"
+            title="再次点击切换 A-Z / Z-A"
+            @click="onSortClick('name')"
+          >
+            按名称
+            <el-icon v-if="sortMode === 'name'" class="sort-dir">
+              <SortUp v-if="sortAsc" />
+              <SortDown v-else />
+            </el-icon>
+          </button>
+          <button
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'count' }"
+            title="再次点击切换数量升序 / 降序"
+            @click="onSortClick('count')"
+          >
+            按数量
+            <el-icon v-if="sortMode === 'count'" class="sort-dir">
+              <SortUp v-if="sortAsc" />
+              <SortDown v-else />
+            </el-icon>
+          </button>
+        </div>
       </div>
+
+      <el-checkbox v-model="hideEmpty" size="small" class="hide-empty">
+        隐藏数量为 0 的标签
+      </el-checkbox>
 
       <div v-if="tagsLoading" class="left-loading">
         <el-icon class="is-loading"><Loading /></el-icon>
       </div>
       <el-empty
         v-else-if="visibleTags.length === 0"
-        description="该分类下还没有标签"
+        :description="hideEmpty ? '没有数量大于 0 的标签' : '该分类下还没有标签'"
         :image-size="60"
       />
       <div v-else class="tag-list">
@@ -250,7 +278,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Loading, Plus, Refresh } from '@element-plus/icons-vue'
+import { Delete, Edit, Loading, Plus, Refresh, SortDown, SortUp } from '@element-plus/icons-vue'
 import TabList from '@/shared/components/TabList.vue'
 import { taggedTabMenu } from '@/shared/actions/tab-actions'
 import {
@@ -292,6 +320,18 @@ const scopeOptions: Array<{ label: string; value: TagScope }> = [
 
 type SortMode = 'name' | 'count'
 const sortMode = ref<SortMode>('name')
+// 名称默认 A-Z，数量默认多→少；再次点击当前排序项切换方向
+const sortAsc = ref(true)
+const hideEmpty = ref(false)
+
+function onSortClick(mode: SortMode): void {
+  if (sortMode.value === mode) {
+    sortAsc.value = !sortAsc.value
+    return
+  }
+  sortMode.value = mode
+  sortAsc.value = mode === 'name'
+}
 
 const visibleTabTags = computed(() =>
   scopeFilter.value === 'tab' ? sortTags(tabTags.value) : [],
@@ -301,13 +341,15 @@ const visibleWorkspaceTags = computed(() =>
 )
 const visibleTags = computed(() => [...visibleTabTags.value, ...visibleWorkspaceTags.value])
 
-// 名称升序；数量降序，数量相同时按名称升序
+// 当前排序项按方向排序；数量相同的项始终按名称升序兜底
 function sortTags(list: TagInfo[]): TagInfo[] {
-  return [...list].sort((a, b) => {
-    if (sortMode.value === 'count') {
-      const diff = tagCountOf(b) - tagCountOf(a)
-      if (diff !== 0) return diff
-    }
+  const visible = hideEmpty.value ? list.filter((tag) => tagCountOf(tag) > 0) : list
+  return [...visible].sort((a, b) => {
+    const primary =
+      sortMode.value === 'count'
+        ? tagCountOf(a) - tagCountOf(b)
+        : a.name.localeCompare(b.name, 'zh-CN', { /*numeric: true*/ })
+    if (primary !== 0) return sortAsc.value ? primary : -primary
     return a.name.localeCompare(b.name, 'zh-CN', { /*numeric: true*/ })
   })
 }
@@ -661,6 +703,45 @@ onMounted(() => {
 .sort-label {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+.sort-toggle {
+  display: inline-flex;
+}
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+.sort-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.sort-btn:last-child {
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+}
+.sort-btn.active {
+  color: #fff;
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+}
+.sort-btn:not(.active):hover {
+  color: var(--el-color-primary);
+}
+.sort-dir {
+  font-size: 12px;
+}
+.hide-empty {
+  height: 24px;
+  margin-bottom: 8px;
+  font-size: 12px;
 }
 .tag-list {
   flex: 1;
