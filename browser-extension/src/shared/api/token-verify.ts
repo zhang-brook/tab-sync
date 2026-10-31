@@ -21,6 +21,11 @@ export async function verifyTokenCandidate(token: string): Promise<TokenVerifyRe
     return { ok: false, status: 0, error: '未配置后端地址' }
   }
 
+  // 后端生成的 Token 只含小写字母、数字和下划线；含中文、全角符号或空格时 fetch 会因 Header 无法编码直接在发请求前抛错
+  if (!/^[a-z0-9_]+$/.test(token)) {
+    return { ok: false, status: 0, error: 'Token 格式无效，请检查' }
+  }
+
   try {
     const deviceId = await getOrCreateDeviceId()
     const res = await fetch(`${baseUrl}/v1/tab-sync/auth/verify-token`, {
