@@ -76,6 +76,7 @@
           :collapsed-windows="collapsedWindows"
           :collapsed-groups="collapsedGroups"
           :menu-items="menuItems"
+          :meta-for-tab="metaForTab"
           @update:selected="setSelection"
           @toggle-window="toggleWindow"
           @toggle-group="toggleGroupCollapse"
@@ -112,9 +113,11 @@ import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
 import { localTabMenu } from '@/shared/actions/tab-actions'
 import { closeLocalTabs, type LocalTab, type LocalTabSegment } from '@/shared/services/local-tabs'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { DASHBOARD_URL } from '@/shared/utils/pages'
 import type { StateData } from '@/shared/types'
+import type { TabRowMeta } from '@/shared/types/tab-list'
 
 // ============ 登录态（从 popup 迁移） ============
 const authLoading = ref(true)
@@ -129,6 +132,7 @@ async function initAuth() {
 async function onLoginSuccess() {
   authenticated.value = true
   await reload()
+  void loadWorkspaceIndex()
 }
 
 async function logout() {
@@ -175,6 +179,14 @@ const closing = ref(false)
 
 const menuItems = computed(() => localTabMenu())
 
+// ============ 已保存到工作组的标签页（按 URL 交叉比对） ============
+const { load: loadWorkspaceIndex, tagsFor, colorsFor } = useWorkspaceTabIndex()
+
+function metaForTab(tab: LocalTab): TabRowMeta | undefined {
+  const tags = tagsFor(tab.url)
+  return tags.length ? { tags, saved: true, savedColors: colorsFor(tab.url) } : undefined
+}
+
 async function onSort(payload: { segment: LocalTabSegment; orderedIds: number[]; movedId: number }) {
   await sortSegment(payload.segment, payload.orderedIds, payload.movedId)
 }
@@ -216,6 +228,7 @@ function openSavePicker(mode: 'add' | 'add-close', tabs: LocalTab[]) {
 
 function onSaved() {
   clearSelection()
+  void loadWorkspaceIndex()
 }
 
 const { run } = useLocalTabActions({
@@ -233,6 +246,7 @@ const { run } = useLocalTabActions({
   onSaved: () => {
     clearSelection()
     void reload({ silent: true })
+    void loadWorkspaceIndex()
   },
 })
 

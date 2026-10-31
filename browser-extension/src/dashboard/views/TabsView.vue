@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Close, Loading, FolderAdd, FolderChecked, FolderOpened, View } from '@element-plus/icons-vue'
@@ -134,13 +134,8 @@ import { useLocalTabs } from '@/shared/composables/useLocalTabs'
 import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
 import { localTabMenu } from '@/shared/actions/tab-actions'
 import { closeLocalTabs, type LocalTab, type LocalTabSegment } from '@/shared/services/local-tabs'
-import { getWorkspaceTabsSummary } from '@/shared/services/workspace-service'
-import { normalizeColor } from '@/shared/constants/theme'
-import type { WorkspaceTabsSummaryData } from '@/shared/types'
+import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
 import type { TabListItem, TabRowMeta, TabTagDisplay } from '@/shared/types/tab-list'
-
-type WorkspaceSummary = WorkspaceTabsSummaryData['summaries'][number]
-type WorkspaceRef = Pick<WorkspaceSummary, 'workspaceId' | 'workspaceName' | 'workspaceColor'>
 
 const router = useRouter()
 
@@ -176,42 +171,11 @@ async function onSort(payload: { segment: LocalTabSegment; orderedIds: number[];
 }
 
 // ============ 标签页所属工作组（按 URL 交叉比对） ============
-const summary = ref<WorkspaceSummary[]>([])
-
-const urlToWorkspaces = computed<Record<string, WorkspaceRef[]>>(() => {
-  const map: Record<string, WorkspaceRef[]> = {}
-  for (const s of summary.value) {
-    for (const t of s.tabs) {
-      ;(map[t.url] ||= []).push({
-        workspaceId: s.workspaceId,
-        workspaceName: s.workspaceName,
-        workspaceColor: s.workspaceColor,
-      })
-    }
-  }
-  return map
-})
-
-function workspaceTags(url: string): TabTagDisplay[] {
-  return (urlToWorkspaces.value[url] ?? []).map((w) => ({
-    key: w.workspaceId,
-    name: w.workspaceName,
-    color: normalizeColor(w.workspaceColor),
-    clickable: true,
-  }))
-}
+const { load: loadWorkspaceIndex, tagsFor, colorsFor } = useWorkspaceTabIndex()
 
 function metaForTab(tab: LocalTab): TabRowMeta | undefined {
-  const tags = workspaceTags(tab.url)
-  return tags.length ? { tags } : undefined
-}
-
-async function loadSummary() {
-  try {
-    summary.value = await getWorkspaceTabsSummary()
-  } catch {
-    // 未登录/后端不可用时仅不展示来源标签
-  }
+  const tags = tagsFor(tab.url)
+  return tags.length ? { tags, saved: true, savedColors: colorsFor(tab.url) } : undefined
 }
 
 function onTagClick(tag: TabTagDisplay) {
@@ -259,7 +223,7 @@ function openSavePicker(mode: 'add' | 'add-close', tabs: LocalTab[]) {
 
 function onSaved() {
   clearSelection()
-  void loadSummary()
+  void loadWorkspaceIndex()
 }
 
 const { run } = useLocalTabActions({
@@ -276,7 +240,7 @@ const { run } = useLocalTabActions({
   onSaved: () => {
     clearSelection()
     void reload({ silent: true })
-    void loadSummary()
+    void loadWorkspaceIndex()
   },
 })
 
@@ -293,7 +257,7 @@ const savedTabsDialogVisible = ref(false)
 const savedSelection = ref<Set<number>>(new Set())
 
 const savedLocalTabs = computed<LocalTab[]>(() =>
-  allTabs.value.filter((tab) => workspaceTags(tab.url).length > 0),
+  allTabs.value.filter((tab) => tagsFor(tab.url).length > 0),
 )
 
 const savedSelectionCount = computed(() => savedSelection.value.size)
@@ -305,7 +269,7 @@ const savedListItems = computed<TabListItem[]>(() =>
     title: tab.title,
     url: tab.url,
     favIconUrl: tab.favIconUrl,
-    tags: workspaceTags(tab.url),
+    tags: tagsFor(tab.url),
   })),
 )
 
@@ -314,7 +278,7 @@ function onSavedSelectionChange(ids: Array<string | number>) {
 }
 
 async function showSavedLocalTabs() {
-  await loadSummary()
+  await loadWorkspaceIndex()
   savedSelection.value = new Set(savedLocalTabs.value.map((t) => t.chromeTabId))
   savedTabsDialogVisible.value = true
 }
@@ -358,9 +322,6 @@ async function handleBatchCloseSavedTabs() {
   await reload({ silent: true })
 }
 
-onMounted(() => {
-  void loadSummary()
-})
 </script>
 
 <style scoped>

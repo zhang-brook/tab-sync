@@ -93,6 +93,17 @@ function tagStyle(tag: TabTagDisplay) {
   return tag.color ? { borderColor: tag.color, color: tag.color } : {}
 }
 
+/** 行首来源色条：单个工作组用纯色，多个工作组按顺序渐变 */
+function savedStyle(item: TabListItem) {
+  if (!item.saved) return undefined
+  const colors = item.savedColors?.filter(Boolean) ?? []
+  if (colors.length === 0) return undefined
+  return {
+    '--tab-saved-accent':
+      colors.length === 1 ? colors[0] : `linear-gradient(180deg, ${colors.join(', ')})`,
+  }
+}
+
 function onTagClick(tag: TabTagDisplay, item: TabListItem) {
   if (tag.clickable) emit('tag-click', tag, item)
 }
@@ -156,7 +167,8 @@ function onSharedMenuCommand(command: string) {
     <template #item="{ element }">
       <div
         class="tab-item"
-        :class="{ 'is-active': element.id === activeId }"
+        :class="{ 'is-active': element.id === activeId, 'is-saved': element.saved }"
+        :style="savedStyle(element)"
         :data-tab-id="element.id"
         @click="emit('click', element)"
         @contextmenu="onRowContextMenu($event, element)"
@@ -242,6 +254,7 @@ function onSharedMenuCommand(command: string) {
 
 <style scoped>
 .tab-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -249,6 +262,18 @@ function onSharedMenuCommand(command: string) {
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.15s;
+}
+
+.tab-item.is-saved::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--tab-saved-accent, var(--el-color-success));
+  pointer-events: none;
 }
 
 .tab-item:hover {

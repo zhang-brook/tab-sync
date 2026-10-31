@@ -39,6 +39,10 @@ export interface TabListItem {
   description?: string
   /** 加入时间（ISO） */
   addedAt?: string
+  /** 已保存到工作组：行首显示来源色条 */
+  saved?: boolean
+  /** 已保存工作组的颜色，多个工作组按顺序渐变 */
+  savedColors?: string[]
 }
 
 /** 拖拽排序事件（vuedraggable update 事件的简化形态） */
@@ -53,4 +57,6 @@ export interface TabRowMeta {
   tags?: TabTagDisplay[]
   description?: string
   addedAt?: string
+  saved?: boolean
+  savedColors?: string[]
 }
