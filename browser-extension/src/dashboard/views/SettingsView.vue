@@ -123,6 +123,10 @@
         <span class="card-title">扩展管理</span>
       </template>
       <el-form label-width="96px" label-position="left">
+        <el-form-item label="管理扩展">
+          <el-button size="small" @click="openExtensionsPage">管理扩展</el-button>
+          <div class="form-tip">在浏览器扩展管理页查看权限、编辑快捷键并重新加载</div>
+        </el-form-item>
         <el-form-item label="重新加载">
           <el-button size="small" type="primary" @click="reloadExtension">重新加载扩展</el-button>
           <div class="form-tip">修改快捷键后点击此按钮重新加载扩展使新按键立即生效（等同于 chrome://extensions 页面的「重新加载」）</div>
@@ -221,6 +225,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { extensionManageUrl } from '@/shared/utils/pages'
 import type { StateData, WorkspacesData, Workspace } from '@/shared/types'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import type { WorkspaceTreeNode as WsNode } from '@/shared/utils/workspace-tree'
@@ -287,6 +292,10 @@ async function loadShortcuts() {
 function openShortcutsPage() {
   // chrome://extensions/shortcuts 无法在扩展页内直接跳转，通过新标签页打开
   void openTabAfterActive('chrome://extensions/shortcuts')
+}
+
+function openExtensionsPage() {
+  void openTabAfterActive(extensionManageUrl())
 }
 
 function reloadExtension() {
