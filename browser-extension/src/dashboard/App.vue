@@ -46,7 +46,7 @@
         <el-divider class="aside-divider" />
         <el-menu-item index="/devices">
           <el-icon><Monitor /></el-icon>
-          <span>设备</span>
+          <span>已登录设备</span>
         </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
@@ -124,7 +124,7 @@ const pageTitleMap: Record<string, string> = {
   '/tags': '标签',
   '/synced': '已同步标签页',
   '/recyclebin': '回收站',
-  '/devices': '设备管理',
+  '/devices': '登录设备管理',
   '/settings': '设置',
 }
 
