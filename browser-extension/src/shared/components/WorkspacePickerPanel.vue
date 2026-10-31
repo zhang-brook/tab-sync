@@ -239,11 +239,13 @@ async function reload() {
   }
   // 先结束 loading 让 el-tree 完成渲染，否则下一帧 treeRef 尚未挂载，高亮会被静默跳过
   loading.value = false
+  await nextTick()
+  // 清空上一轮残留的高亮：预选目标不存在（如原工作组已删除）时不能留下旧节点的选中态
+  treeRef.value?.setCurrentKey(null)
   // 默认选中：优先使用调用方指定的工作组，其次「默认分组」（被禁用的分组不选中）
   const initialId = props.preselectId || defaultWorkspaceId.value
   const initialNode = initialId ? findWorkspaceTreeNode(treeData.value, initialId) : null
   if (initialNode && !disabledSet.value.has(initialNode.id)) {
-    await nextTick()
     treeRef.value?.setCurrentKey(initialNode.id)
     selectedNode.value = initialNode
   }

@@ -197,9 +197,9 @@ function openRestoreDialog(targets: RecycleBinTab[]) {
   restoreDialogVisible.value = true
 }
 
-/** 选定目标工作组后提交恢复 */
-async function handleRestoreTarget(node: WorkspaceTreeNode) {
-  if (restoring.value || restoreTargets.value.length === 0) return
+/** 选定目标工作组后提交恢复；未选中目标（如原工作组已被删除）时不提交 */
+async function handleRestoreTarget(node?: WorkspaceTreeNode) {
+  if (!node?.id || restoring.value || restoreTargets.value.length === 0) return
   restoring.value = true
   const ids = restoreTargets.value.map((item) => item.id)
   const res = await sendMessage({
