@@ -91,6 +91,8 @@
       <el-button text @click="retryCheckAuth">我已登录</el-button>
     </div>
   </div>
+
+  <EntityTooltipHost />
 </template>
 
 <script setup lang="ts">
@@ -100,6 +102,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Collection, FolderOpened, Monitor, Setting, WarningFilled, SwitchButton, PriceTag, Files, Odometer, Delete } from '@element-plus/icons-vue'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { ENTITY_NAVIGATION } from '@/shared/composables/entity-navigation'
+import EntityTooltipHost from '@/shared/components/EntityTooltipHost.vue'
 import { dashboardTargetRoute } from '@/shared/utils/dashboard-links'
 import { STORAGE_KEYS } from '@/shared/storage'
 import type { StateData } from '@/shared/types'

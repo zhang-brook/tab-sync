@@ -97,6 +97,8 @@
       :default-close-after-save="saveCloseAfter"
       @saved="onSaved"
     />
+
+    <EntityTooltipHost />
   </div>
 </template>
 
@@ -108,6 +110,7 @@ import LocalTabTree from '@/shared/components/LocalTabTree.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import LocalSaveTabsDialog from '@/shared/components/LocalSaveTabsDialog.vue'
 import LoginPanel from '@/shared/components/LoginPanel.vue'
+import EntityTooltipHost from '@/shared/components/EntityTooltipHost.vue'
 import { useLocalTabs } from '@/shared/composables/useLocalTabs'
 import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
 import { localTabMenu } from '@/shared/actions/tab-actions'
