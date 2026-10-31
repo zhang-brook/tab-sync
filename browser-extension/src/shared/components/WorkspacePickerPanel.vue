@@ -162,14 +162,39 @@ const UNGROUPED_WORKSPACE_ID = 'ungrouped'
 
 const treeProps = { label: 'name', children: 'children' }
 
+/** 需要初始选中且可见的节点：调用方预选优先于「默认分组」 */
+const revealTargetId = computed(() => props.preselectId || defaultWorkspaceId.value)
+
+/** 目标节点的祖先 id 路径；目标不存在时返回 null */
+function findAncestorIds(
+  nodes: WorkspaceTreeNode[],
+  id: string,
+  trail: string[] = [],
+): string[] | null {
+  if (!id) return null
+  for (const node of nodes) {
+    if (node.id === id) return trail
+    const found = findAncestorIds(node.children, id, [...trail, node.id])
+    if (found) return found
+  }
+  return null
+}
+
+/** 选中项路径上的工作组：即使标记了默认折叠也要展开，否则初始状态下看不到选中项 */
+const revealAncestorIds = computed(
+  () => new Set(findAncestorIds(treeData.value, revealTargetId.value) ?? []),
+)
+
 /** 树默认展开的工作组：未设置「默认折叠」（collapsed 非 true）且带子节点的节点。
  *  处于默认折叠节点后代的节点不加入：父收起时不可见，且加入会触发 el-tree 的
- *  autoExpandParent 连带展开折叠祖先，导致首次渲染「先展开再收起」的闪烁 */
+ *  autoExpandParent 连带展开折叠祖先，导致首次渲染「先展开再收起」的闪烁。
+ *  例外：初始选中项的祖先必须展开，否则选中项不可见。 */
 const defaultExpandedKeys = computed<string[]>(() => {
   const ids: string[] = []
+  const reveal = revealAncestorIds.value
   const walk = (nodes: WorkspaceTreeNode[], collapsedAncestor: boolean) => {
     for (const n of nodes) {
-      const collapsed = !!n.workspace.collapsed
+      const collapsed = !!n.workspace.collapsed && !reveal.has(n.id)
       if (n.children.length > 0 && !collapsed && !collapsedAncestor) ids.push(n.id)
       walk(n.children, collapsedAncestor || collapsed)
     }
@@ -183,9 +208,12 @@ watch(treeData, async () => {
   await nextTick()
   const tree = treeRef.value
   if (!tree) return
+  const reveal = revealAncestorIds.value
   const walk = (nodes: WorkspaceTreeNode[]) => {
     for (const n of nodes) {
-      if (n.children.length > 0 && n.workspace.collapsed) tree.getNode(n.id)?.collapse()
+      if (n.children.length > 0 && n.workspace.collapsed && !reveal.has(n.id)) {
+        tree.getNode(n.id)?.collapse()
+      }
       walk(n.children)
     }
   }
