@@ -155,9 +155,27 @@
                     show-password
                     clearable
                   />
-                  <el-button type="primary" :loading="tokenChecking" :disabled="!tokenInput.trim()" @click="handleSetToken">
-                    {{ authStatus === 'authenticated' ? '保存（替换已保存Token）' : '保存' }}
-                  </el-button>
+                  <!-- 单向受控：不绑定 update:visible，避免点击外部关闭，必须显式选择保存或不保存 -->
+                  <el-popconfirm
+                    :visible="tokenConfirmVisible"
+                    title="确定要替换已保存的 Token 吗？"
+                    confirm-button-text="保存"
+                    cancel-button-text="不保存"
+                    :width="240"
+                    @confirm="handleConfirmReplaceToken"
+                    @cancel="tokenConfirmVisible = false"
+                  >
+                    <template #reference>
+                      <el-button
+                        type="primary"
+                        :loading="tokenChecking"
+                        :disabled="!tokenInput.trim()"
+                        @click="handleTokenSaveClick"
+                      >
+                        保存
+                      </el-button>
+                    </template>
+                  </el-popconfirm>
                 </div>
                 <div class="form-tip" style="width: 100%">
                   Token 在轻量后端管理后台生成（首次运行后访问 /setup 初始化）
@@ -297,6 +315,8 @@ const deviceName = ref('')
 const tabCount = ref({ open: 0, frozen: 0 })
 const tokenInput = ref('')
 const tokenChecking = ref(false)
+// 替换已保存 Token 的确认气泡（单向受控，点击外部不关闭）
+const tokenConfirmVisible = ref(false)
 const versionChecking = ref(false)
 // 连通性测试气泡
 const connectivityPopoverVisible = ref(false)
@@ -485,6 +505,20 @@ function openConnectivityPopover() {
   testAddress.value = apiBaseUrl.value.trim()
   connectivityPopoverVisible.value = true
   void checkTestVersion(false)
+}
+
+// 已有 Token 时先确认替换，未配置时直接保存
+function handleTokenSaveClick() {
+  if (authStatus.value === 'authenticated') {
+    tokenConfirmVisible.value = true
+  } else {
+    void handleSetToken()
+  }
+}
+
+function handleConfirmReplaceToken() {
+  tokenConfirmVisible.value = false
+  void handleSetToken()
 }
 
 async function handleSetToken() {
