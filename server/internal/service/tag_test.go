@@ -29,7 +29,7 @@ func TestTagService_List_TabCount(t *testing.T) {
 		t.Fatalf("创建工作组失败: %v", err)
 	}
 	updated, err := wsSvc.Update(ws.Workspace.ID, UpdateWorkspacePayload{
-		Tabs: []WorkspaceTabData{
+		Tabs: []TabData{
 			{URL: "https://example.com", Title: "Example", ChromeTabID: 1},
 			{URL: "https://test.com", Title: "Test", ChromeTabID: 2},
 		},
@@ -101,7 +101,7 @@ func TestTagService_TabRemoval_CleansAssociations(t *testing.T) {
 		t.Fatalf("创建工作组失败: %v", err)
 	}
 	updated, err := wsSvc.Update(ws.Workspace.ID, UpdateWorkspacePayload{
-		Tabs: []WorkspaceTabData{
+		Tabs: []TabData{
 			{URL: "https://a.example.com", Title: "A"},
 			{URL: "https://b.example.com", Title: "B"},
 		},
@@ -150,7 +150,7 @@ func TestTagService_TabRemoval_CleansAssociations(t *testing.T) {
 
 	// 整组更新移除剩余标签页：关联同样清理
 	if _, err := wsSvc.Update(ws.Workspace.ID, UpdateWorkspacePayload{
-		Tabs: []WorkspaceTabData{},
+		Tabs: []TabData{},
 	}); err != nil {
 		t.Fatalf("清空标签页失败: %v", err)
 	}

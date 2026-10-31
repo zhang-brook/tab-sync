@@ -22,7 +22,7 @@ func TestWorkspaceService_Duplicate(t *testing.T) {
 	a11 := createWS(t, svc, "A11", a1)
 
 	addedAt := time.Date(2025, 1, 2, 3, 4, 5, 0, time.Local).Format(time.RFC3339)
-	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []WorkspaceTabData{
+	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []TabData{
 		{URL: "https://a.com", Title: "A Tab"},
 	}})
 	if err != nil {
@@ -31,7 +31,7 @@ func TestWorkspaceService_Duplicate(t *testing.T) {
 	if err := svc.UpdateTab(a, updated.Tabs[0].TabID, UpdateTabPayload{AddedAt: &addedAt}); err != nil {
 		t.Fatalf("设置添加时间失败: %v", err)
 	}
-	updatedA1, err := svc.Update(a1, UpdateWorkspacePayload{Tabs: []WorkspaceTabData{
+	updatedA1, err := svc.Update(a1, UpdateWorkspacePayload{Tabs: []TabData{
 		{URL: "https://a1.com", Title: "A1 Tab"},
 	}})
 	if err != nil {

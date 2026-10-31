@@ -38,8 +38,8 @@ func NewWorkspaceService(db *database.DB, syncSvc *SyncService) *WorkspaceServic
 	return &WorkspaceService{db: db, syncSvc: syncSvc}
 }
 
-// WorkspaceTabData 创建/更新时的标签页数据
-type WorkspaceTabData struct {
+// TabData 创建/更新时的标签页数据
+type TabData struct {
 	// TabID 为后端主键 ID（字符串）。
 	// 更新已有标签页时由前端回传以便增量匹配；新建时留空，由数据库自增生成。
 	TabID       string `json:"tabId"`
@@ -62,13 +62,13 @@ type CreateWorkspacePayload struct {
 
 // UpdateWorkspacePayload 更新工作区请求体
 type UpdateWorkspacePayload struct {
-	Name        *string            `json:"name,omitempty"`
-	Color       *string            `json:"color,omitempty"`
-	Icon        *string            `json:"icon,omitempty"`
-	Description *string            `json:"description,omitempty"`
-	ParentID    *string            `json:"parentId,omitempty"`  // 移动到新父工作组（空字符串表示移到根级）
-	Collapsed   *bool              `json:"collapsed,omitempty"` // 默认折叠状态：true=默认折叠，false=默认展开
-	Tabs        []WorkspaceTabData `json:"tabs,omitempty"`
+	Name        *string   `json:"name,omitempty"`
+	Color       *string   `json:"color,omitempty"`
+	Icon        *string   `json:"icon,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	ParentID    *string   `json:"parentId,omitempty"`  // 移动到新父工作组（空字符串表示移到根级）
+	Collapsed   *bool     `json:"collapsed,omitempty"` // 默认折叠状态：true=默认折叠，false=默认展开
+	Tabs        []TabData `json:"tabs,omitempty"`
 }
 
 // 工作组拖拽落点相对目标工作组的位置
@@ -193,7 +193,7 @@ func (s *WorkspaceService) GetTabs(id string) ([]TabReference, error) {
 // GetTabsTree 获取某个工作组自身及整棵子树的标签页，按工作区分组返回。
 // 用于管理页面「包含子工作组」模式：一次接口调用即可拿到所有相关分组的数据，
 // 避免前端逐个工作组批量请求。返回的分组按根到叶的后序遍历顺序排列。
-func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) {
+func (s *WorkspaceService) GetTabsTree(id string) ([]TabsGroup, error) {
 	// 先确认根工作组存在
 	var root model.Workspace
 	if err := s.db.
@@ -229,7 +229,7 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) 
 	visit(id)
 
 	// 批量预加载子树内所有工作组的标签页（一次查询，避免 N+1）
-	var tabs []model.WorkspaceTab
+	var tabs []model.Tab
 	if err := s.db.
 		Preload("Tags.Tag").
 		Where("workspace_id IN ?", subtree).
@@ -237,16 +237,16 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) 
 		Find(&tabs).Error; err != nil {
 		return nil, err
 	}
-	tabsByWorkspace := make(map[string][]model.WorkspaceTab, len(subtree))
+	tabsByWorkspace := make(map[string][]model.Tab, len(subtree))
 	for _, t := range tabs {
 		tabsByWorkspace[t.WorkspaceID] = append(tabsByWorkspace[t.WorkspaceID], t)
 	}
 
 	// 按后序遍历顺序组装分组，保证根在其子树之前返回（顺序稳定、便于前端缓存合并）
-	groups := make([]WorkspaceTabsGroup, 0, len(subtree))
+	groups := make([]TabsGroup, 0, len(subtree))
 	for _, wid := range subtree {
 		ws := meta[wid]
-		groups = append(groups, WorkspaceTabsGroup{
+		groups = append(groups, TabsGroup{
 			WorkspaceID: ws.WorkspaceID,
 			Name:        ws.Name,
 			Color:       ws.Color,
@@ -259,15 +259,15 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]WorkspaceTabsGroup, error) 
 // ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页与关键字搜索。
 // 直接聚合数据，无需先取工作组树再拍平。
 func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, page, pageSize int) (*SyncedTabPage, error) {
-	q := s.db.Model(&model.WorkspaceTab{}).
-		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+	q := s.db.Model(&model.Tab{}).
+		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("workspaces.is_deleted = ?", false)
 	if !includeSystem {
 		q = q.Where("workspaces.is_system = ?", false)
 	}
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		q = q.Where("workspace_tabs.title LIKE ? OR workspace_tabs.url LIKE ?", like, like)
+		q = q.Where("tabs.title LIKE ? OR tabs.url LIKE ?", like, like)
 	}
 
 	var total int64
@@ -275,10 +275,10 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, pa
 		return nil, err
 	}
 
-	var tabs []model.WorkspaceTab
+	var tabs []model.Tab
 	offset := (page - 1) * pageSize
 	if err := q.Offset(offset).Limit(pageSize).
-		Order("workspace_tabs.added_at DESC, workspace_tabs.id DESC").
+		Order("tabs.added_at DESC, tabs.id DESC").
 		Preload("Tags.Tag").
 		Find(&tabs).Error; err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, pa
 			WorkspaceID: w.WorkspaceID,
 			Name:        w.Name,
 			Color:       w.Color,
-			Tab:         toTabReferences([]model.WorkspaceTab{t})[0],
+			Tab:         toTabReferences([]model.Tab{t})[0],
 		})
 	}
 	return &SyncedTabPage{Items: items, Total: total, Page: page, PageSize: pageSize}, nil
@@ -383,7 +383,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 
 	// 增量更新标签页列表
 	if payload.Tabs != nil {
-		existingByID := make(map[uint]model.WorkspaceTab)
+		existingByID := make(map[uint]model.Tab)
 		for _, t := range workspace.Tabs {
 			existingByID[t.ID] = t
 		}
@@ -391,7 +391,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 
 		err := s.db.Transaction(func(tx *gorm.DB) error {
 			for i, tabData := range payload.Tabs {
-				var tab model.WorkspaceTab
+				var tab model.Tab
 				if tabData.TabID != "" {
 					if uid, perr := strconv.ParseUint(tabData.TabID, 10, 64); perr == nil {
 						if existing, ok := existingByID[uint(uid)]; ok {
@@ -402,7 +402,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 				}
 				if tab.ID == 0 {
 					// 新增标签页
-					tab = model.WorkspaceTab{
+					tab = model.Tab{
 						WorkspaceID: id,
 						AddedAt:     time.Now(),
 					}
@@ -432,10 +432,10 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 						}
 					}
 					// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
-					if terr := tx.Where("workspace_tab_id = ?", uid).Delete(&model.TabTag{}).Error; terr != nil {
+					if terr := tx.Where("tab_id = ?", uid).Delete(&model.TabTag{}).Error; terr != nil {
 						return terr
 					}
-					if derr := tx.Where("id = ?", uid).Delete(&model.WorkspaceTab{}).Error; derr != nil {
+					if derr := tx.Where("id = ?", uid).Delete(&model.Tab{}).Error; derr != nil {
 						return derr
 					}
 				}
@@ -500,15 +500,15 @@ func (s *WorkspaceService) Delete(id string, defaultWorkspaceID string) error {
 
 		// 物理删除子树内每个工作组的标签页（从叶子到父级）及其标签关联
 		for _, wid := range subtree {
-			if err := tx.Where("workspace_tab_id IN (?)",
-				tx.Model(&model.WorkspaceTab{}).Select("id").Where("workspace_id = ?", wid)).
+			if err := tx.Where("tab_id IN (?)",
+				tx.Model(&model.Tab{}).Select("id").Where("workspace_id = ?", wid)).
 				Delete(&model.TabTag{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTag{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("workspace_id = ?", wid).Delete(&model.WorkspaceTab{}).Error; err != nil {
+			if err := tx.Where("workspace_id = ?", wid).Delete(&model.Tab{}).Error; err != nil {
 				return err
 			}
 		}
@@ -572,13 +572,13 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 		visit(id)
 
 		// 3. 批量加载子树内全部标签页与标签关联（一次查询，避免 N+1）
-		var allTabs []model.WorkspaceTab
+		var allTabs []model.Tab
 		if err := tx.Where("workspace_id IN ?", subtree).
 			Order("sort_order ASC, id ASC").
 			Find(&allTabs).Error; err != nil {
 			return err
 		}
-		tabsByWorkspace := make(map[string][]model.WorkspaceTab, len(subtree))
+		tabsByWorkspace := make(map[string][]model.Tab, len(subtree))
 		tabWorkspace := make(map[uint]string, len(allTabs))
 		for _, t := range allTabs {
 			tabsByWorkspace[t.WorkspaceID] = append(tabsByWorkspace[t.WorkspaceID], t)
@@ -593,7 +593,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 			srcTabIDs = append(srcTabIDs, t.ID)
 		}
 		var tabTagRels []model.TabTag
-		if err := tx.Where("workspace_tab_id IN ?", srcTabIDs).Find(&tabTagRels).Error; err != nil {
+		if err := tx.Where("tab_id IN ?", srcTabIDs).Find(&tabTagRels).Error; err != nil {
 			return err
 		}
 		var wsTagRels []model.WorkspaceTag
@@ -646,7 +646,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 
 			// 复制标签页：标题/图标/显示名/描述/排序/添加时间原样保留
 			for _, srcTab := range tabsByWorkspace[wid] {
-				tab := model.WorkspaceTab{
+				tab := model.Tab{
 					WorkspaceID: newWSID,
 					URL:         srcTab.URL,
 					Title:       srcTab.Title,
@@ -663,20 +663,20 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 			}
 
 			// 复制标签页的标签关联（全局标签共享，仅重建关联行并指向新标签页主键。
-			// 归属判断基于 workspace_tabs 表推导的 tabWorkspace，而非 tab_tags.workspace_id，
+			// 归属判断基于 tabs 表推导的 tabWorkspace，而非 tab_tags.workspace_id，
 			// 避免标签页被移动后关联行的旧 workspace_id 造成遗漏或重复）
 			for _, rel := range tabTagRels {
-				if tabWorkspace[rel.WorkspaceTabID] != wid {
+				if tabWorkspace[rel.TabID] != wid {
 					continue
 				}
-				newTab, ok := newTabID[rel.WorkspaceTabID]
+				newTab, ok := newTabID[rel.TabID]
 				if !ok {
 					continue
 				}
 				if err := tx.Create(&model.TabTag{
-					WorkspaceTabID: newTab,
-					WorkspaceID:    newWSID,
-					TagID:          rel.TagID,
+					TabID:       newTab,
+					WorkspaceID: newWSID,
+					TagID:       rel.TagID,
 				}).Error; err != nil {
 					return err
 				}
@@ -870,7 +870,7 @@ func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
 		return err
 	}
 
-	var tab model.WorkspaceTab
+	var tab model.Tab
 	if err := s.db.Where("id = ? AND workspace_id = ?", uint(uid), workspaceID).First(&tab).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New("标签页不存在")
@@ -885,10 +885,10 @@ func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
 			}
 		}
 		// 标签关联随标签页一并移除，避免残留关联让标签计数与详情不一致
-		if terr := tx.Where("workspace_tab_id = ?", uint(uid)).Delete(&model.TabTag{}).Error; terr != nil {
+		if terr := tx.Where("tab_id = ?", uint(uid)).Delete(&model.TabTag{}).Error; terr != nil {
 			return terr
 		}
-		return tx.Where("id = ?", uint(uid)).Delete(&model.WorkspaceTab{}).Error
+		return tx.Where("id = ?", uint(uid)).Delete(&model.Tab{}).Error
 	})
 	if err != nil {
 		return err
@@ -902,7 +902,7 @@ func (s *WorkspaceService) DeleteTab(workspaceID string, tabID string) error {
 }
 
 // TabsSummary 获取所有工作组标签页摘要
-func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
+func (s *WorkspaceService) TabsSummary() ([]TabSummary, error) {
 	var workspaces []model.Workspace
 	err := s.db.Where("is_deleted = ?", false).
 		Preload("Tabs", func(db *gorm.DB) *gorm.DB {
@@ -913,7 +913,7 @@ func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 		return nil, err
 	}
 
-	summaries := make([]WorkspaceTabSummary, 0, len(workspaces))
+	summaries := make([]TabSummary, 0, len(workspaces))
 	for _, ws := range workspaces {
 		tabs := make([]TabURLPair, 0, len(ws.Tabs))
 		for _, tab := range ws.Tabs {
@@ -922,7 +922,7 @@ func (s *WorkspaceService) TabsSummary() ([]WorkspaceTabSummary, error) {
 				URL:   tab.URL,
 			})
 		}
-		summaries = append(summaries, WorkspaceTabSummary{
+		summaries = append(summaries, TabSummary{
 			WorkspaceID:    ws.WorkspaceID,
 			WorkspaceName:  ws.Name,
 			WorkspaceColor: ws.Color,
@@ -944,7 +944,7 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// 先找到要移动的标签页
-		var tab model.WorkspaceTab
+		var tab model.Tab
 		if err := tx.Where("id = ?", uid).First(&tab).Error; err != nil {
 			return err
 		}
@@ -956,25 +956,25 @@ func (s *WorkspaceService) MoveTab(workspaceID, tabID string, newIndex int) erro
 			return err
 		}
 
-		// 同步更新标签页标签关联的工作组归属：tab_tags.workspace_id 以 workspace_tabs 为准。
+		// 同步更新标签页标签关联的工作组归属：tab_tags.workspace_id 以 tabs 为准。
 		// 若不更新，移动标签页后其标签关联仍指向旧工作组，导致「按组移除标签」删不掉、
 		// 「按标签联查工作组」显示在旧工作组下（旧工作组删除后标签页还会在标签视图中丢失）。
 		if oldWorkspaceID != workspaceID {
 			if err := tx.Model(&model.TabTag{}).
-				Where("workspace_tab_id = ?", tab.ID).
+				Where("tab_id = ?", tab.ID).
 				Update("workspace_id", workspaceID).Error; err != nil {
 				return err
 			}
 		}
 
 		// 重整目标工作组的 sortOrder
-		var tabs []model.WorkspaceTab
+		var tabs []model.Tab
 		tx.Where("workspace_id = ?", workspaceID).
 			Order("sort_order ASC, added_at ASC").
 			Find(&tabs)
 
 		// 把目标 tab 插入到指定位置
-		reordered := make([]model.WorkspaceTab, 0, len(tabs))
+		reordered := make([]model.Tab, 0, len(tabs))
 		inserted := false
 		for _, t := range tabs {
 			if uint64(t.ID) == uid {
@@ -1027,7 +1027,7 @@ func (s *WorkspaceService) AddTabByURL(workspaceID string, payload AddTabByURLPa
 		title = payload.URL
 	}
 
-	tab := model.WorkspaceTab{
+	tab := model.Tab{
 		WorkspaceID: workspaceID,
 		URL:         sanitizeString(payload.URL, 2048),
 		Title:       sanitizeString(title, 500),
@@ -1038,7 +1038,7 @@ func (s *WorkspaceService) AddTabByURL(workspaceID string, payload AddTabByURLPa
 
 	// 计算新标签页的 sortOrder（放在末尾）
 	var maxOrder int
-	s.db.Model(&model.WorkspaceTab{}).
+	s.db.Model(&model.Tab{}).
 		Where("workspace_id = ?", workspaceID).
 		Select("COALESCE(MAX(sort_order), -1)").
 		Scan(&maxOrder)
@@ -1090,7 +1090,7 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 		return errors.New("tabID 格式无效")
 	}
 
-	var tab model.WorkspaceTab
+	var tab model.Tab
 	if err := s.db.Where("id = ? AND workspace_id = ?", uid, workspaceID).First(&tab).Error; err != nil {
 		return err
 	}
@@ -1203,7 +1203,7 @@ func subtreeContains(childrenOf map[string][]model.Workspace, rootID, candidate 
 	return false
 }
 
-func toTabReferences(tabs []model.WorkspaceTab) []TabReference {
+func toTabReferences(tabs []model.Tab) []TabReference {
 	refs := make([]TabReference, len(tabs))
 	for i, tab := range tabs {
 		refs[i] = TabReference{
@@ -1274,16 +1274,16 @@ func duplicateWorkspaceName(name string) string {
 
 // ===================== 响应类型 =====================
 
-// WorkspaceTabsGroup 某个工作组及其标签页的分组（用于「包含子工作组」批量接口）
-type WorkspaceTabsGroup struct {
+// TabsGroup 某个工作组及其标签页的分组（用于「包含子工作组」批量接口）
+type TabsGroup struct {
 	WorkspaceID string         `json:"workspaceId"`
 	Name        string         `json:"name"`
 	Color       string         `json:"color"`
 	Tabs        []TabReference `json:"tabs"`
 }
 
-// WorkspaceTabSummary 工作组标签页摘要
-type WorkspaceTabSummary struct {
+// TabSummary 工作组标签页摘要
+type TabSummary struct {
 	WorkspaceID    string       `json:"workspaceId"`
 	WorkspaceName  string       `json:"workspaceName"`
 	WorkspaceColor string       `json:"workspaceColor"`

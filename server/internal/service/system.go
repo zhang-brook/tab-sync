@@ -124,7 +124,7 @@ func (s *SystemService) GetStats() map[string]interface{} {
 	var deviceCount, workspaceCount, tabCount int64
 	s.db.Model(&model.Device{}).Count(&deviceCount)
 	s.db.Model(&model.Workspace{}).Where("is_deleted = ?", false).Count(&workspaceCount)
-	s.db.Model(&model.WorkspaceTab{}).Count(&tabCount)
+	s.db.Model(&model.Tab{}).Count(&tabCount)
 
 	return map[string]interface{}{
 		"devices":    deviceCount,

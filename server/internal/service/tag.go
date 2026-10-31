@@ -29,7 +29,7 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 		return nil, err
 	}
 	// 统计每个标签关联的标签页数量（仅 tab 类标签有实际关联）
-	// 以 workspace_tabs 为准联查存活标签页，避免历史残留的孤儿关联行把计数算大
+	// 以 tabs 为准联查存活标签页，避免历史残留的孤儿关联行把计数算大
 	type tabCountRow struct {
 		TagID uint
 		Count int64
@@ -37,8 +37,8 @@ func (s *TagService) List(scope string) ([]TagResponse, error) {
 	rows := make([]tabCountRow, 0)
 	if err := s.db.Table("tab_tags").
 		Select("tab_tags.tag_id AS tag_id, COUNT(*) AS count").
-		Joins("JOIN workspace_tabs ON workspace_tabs.id = tab_tags.workspace_tab_id").
-		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+		Joins("JOIN tabs ON tabs.id = tab_tags.tab_id").
+		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("workspaces.is_deleted = ?", false).
 		Group("tab_tags.tag_id").
 		Scan(&rows).Error; err != nil {
@@ -106,7 +106,7 @@ func (s *TagService) Delete(id uint) error {
 // AddToTab 给工作组内标签页打标签（校验归属）
 func (s *TagService) AddToTab(workspaceID string, tabID, tagID uint) error {
 	var count int64
-	if err := s.db.Model(&model.WorkspaceTab{}).
+	if err := s.db.Model(&model.Tab{}).
 		Where("id = ? AND workspace_id = ?", tabID, workspaceID).
 		Count(&count).Error; err != nil {
 		return err
@@ -116,17 +116,17 @@ func (s *TagService) AddToTab(workspaceID string, tabID, tagID uint) error {
 	}
 	var exist int64
 	s.db.Model(&model.TabTag{}).
-		Where("workspace_tab_id = ? AND tag_id = ?", tabID, tagID).
+		Where("tab_id = ? AND tag_id = ?", tabID, tagID).
 		Count(&exist)
 	if exist > 0 {
 		return nil
 	}
-	return s.db.Create(&model.TabTag{WorkspaceTabID: tabID, WorkspaceID: workspaceID, TagID: tagID}).Error
+	return s.db.Create(&model.TabTag{TabID: tabID, WorkspaceID: workspaceID, TagID: tagID}).Error
 }
 
 // RemoveFromTab 去掉标签页上的标签
 func (s *TagService) RemoveFromTab(workspaceID string, tabID, tagID uint) error {
-	res := s.db.Where("workspace_tab_id = ? AND workspace_id = ? AND tag_id = ?", tabID, workspaceID, tagID).
+	res := s.db.Where("tab_id = ? AND workspace_id = ? AND tag_id = ?", tabID, workspaceID, tagID).
 		Delete(&model.TabTag{})
 	if res.Error != nil {
 		return res.Error
@@ -166,7 +166,7 @@ func (s *TagService) RemoveFromWorkspace(workspaceID string, tagID uint) error {
 	return nil
 }
 
-// TagTabItem 表示带有某个标签的云端标签页（关联 WorkspaceTab）
+// TagTabItem 表示带有某个标签的云端标签页（关联 Tab）
 // 用于「标签」页面右侧：展示该标签下包含的所有标签页
 type TagTabItem struct {
 	TabID         uint   `json:"tabId"`
@@ -182,11 +182,11 @@ func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
 	items := make([]TagTabItem, 0)
 	err := s.db.
 		Table("tab_tags").
-		Select("workspace_tabs.id AS tab_id, workspace_tabs.url, workspace_tabs.title, workspace_tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
-		Joins("JOIN workspace_tabs ON workspace_tabs.id = tab_tags.workspace_tab_id").
-		Joins("JOIN workspaces ON workspaces.workspace_id = workspace_tabs.workspace_id").
+		Select("tabs.id AS tab_id, tabs.url, tabs.title, tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
+		Joins("JOIN tabs ON tabs.id = tab_tags.tab_id").
+		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("tab_tags.tag_id = ? AND workspaces.is_deleted = ?", tagID, false).
-		Order("workspaces.name, workspace_tabs.sort_order").
+		Order("workspaces.name, tabs.sort_order").
 		Scan(&items).Error
 	if err != nil {
 		return nil, err

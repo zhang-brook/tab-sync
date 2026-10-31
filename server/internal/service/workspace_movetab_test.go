@@ -19,7 +19,7 @@ func TestWorkspaceService_MoveTab_SyncTabTag(t *testing.T) {
 	b := createWS(t, svc, "B", "")
 
 	// A 中添加一个标签页并打上标签
-	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []WorkspaceTabData{
+	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []TabData{
 		{URL: "https://a.com", Title: "A Tab"},
 	}})
 	if err != nil {
@@ -44,7 +44,7 @@ func TestWorkspaceService_MoveTab_SyncTabTag(t *testing.T) {
 
 	// 1. tab_tags.workspace_id 已同步为新归属 B
 	var rel model.TabTag
-	if err := db.Where("workspace_tab_id = ?", tabID).First(&rel).Error; err != nil {
+	if err := db.Where("tab_id = ?", tabID).First(&rel).Error; err != nil {
 		t.Fatalf("查询标签关联失败: %v", err)
 	}
 	if rel.WorkspaceID != b {
@@ -78,7 +78,7 @@ func TestWorkspaceService_MoveTab_SameWorkspace(t *testing.T) {
 
 	a := createWS(t, svc, "A", "")
 
-	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []WorkspaceTabData{
+	updated, err := svc.Update(a, UpdateWorkspacePayload{Tabs: []TabData{
 		{URL: "https://a1.com", Title: "A1"},
 		{URL: "https://a2.com", Title: "A2"},
 	}})
@@ -103,7 +103,7 @@ func TestWorkspaceService_MoveTab_SameWorkspace(t *testing.T) {
 	}
 
 	var rel model.TabTag
-	if err := db.Where("workspace_tab_id = ?", tabID).First(&rel).Error; err != nil {
+	if err := db.Where("tab_id = ?", tabID).First(&rel).Error; err != nil {
 		t.Fatalf("查询标签关联失败: %v", err)
 	}
 	if rel.WorkspaceID != a {

@@ -22,7 +22,7 @@ func TestWorkspaceService_Create(t *testing.T) {
 
 	// Create 不再接收标签页，通过 Update 添加标签页以验证可写入
 	updated, err := svc.Update(result.Workspace.ID, UpdateWorkspacePayload{
-		Tabs: []WorkspaceTabData{
+		Tabs: []TabData{
 			{URL: "https://example.com", Title: "Example", ChromeTabID: 1},
 			{URL: "https://test.com", Title: "Test", ChromeTabID: 2},
 		},
@@ -100,7 +100,7 @@ func TestWorkspaceService_TabsSummary(t *testing.T) {
 	result, _ := svc.Create(CreateWorkspacePayload{Name: "带标签的工作组"})
 
 	_, err := svc.Update(result.Workspace.ID, UpdateWorkspacePayload{
-		Tabs: []WorkspaceTabData{
+		Tabs: []TabData{
 			{URL: "https://a.com", Title: "A"},
 			{URL: "https://b.com", Title: "B"},
 			{URL: "https://c.com", Title: "C"},

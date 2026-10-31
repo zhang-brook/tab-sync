@@ -52,7 +52,7 @@ func (s *RecycleBinService) List() ([]RecycleBinTabResponse, error) {
 // Add 将一条被移除的标签页加入回收站。
 // 必须在调用方的事务 tx 中执行，避免与单连接 SQLite（MaxOpenConns=1）下
 // 的事务产生连接争用导致死锁。
-func (s *RecycleBinService) Add(tx *gorm.DB, originalWorkspaceID, originalWorkspaceName string, tab model.WorkspaceTab) error {
+func (s *RecycleBinService) Add(tx *gorm.DB, originalWorkspaceID, originalWorkspaceName string, tab model.Tab) error {
 	item := model.RecycleBinTab{
 		OriginalWorkspaceID:   originalWorkspaceID,
 		OriginalWorkspaceName: originalWorkspaceName,
@@ -83,7 +83,7 @@ func (s *RecycleBinService) Restore(id uint) error {
 		return err
 	}
 
-	newTab := model.WorkspaceTab{
+	newTab := model.Tab{
 		WorkspaceID: ws.WorkspaceID,
 		URL:         item.URL,
 		Title:       item.Title,
