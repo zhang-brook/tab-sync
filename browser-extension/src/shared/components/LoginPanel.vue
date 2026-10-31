@@ -70,15 +70,14 @@ async function handleServerUrlChange() {
 }
 
 async function handleTokenLogin() {
+  errorMsg.value = ''
   if (!tokenInput.value.trim()) {
     errorMsg.value = '请输入 Token'
     return
   }
-  await ensureServerUrl()
-  if (errorMsg.value) return
+  if (!(await ensureServerUrl())) return
 
   loading.value = true
-  errorMsg.value = ''
 
   const res = await sendMessage({
     action: 'LOGIN_WITH_TOKEN',
@@ -94,12 +93,13 @@ async function handleTokenLogin() {
   }
 }
 
-async function ensureServerUrl() {
+async function ensureServerUrl(): Promise<boolean> {
   if (!serverUrl.value.trim()) {
     errorMsg.value = '请先配置后端地址'
-    return
+    return false
   }
   await handleServerUrlChange()
+  return true
 }
 </script>
 
