@@ -9,6 +9,7 @@ import {
   FolderAdd,
   FolderChecked,
   FolderOpened,
+  InfoFilled,
   Link,
   Memo,
   Plus,
@@ -44,6 +45,7 @@ export type TabActionId =
   | 'remove'
   | 'removeTag'
   | 'openWorkspace'
+  | 'properties'
 
 interface ActionMeta {
   label: string
@@ -73,6 +75,7 @@ const ACTION_META: Record<TabActionId, ActionMeta> = {
   remove: { label: '移至回收站', icon: Delete, danger: true },
   removeTag: { label: '移除标签', icon: Delete, danger: true },
   openWorkspace: { label: '打开工作组', icon: FolderOpened },
+  properties: { label: '属性', icon: InfoFilled },
 }
 
 export interface BuildTabMenuOptions {
@@ -126,8 +129,8 @@ export function localTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntr
 /** 云端标签页行菜单 */
 export function cloudTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntry[] {
   return buildTabMenu(
-    ['open', 'copyTitle', 'copyLink', 'rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'remove'],
-    { dividersBefore: ['copyTitle', 'rename', 'move', 'remove'], ...options },
+    ['open', 'copyTitle', 'copyLink', 'rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'remove', 'properties'],
+    { dividersBefore: ['copyTitle', 'rename', 'move', 'remove', 'properties'], ...options },
   )
 }
 

@@ -298,6 +298,10 @@
 
     <!-- 工作组属性对话框 -->
     <WorkspacePropertiesDialog v-model="propertiesVisible" :workspace="propertiesTarget" :workspaces="workspaces" />
+
+    <!-- 标签页属性对话框 -->
+    <TabPropertiesDialog v-model="tabPropertiesVisible" :tab="tabPropertiesTarget?.tab ?? null"
+      :workspace-path="tabPropertiesPath" />
   </div>
 </template>
 
@@ -312,12 +316,13 @@ import TagEditorDialog from '@/shared/components/TagEditorDialog.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
+import TabPropertiesDialog from '../components/TabPropertiesDialog.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
-import { buildWorkspaceTree, collectDescendantIds, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import { buildWorkspaceTree, collectDescendantIds, getWorkspacePath, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { copyText } from '@/shared/utils/clipboard'
 import { cloudTabMenu } from '@/shared/actions/tab-actions'
@@ -590,6 +595,15 @@ const tabMenu = cloudTabMenu()
 
 const tabDialogMode = ref<CloudTabDialogMode | null>(null)
 const tabDialogTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
+
+/** 标签页属性弹窗：展示所属工作组路径、标签、描述与添加时间 */
+const tabPropertiesVisible = ref(false)
+const tabPropertiesTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
+const tabPropertiesPath = computed(() =>
+  tabPropertiesTarget.value
+    ? getWorkspacePath(workspaces.value, tabPropertiesTarget.value.workspaceId).fullPath
+    : '',
+)
 
 function openTabDialog(mode: CloudTabDialogMode, workspaceId: string, tab: TabReference) {
   tabDialogTarget.value = { workspaceId, tab }
@@ -864,6 +878,10 @@ function onTabMenuCommand(command: string, item: TabListItem) {
       break
     case 'remove':
       void handleRemoveTab(workspaceId, tab.tabId)
+      break
+    case 'properties':
+      tabPropertiesTarget.value = { workspaceId, tab }
+      tabPropertiesVisible.value = true
       break
     default:
       openTabDialog(command as CloudTabDialogMode, workspaceId, tab)
