@@ -3,6 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "description": "Tab Sync browser extension.",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
