@@ -93,15 +93,26 @@ function tagStyle(tag: TabTagDisplay) {
   return tag.color ? { borderColor: tag.color, color: tag.color } : {}
 }
 
-/** 行首来源色条：单个工作组用纯色，多个工作组按顺序渐变 */
+/** 多工作组色条：各段占满均分区间，仅在相邻色段间留窄过渡，避免混出奇怪的中间色 */
+function savedAccent(colors: string[]): string {
+  if (colors.length === 1) return colors[0]
+  const step = 100 / colors.length
+  const fade = Math.min(10, step * 0.3)
+  const stops: string[] = []
+  colors.forEach((color, i) => {
+    const start = i * step
+    stops.push(`${color} ${i === 0 ? 0 : start + fade / 2}%`)
+    stops.push(`${color} ${i === colors.length - 1 ? 100 : start + step - fade / 2}%`)
+  })
+  return `linear-gradient(180deg, ${stops.join(', ')})`
+}
+
+/** 行首来源色条：单个工作组用纯色，多个工作组按顺序分段 */
 function savedStyle(item: TabListItem) {
   if (!item.saved) return undefined
   const colors = item.savedColors?.filter(Boolean) ?? []
   if (colors.length === 0) return undefined
-  return {
-    '--tab-saved-accent':
-      colors.length === 1 ? colors[0] : `linear-gradient(180deg, ${colors.join(', ')})`,
-  }
+  return { '--tab-saved-accent': savedAccent(colors) }
 }
 
 function onTagClick(tag: TabTagDisplay, item: TabListItem) {
