@@ -4,6 +4,15 @@
     <div class="sidepanel-header">
       <h3>Tab Sync</h3>
       <div class="sp-actions">
+        <el-button
+          v-if="!authLoading && !authenticated"
+          size="small"
+          type="primary"
+          text
+          @click="loginVisible = true"
+        >
+          登录
+        </el-button>
         <el-dropdown trigger="click" placement="bottom-end" @command="onHeaderCommand">
           <el-button size="small" text circle :icon="MoreFilled" title="更多操作" />
           <template #dropdown>
@@ -25,97 +34,88 @@
       </div>
     </div>
 
-    <!-- 未登录：显示登录面板（从 popup 迁移而来） -->
-    <div v-if="authLoading" class="hint-state">
-      <el-icon class="is-loading"><Loading /></el-icon>
-      <span>加载中...</span>
-    </div>
-    <LoginPanel v-else-if="!authenticated" @login-success="onLoginSuccess" />
-
-    <!-- 已登录：标签页管理 -->
-    <template v-else>
-      <!-- 工具栏：窗口选择 + 搜索 -->
-      <div class="toolbar">
-        <el-select v-model="windowFilter" size="small" class="window-select">
-          <el-option label="全部窗口" value="all" />
-          <el-option
-            v-for="win in windowOptions"
-            :key="win.id"
-            :label="win.label"
-            :value="win.id"
-          />
-        </el-select>
-        <el-input
-          v-model="keyword"
-          placeholder="搜索标签页..."
+    <!-- 本地标签页不依赖登录态，未登录也可查看；登录入口在顶部 -->
+    <!-- 工具栏：窗口选择 + 搜索 -->
+    <div class="toolbar">
+      <el-select v-model="windowFilter" size="small" class="window-select">
+        <el-option label="全部窗口" value="all" />
+        <el-option
+          v-for="win in windowOptions"
+          :key="win.id"
+          :label="win.label"
+          :value="win.id"
+        />
+      </el-select>
+      <el-input
+        v-model="keyword"
+        placeholder="搜索标签页..."
+        size="small"
+        clearable
+        :prefix-icon="Search"
+        class="search-input"
+      />
+      <el-tooltip content="定位到当前激活的标签页" placement="top">
+        <el-button size="small" :icon="Aim" @click="focusActiveTab">定位</el-button>
+      </el-tooltip>
+      <el-tooltip content="刷新标签页与已保存标记" placement="top">
+        <el-button
           size="small"
-          clearable
-          :prefix-icon="Search"
-          class="search-input"
+          :icon="Refresh"
+          circle
+          :loading="refreshing"
+          @click="refreshAll"
         />
-        <el-tooltip content="定位到当前激活的标签页" placement="top">
-          <el-button size="small" :icon="Aim" @click="focusActiveTab">定位</el-button>
-        </el-tooltip>
-        <el-tooltip content="刷新标签页与已保存标记" placement="top">
-          <el-button
-            size="small"
-            :icon="Refresh"
-            circle
-            :loading="refreshing"
-            @click="refreshAll"
-          />
-        </el-tooltip>
+      </el-tooltip>
+    </div>
+
+    <!-- 选择操作栏 -->
+    <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="selection">
+      <el-button size="small" text @click="clearSelection">取消选择</el-button>
+      <el-button size="small" @click="openSavePicker('add', selectedTabs)">加入工作组</el-button>
+      <el-button size="small" type="primary" @click="openSavePicker('add-close', selectedTabs)">
+        加入并关闭
+      </el-button>
+      <el-button size="small" type="danger" plain :loading="closing" @click="closeSelectedTabs">
+        关闭选中
+      </el-button>
+    </SelectionBar>
+
+    <!-- 树状列表 -->
+    <div class="tree-list">
+      <div v-if="loading" class="hint-state">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载中...</span>
       </div>
 
-      <!-- 选择操作栏 -->
-      <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="selection">
-        <el-button size="small" text @click="clearSelection">取消选择</el-button>
-        <el-button size="small" @click="openSavePicker('add', selectedTabs)">加入工作组</el-button>
-        <el-button size="small" type="primary" @click="openSavePicker('add-close', selectedTabs)">
-          加入并关闭
-        </el-button>
-        <el-button size="small" type="danger" plain :loading="closing" @click="closeSelectedTabs">
-          关闭选中
-        </el-button>
-      </SelectionBar>
-
-      <!-- 树状列表 -->
-      <div class="tree-list">
-        <div v-if="loading" class="hint-state">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>加载中...</span>
-        </div>
-
-        <div v-else-if="visibleWindows.length === 0" class="hint-state">
-          <span>暂无标签页</span>
-        </div>
-
-        <LocalTabTree
-          v-else
-          :windows="visibleWindows"
-          :selected="selectedIds"
-          :active-tab-id="activeTabId"
-          :collapsed-windows="collapsedWindows"
-          :collapsed-groups="collapsedGroups"
-          :menu-items="menuItems"
-          :meta-for-tab="metaForTab"
-          @update:selected="setSelection"
-          @toggle-window="toggleWindow"
-          @toggle-group="toggleGroupCollapse"
-          @group-selection="toggleGroupSelection"
-          @activate="activate"
-          @close="closeTab"
-          @sort="onSort"
-          @command="(cmd, tab) => run(cmd, tab)"
-        />
+      <div v-else-if="visibleWindows.length === 0" class="hint-state">
+        <span>暂无标签页</span>
       </div>
 
-      <div class="sidepanel-footer">
-        <el-button link type="primary" size="small" :icon="TopRight" @click="openDashboardTabs">
-          在后台管理页面中查看
-        </el-button>
-      </div>
-    </template>
+      <LocalTabTree
+        v-else
+        :windows="visibleWindows"
+        :selected="selectedIds"
+        :active-tab-id="activeTabId"
+        :collapsed-windows="collapsedWindows"
+        :collapsed-groups="collapsedGroups"
+        :menu-items="menuItems"
+        :meta-for-tab="metaForTab"
+        @update:selected="setSelection"
+        @toggle-window="toggleWindow"
+        @toggle-group="toggleGroupCollapse"
+        @group-selection="toggleGroupSelection"
+        @activate="activate"
+        @close="closeTab"
+        @sort="onSort"
+        @command="(cmd, tab) => run(cmd, tab)"
+      />
+    </div>
+
+    <div class="sidepanel-footer">
+      <el-button link type="primary" size="small" :icon="TopRight" @click="openDashboardTabs">
+        在后台管理页面中查看
+      </el-button>
+    </div>
 
     <!-- 工作组选择弹窗：加入 / 加入并关闭 -->
     <LocalSaveTabsDialog
@@ -126,12 +126,17 @@
       @saved="onSaved"
     />
 
+    <!-- 顶部「登录」按钮打开的面板内登录框 -->
+    <el-dialog v-model="loginVisible" title="登录" width="90%" append-to-body destroy-on-close>
+      <LoginPanel @login-success="onLoginSuccess" />
+    </el-dialog>
+
     <EntityTooltipHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Loading, Aim, MoreFilled, Monitor, Setting, SwitchButton, Refresh, TopRight } from '@element-plus/icons-vue'
 import LocalTabTree from '@/shared/components/LocalTabTree.vue'
@@ -144,6 +149,7 @@ import { useLocalTabActions } from '@/shared/composables/useLocalTabActions'
 import { localTabMenu } from '@/shared/actions/tab-actions'
 import { closeLocalTabs, type LocalTab, type LocalTabSegment } from '@/shared/services/local-tabs'
 import { sendMessage } from '@/shared/composables/useMessage'
+import { STORAGE_KEYS } from '@/shared/storage'
 import { useWorkspaceTabIndex } from '@/shared/composables/useWorkspaceTabIndex'
 import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { DASHBOARD_URL } from '@/shared/utils/pages'
@@ -153,6 +159,8 @@ import type { TabRowMeta } from '@/shared/types/tab-list'
 // ============ 登录态（从 popup 迁移） ============
 const authLoading = ref(true)
 const authenticated = ref(false)
+// 未登录时由顶部「登录」按钮打开的登录框
+const loginVisible = ref(false)
 
 async function initAuth() {
   const res = await sendMessage<StateData>({ action: 'GET_STATE' })
@@ -161,6 +169,7 @@ async function initAuth() {
 }
 
 async function onLoginSuccess() {
+  loginVisible.value = false
   authenticated.value = true
   await reload()
   void loadWorkspaceIndex()
@@ -303,8 +312,26 @@ const { run } = useLocalTabActions({
   },
 })
 
+// 管理面板等页面登录/登出都会改写 Token，侧边栏按新值同步登录态
+function handleStorageChange(changes: { [key: string]: chrome.storage.StorageChange }) {
+  const tokenChange = changes[STORAGE_KEYS.AUTH_TOKEN]
+  if (!tokenChange) return
+  const next = !!tokenChange.newValue
+  if (next === authenticated.value) return
+  authenticated.value = next
+  if (next) {
+    void reload()
+    void loadWorkspaceIndex()
+  }
+}
+
 onMounted(() => {
   void initAuth()
+  chrome.storage.onChanged.addListener(handleStorageChange)
+})
+
+onUnmounted(() => {
+  chrome.storage.onChanged.removeListener(handleStorageChange)
 })
 </script>
 

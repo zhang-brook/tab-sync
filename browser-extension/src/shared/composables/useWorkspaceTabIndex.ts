@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getWorkspaceTabsSummary } from '../services/workspace-service'
 import { normalizeColor } from '../constants/theme'
+import { STORAGE_KEYS } from '../storage'
 import type { WorkspaceTabsSummaryData, WorkspaceTabsChangedMessage } from '../types'
 import type { TabTagDisplay } from '../types/tab-list'
 
@@ -75,14 +76,24 @@ export function useWorkspaceTabIndex() {
     }
   }
 
+  // 登录态变化时重建来源索引：登出后不再展示云端工作组来源，重新登录后恢复
+  function onStorageChanged(changes: { [key: string]: chrome.storage.StorageChange }) {
+    const tokenChange = changes[STORAGE_KEYS.AUTH_TOKEN]
+    if (!tokenChange) return
+    if (tokenChange.newValue) void load()
+    else workspacesByUrl.value = {}
+  }
+
   onMounted(() => {
     // 工作组标签页的写操作统一由 background 广播，其他页面（管理面板/右键菜单）修改后也能同步刷新
     chrome.runtime.onMessage.addListener(onMessage)
+    chrome.storage.onChanged.addListener(onStorageChanged)
     void load()
   })
 
   onUnmounted(() => {
     chrome.runtime.onMessage.removeListener(onMessage)
+    chrome.storage.onChanged.removeListener(onStorageChanged)
     if (reloadTimer) clearTimeout(reloadTimer)
   })
 
