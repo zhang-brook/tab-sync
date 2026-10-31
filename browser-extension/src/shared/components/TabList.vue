@@ -355,6 +355,13 @@ function onSharedMenuCommand(command: string) {
   flex-shrink: 0;
 }
 
+.tab-extra .tab-tag {
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .tab-tag.is-clickable {
   cursor: pointer;
 }
