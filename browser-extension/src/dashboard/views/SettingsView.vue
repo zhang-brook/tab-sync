@@ -104,25 +104,35 @@
               <el-form-item v-if="connectionMode === 'lightweight'" label="API 地址">
                 <div class="field-row">
                   <el-input v-model="apiBaseUrl" placeholder="例如: http://localhost:8080" clearable />
+                  <!-- 单向受控：不绑定 update:visible，Element Plus 才会禁用自带的开关与点击外部关闭 -->
                   <el-popover
-                    v-model:visible="connectivityPopoverVisible"
+                    :visible="connectivityPopoverVisible"
                     trigger="click"
                     placement="bottom-end"
-                    :width="460"
+                    :width="520"
                     popper-class="connectivity-popover"
+                    @hide="connectivityPopoverVisible = false"
                   >
                     <template #reference>
                       <el-button :loading="testChecking" :disabled="!apiBaseUrl.trim()" @click="openConnectivityPopover">
                         测试连通性
                       </el-button>
                     </template>
-                    <ServerInfoPanel
-                      :api-base-url="testAddress"
-                      :version-info="testVersionInfo"
-                      :extension-version="extensionVersion"
-                    />
-                    <div class="popover-footer">
-                      <el-button size="small" @click="connectivityPopoverVisible = false">关闭</el-button>
+                    <div class="popover-body">
+                      <button
+                        type="button"
+                        class="popover-close"
+                        aria-label="关闭"
+                        title="关闭"
+                        @click="connectivityPopoverVisible = false"
+                      >
+                        <el-icon><Close /></el-icon>
+                      </button>
+                      <ServerInfoPanel
+                        :api-base-url="testAddress"
+                        :version-info="testVersionInfo"
+                        :extension-version="extensionVersion"
+                      />
                     </div>
                   </el-popover>
                   <el-button type="primary" :loading="apiSaving" :disabled="!apiBaseUrl.trim() || !addressDirty" @click="handleSaveApiBaseUrl">
@@ -266,7 +276,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, watch, type Ref } from 'vue'
+import { Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
@@ -296,6 +307,11 @@ const testChecking = ref(false)
 
 // 地址输入框与已保存值不一致时才允许保存
 const addressDirty = computed(() => apiBaseUrl.value.trim() !== savedApiBaseUrl.value)
+
+// 地址变化后气泡里的检测结果对应旧地址，直接关闭
+watch(apiBaseUrl, () => {
+  connectivityPopoverVisible.value = false
+})
 
 // 顶部 tab: extension(扩展设置) | cloud(云端设置) | data(数据管理) | about(关于)
 const activeTab = ref('extension')
@@ -451,8 +467,13 @@ async function handleSaveApiBaseUrl() {
     }
     apiBaseUrl.value = nextUrl
     savedApiBaseUrl.value = nextUrl
-    // 地址变了，旧地址的检测结果不再适用
-    if (nextUrl !== previousSaved) versionInfo.value = null
+    // 保存后关闭气泡：其中的检测结果对应保存前的地址
+    connectivityPopoverVisible.value = false
+    // 地址变了，旧地址的检测结果不再适用，按新地址静默重检刷新「服务端信息」
+    if (nextUrl !== previousSaved) {
+      versionInfo.value = null
+      void checkVersion(false)
+    }
     ElMessage.success('API 地址已保存')
   } finally {
     apiSaving.value = false
@@ -619,11 +640,37 @@ async function handleClearData() {
   flex: 1;
 }
 
-/* 气泡底部操作区 */
-.popover-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
+/* 气泡挂在 body 下，scoped 选择器命不中，用 :global 增加内容留白 */
+:global(.el-popover.el-popper.connectivity-popover) {
+  padding: 16px 18px;
+}
+
+/* 关闭叉：悬浮在气泡右上角，无背景与描边 */
+.popover-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #909399;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.popover-close:hover {
+  color: #303133;
+}
+
+/* 首行右侧给关闭叉留位置，避免地址文本压到叉下 */
+.popover-body :deep(.el-form .el-form-item:first-child) {
+  padding-right: 18px;
 }
 
 .token-status-on {
