@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -32,13 +33,33 @@ type RecycleBinTabResponse struct {
 	DisplayName           string    `json:"displayName"`
 	FavIconURL            string    `json:"favIconUrl"`
 	Description           string    `json:"description"`
+	AddedAt               time.Time `json:"addedAt"`
 	DeletedAt             time.Time `json:"deletedAt"`
 }
 
-// List 列出回收站中的全部标签页（按删除时间倒序）
-func (s *RecycleBinService) List() ([]RecycleBinTabResponse, error) {
-	var items []model.RecycleBinTab
-	if err := s.db.Order("deleted_at DESC, id DESC").Find(&items).Error; err != nil {
+// RecycleBinPage 回收站分页结果
+type RecycleBinPage struct {
+	Items    []RecycleBinTabResponse `json:"items"`
+	Total    int64                   `json:"total"`
+	Page     int                     `json:"page"`
+	PageSize int                     `json:"pageSize"`
+}
+
+// List 分页列出回收站中的标签页。
+// sort 支持 name（显示名/标题/URL）、deletedAt（移入回收站时间）、addedAt（原标签页添加时间），
+// 传入其他值或空值时按删除时间倒序；order 为 asc 时升序，否则降序。
+func (s *RecycleBinService) List(page, pageSize int, sort, order string) (*RecycleBinPage, error) {
+	q := s.db.Model(&model.RecycleBinTab{})
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	items := make([]model.RecycleBinTab, 0, pageSize)
+	if err := q.Offset((page - 1) * pageSize).Limit(pageSize).
+		Order(recycleBinOrderBy(sort, order)).
+		Find(&items).Error; err != nil {
 		return nil, err
 	}
 
@@ -46,7 +67,24 @@ func (s *RecycleBinService) List() ([]RecycleBinTabResponse, error) {
 	for i, it := range items {
 		resp[i] = toRecycleBinResponse(it)
 	}
-	return resp, nil
+	return &RecycleBinPage{Items: resp, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// recycleBinOrderBy 生成排序子句；排序列只从固定白名单中选择，不拼接用户输入。
+func recycleBinOrderBy(sort, order string) string {
+	dir := "DESC"
+	if strings.EqualFold(order, "asc") {
+		dir = "ASC"
+	}
+	switch sort {
+	case "name":
+		// 与前端 displayName() 的回退顺序保持一致：显示名 → 标题 → URL
+		return "COALESCE(NULLIF(display_name, ''), NULLIF(title, ''), url) " + dir + ", id " + dir
+	case "addedAt":
+		return "added_at " + dir + ", id " + dir
+	default:
+		return "deleted_at " + dir + ", id " + dir
+	}
 }
 
 // Add 将一条被移除的标签页加入回收站。
@@ -196,6 +234,7 @@ func toRecycleBinResponse(it model.RecycleBinTab) RecycleBinTabResponse {
 		DisplayName:           it.DisplayName,
 		FavIconURL:            it.FavIconURL,
 		Description:           it.Description,
+		AddedAt:               it.AddedAt,
 		DeletedAt:             it.DeletedAt,
 	}
 }

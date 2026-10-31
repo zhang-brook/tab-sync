@@ -1,4 +1,4 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { verifyToken, getServerVersion } from '../shared/api/auth'
@@ -83,7 +83,7 @@ export async function handleMessage(message: ExtensionMessage): Promise<MessageR
       return handleRemoveWorkspaceTab(message.payload.workspaceId, message.payload.tabId)
 
     case 'GET_RECYCLE_BIN':
-      return handleGetRecycleBin()
+      return handleGetRecycleBin(message.payload)
 
     case 'RESTORE_RECYCLE_BIN_TABS':
       return handleRestoreRecycleBinTabs(message.payload)
@@ -854,10 +854,12 @@ async function handleGetTagTabs(tagId: number): Promise<MessageResponse<TagTabsD
 
 // ============ 回收站 ============
 
-async function handleGetRecycleBin(): Promise<MessageResponse<RecycleBinData>> {
-  const res = await getRecycleBin()
+async function handleGetRecycleBin(
+  payload?: GetRecycleBinMessage['payload'],
+): Promise<MessageResponse<RecycleBinData>> {
+  const res = await getRecycleBin(payload)
   if (res.ok && res.data) {
-    return { success: true, data: { recycleBin: res.data } }
+    return { success: true, data: res.data }
   }
   return { success: false, error: res.error || '获取回收站失败', authError: res.status === 401 }
 }

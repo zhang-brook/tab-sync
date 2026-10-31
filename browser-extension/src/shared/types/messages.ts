@@ -306,13 +306,22 @@ export interface RecycleBinTab {
   favIconUrl: string
   /** 标签页描述（可选，用户主动设置时保存） */
   description?: string
+  /** 标签页在原工作组中的添加时间 */
+  addedAt: string
   /** 移入回收站的时间 */
   deletedAt: string
 }
 
-/** 获取回收站列表 */
+/** 获取回收站列表（分页，可按名称/删除时间/添加时间排序） */
 export interface GetRecycleBinMessage {
   action: 'GET_RECYCLE_BIN'
+  payload?: {
+    page?: number
+    pageSize?: number
+    /** 排序字段：名称 / 移入回收站时间 / 原标签页添加时间 */
+    sort?: 'name' | 'deletedAt' | 'addedAt'
+    order?: 'asc' | 'desc'
+  }
 }
 
 /** 批量恢复回收站标签页到指定工作组（workspaceId 为空时回退「未分组」） */
@@ -469,5 +478,8 @@ export interface TagTabsData {
 
 /** GET_RECYCLE_BIN 响应数据 */
 export interface RecycleBinData {
-  recycleBin: RecycleBinTab[]
+  items: RecycleBinTab[]
+  total: number
+  page: number
+  pageSize: number
 }

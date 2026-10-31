@@ -1,9 +1,23 @@
 import { apiClient } from './client'
-import type { RecycleBinTab } from '../types'
+import type { RecycleBinData } from '../types'
 
-/** 获取回收站列表 */
-export function getRecycleBin() {
-  return apiClient.get<RecycleBinTab[]>('/v1/tab-sync/recyclebin')
+export interface RecycleBinQuery {
+  page?: number
+  pageSize?: number
+  /** 排序字段：名称 / 移入回收站时间 / 原标签页添加时间 */
+  sort?: 'name' | 'deletedAt' | 'addedAt'
+  order?: 'asc' | 'desc'
+}
+
+/** 分页获取回收站列表，支持按名称/删除时间/添加时间排序 */
+export function getRecycleBin(params: RecycleBinQuery = {}) {
+  const query = new URLSearchParams()
+  if (params.page != null) query.set('page', String(params.page))
+  if (params.pageSize != null) query.set('pageSize', String(params.pageSize))
+  if (params.sort) query.set('sort', params.sort)
+  if (params.order) query.set('order', params.order)
+  const qs = query.toString()
+  return apiClient.get<RecycleBinData>(`/v1/tab-sync/recyclebin${qs ? `?${qs}` : ''}`)
 }
 
 /** 批量恢复回收站标签页到指定工作组（workspaceId 为空时回退「未分组」） */

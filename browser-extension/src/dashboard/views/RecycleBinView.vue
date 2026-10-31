@@ -1,14 +1,61 @@
 <template>
   <div class="recyclebin-view">
-    <div class="toolbar">
-      <el-alert type="info" :closable="false" show-icon>
-        从工作组移除的标签页会暂存在此处，可勾选后恢复到指定工作组；也可在此彻底删除，或一键清空。
-      </el-alert>
-      <div class="toolbar-actions">
+    <el-alert type="info" :closable="false" show-icon>
+      从工作组移除的标签页会暂存在此处，可勾选后恢复到指定工作组；也可在此彻底删除，或一键清空。
+    </el-alert>
+
+    <!-- 列表内容统一放在白色块中 -->
+    <div v-loading="loading" class="list-pane">
+      <div class="pane-toolbar">
+        <div class="sort-row">
+          <span class="sort-label">排序</span>
+          <div class="sort-toggle">
+            <button
+              type="button"
+              class="sort-btn"
+              :class="{ active: sortMode === 'name' }"
+              title="再次点击切换 A-Z / Z-A"
+              @click="onSortClick('name')"
+            >
+              按名称
+              <el-icon v-if="sortMode === 'name'" class="sort-dir">
+                <SortUp v-if="sortAsc" />
+                <SortDown v-else />
+              </el-icon>
+            </button>
+            <button
+              type="button"
+              class="sort-btn"
+              :class="{ active: sortMode === 'deletedAt' }"
+              title="再次点击切换删除时间升序 / 降序"
+              @click="onSortClick('deletedAt')"
+            >
+              按删除时间
+              <el-icon v-if="sortMode === 'deletedAt'" class="sort-dir">
+                <SortUp v-if="sortAsc" />
+                <SortDown v-else />
+              </el-icon>
+            </button>
+            <button
+              type="button"
+              class="sort-btn"
+              :class="{ active: sortMode === 'addedAt' }"
+              title="再次点击切换添加时间升序 / 降序"
+              @click="onSortClick('addedAt')"
+            >
+              按添加时间
+              <el-icon v-if="sortMode === 'addedAt'" class="sort-dir">
+                <SortUp v-if="sortAsc" />
+                <SortDown v-else />
+              </el-icon>
+            </button>
+          </div>
+        </div>
+
         <el-button
           type="danger"
           plain
-          :disabled="items.length === 0"
+          :disabled="total === 0"
           :loading="emptying"
           @click="handleEmpty"
         >
@@ -16,30 +63,16 @@
           清空回收站
         </el-button>
       </div>
-    </div>
 
-    <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="batch-bar">
-      <el-button @click="clearSelection">取消选择</el-button>
-      <el-button type="primary" :loading="restoring" @click="openRestoreDialog(selectedItems)">
-        恢复到工作组
-      </el-button>
-    </SelectionBar>
-
-    <el-card v-loading="loading" shadow="never" class="recyclebin-card">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">回收站（{{ items.length }}）</span>
-          <el-checkbox
-            v-if="items.length > 0"
-            :model-value="allSelected"
-            :indeterminate="someSelected"
-            @change="toggleSelectAll"
-          >全选</el-checkbox>
-        </div>
-      </template>
+      <SelectionBar v-if="selectedCount > 0" :count="selectedCount" class="batch-bar">
+        <el-button @click="clearSelection">取消选择</el-button>
+        <el-button type="primary" :loading="restoring" @click="openRestoreDialog(selectedItems)">
+          恢复到工作组
+        </el-button>
+      </SelectionBar>
 
       <div v-if="items.length > 0" class="recyclebin-list">
-        <div v-for="item in sortedItems" :key="item.id" class="recycle-item">
+        <div v-for="item in items" :key="item.id" class="recycle-item">
           <el-checkbox
             class="item-check"
             :model-value="selectedIds.includes(item.id)"
@@ -61,6 +94,7 @@
               <el-tag size="small" type="info" effect="plain">
                 来自：{{ item.originalWorkspaceName || '未知工作组' }}
               </el-tag>
+              <span class="item-time">添加于 {{ formatTime(item.addedAt) }}</span>
               <span class="item-time">删除于 {{ formatTime(item.deletedAt) }}</span>
             </div>
           </div>
@@ -82,8 +116,27 @@
         </div>
       </div>
 
-      <el-empty v-else description="回收站为空，从工作组移除的标签页会显示在这里" :image-size="120" />
-    </el-card>
+      <el-empty v-else class="pane-empty" description="回收站为空，从工作组移除的标签页会显示在这里" :image-size="120" />
+
+      <div v-if="total > 0" class="pagination">
+        <div class="list-summary">
+          <el-checkbox
+            :model-value="allSelected"
+            :indeterminate="someSelected"
+            @change="toggleSelectAll"
+          >全选</el-checkbox>
+          <span class="total-count">共 {{ total }} 条</span>
+        </div>
+        <el-pagination
+          layout="prev, pager, next, jumper"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          :disabled="total <= pageSize"
+          @current-change="onPageChange"
+        />
+      </div>
+    </div>
 
     <WorkspacePickerDialog
       v-model="restoreDialogVisible"
@@ -100,7 +153,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Delete, Link } from '@element-plus/icons-vue'
+import { Delete, Link, SortDown, SortUp } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendMessage } from '@/shared/composables/useMessage'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
@@ -108,11 +161,20 @@ import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue
 import type { WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import type { RecycleBinData, RecycleBinTab } from '@/shared/types'
 
+type SortMode = 'name' | 'deletedAt' | 'addedAt'
+
 const items = ref<RecycleBinTab[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
 const loading = ref(true)
 const emptying = ref(false)
 const restoring = ref(false)
 const deletingId = ref<number | null>(null)
+
+/** 排序由后端完成：名称默认 A-Z，时间默认最新在前 */
+const sortMode = ref<SortMode>('deletedAt')
+const sortAsc = ref(false)
 
 /** 当前勾选的回收站条目 id */
 const selectedIds = ref<number[]>([])
@@ -122,36 +184,66 @@ const restoreDialogVisible = ref(false)
 /** 选择弹窗的预选工作组：单条恢复或来源一致时预选原工作组 */
 const restorePreselectId = ref('')
 
-/** 按删除时间倒序展示 */
-const sortedItems = computed(() =>
-  [...items.value].sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()),
-)
-
 const selectedCount = computed(() => selectedIds.value.length)
 const allSelected = computed(
-  () => items.value.length > 0 && selectedIds.value.length === items.value.length,
+  () => items.value.length > 0 && items.value.every((item) => selectedIds.value.includes(item.id)),
 )
-const someSelected = computed(
-  () => selectedIds.value.length > 0 && selectedIds.value.length < items.value.length,
-)
+const someSelected = computed(() => selectedCount.value > 0 && !allSelected.value)
 const selectedItems = computed(() =>
-  sortedItems.value.filter((item) => selectedIds.value.includes(item.id)),
+  items.value.filter((item) => selectedIds.value.includes(item.id)),
 )
 
 onMounted(load)
 
 async function load() {
   loading.value = true
-  const res = await sendMessage<RecycleBinData>({ action: 'GET_RECYCLE_BIN' })
-  if (res.success && res.data) {
-    items.value = res.data.recycleBin ?? []
-    // 丢弃已不在列表中的勾选项（可能已被其他设备恢复或彻底删除）
-    const existing = new Set(items.value.map((item) => item.id))
-    selectedIds.value = selectedIds.value.filter((id) => existing.has(id))
-  } else {
-    ElMessage.error(res.error || '获取回收站失败')
-  }
+  const res = await sendMessage<RecycleBinData>({
+    action: 'GET_RECYCLE_BIN',
+    payload: {
+      page: page.value,
+      pageSize: pageSize.value,
+      sort: sortMode.value,
+      order: sortAsc.value ? 'asc' : 'desc',
+    },
+  })
   loading.value = false
+
+  if (!res.success || !res.data) {
+    ElMessage.error(res.error || '获取回收站失败')
+    return
+  }
+
+  // 删除/恢复后当前页可能已不存在，回退到最后一页重新加载
+  const maxPage = Math.max(1, Math.ceil(res.data.total / pageSize.value))
+  if (page.value > maxPage) {
+    page.value = maxPage
+    await load()
+    return
+  }
+
+  items.value = res.data.items ?? []
+  total.value = res.data.total
+  // 丢弃已不在当前页的勾选项（可能已被其他设备恢复或彻底删除）
+  const existing = new Set(items.value.map((item) => item.id))
+  selectedIds.value = selectedIds.value.filter((id) => existing.has(id))
+}
+
+function onPageChange(p: number) {
+  page.value = p
+  clearSelection()
+  void load()
+}
+
+function onSortClick(mode: SortMode) {
+  if (sortMode.value === mode) {
+    sortAsc.value = !sortAsc.value
+  } else {
+    sortMode.value = mode
+    sortAsc.value = mode === 'name'
+  }
+  page.value = 1
+  clearSelection()
+  void load()
 }
 
 function displayName(item: RecycleBinTab): string {
@@ -162,10 +254,11 @@ function onFavError(e: Event) {
   ;(e.target as HTMLImageElement).style.display = 'none'
 }
 
-/** 格式化时间 */
+/** 格式化时间；空值或零值（旧数据未记录添加时间）显示占位符 */
 function formatTime(iso: string): string {
   if (!iso) return '--'
   const d = new Date(iso)
+  if (Number.isNaN(d.getTime()) || d.getFullYear() < 1970) return '--'
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -179,7 +272,7 @@ function toggleSelect(id: number) {
   }
 }
 
-/** el-checkbox 的 change 参数可能是 boolean/string/number，统一按真值处理 */
+/** el-checkbox 的 change 参数可能是 boolean/string/number，统一按真值处理；全选只作用于当前页 */
 function toggleSelectAll(checked: boolean | string | number) {
   selectedIds.value = checked ? items.value.map((item) => item.id) : []
 }
@@ -271,48 +364,134 @@ async function handleEmpty() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.toolbar {
+.list-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pane-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-}
-
-.toolbar :deep(.el-alert) {
-  flex: 1;
-}
-
-.toolbar-actions {
+  gap: 12px;
   flex-shrink: 0;
 }
 
-.card-header {
+.sort-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.card-title {
-  font-weight: 600;
+.sort-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.sort-toggle {
+  display: inline-flex;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.sort-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.sort-btn + .sort-btn {
+  border-left: none;
+}
+
+.sort-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.sort-btn.active {
+  color: #fff;
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+}
+
+.sort-btn:not(.active):hover {
+  color: var(--el-color-primary);
+}
+
+.sort-dir {
+  font-size: 12px;
 }
 
 .recyclebin-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+
+.batch-bar {
+  flex-shrink: 0;
+}
+
+.pane-empty {
+  flex: 1;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.list-summary {
+  display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+.total-count {
+  font-size: 12px;
+  color: #909399;
 }
 
 .recycle-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  background: #fff;
+  padding: 10px 8px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.recycle-item:hover {
+  background: #f5f7fa;
 }
 
 .item-check {
@@ -341,7 +520,16 @@ async function handleEmpty() {
 .item-url {
   font-size: 12px;
   color: #909399;
-  margin: 2px 0 6px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #606266;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -352,6 +540,7 @@ async function handleEmpty() {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 .item-time {

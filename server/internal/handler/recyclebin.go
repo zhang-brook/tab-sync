@@ -24,14 +24,24 @@ func NewRecycleBinHandler(svc *service.RecycleBinService) *RecycleBinHandler {
 	return &RecycleBinHandler{svc: svc}
 }
 
-// List 获取回收站标签页列表
+// List 分页获取回收站标签页列表。
+// 查询参数：page/pageSize（默认 1/20）、sort（name/deletedAt/addedAt，默认删除时间）、order（asc/desc，默认 desc）。
 func (h *RecycleBinHandler) List(c *gin.Context) {
-	items, err := h.svc.List()
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	result, err := h.svc.List(page, pageSize, c.Query("sort"), c.Query("order"))
 	if err != nil {
 		InternalError(c, "获取回收站失败")
 		return
 	}
-	Success(c, items)
+	Success(c, result)
 }
 
 // Restore 恢复一条回收站标签页（可指定目标工作组）
