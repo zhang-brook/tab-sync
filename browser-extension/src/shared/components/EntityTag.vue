@@ -21,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const isWorkspace = computed(() => props.tag.kind === 'workspace')
-/** 悬浮提示：帮助区分标签与工作组 */
+/** 悬浮提示：帮助区分标签与工作组；关闭 persistent，大列表里未悬停的芯片不挂弹层内容 */
 const kindLabel = computed(() => (isWorkspace.value ? '工作组' : '标签'))
 const target = computed(() => targetOfTag(props.tag))
 
@@ -48,15 +48,16 @@ function onClick(event: MouseEvent) {
 </script>
 
 <template>
-  <el-tag
-    :size="size"
-    :effect="isWorkspace ? 'plain' : 'dark'"
-    :round="!isWorkspace"
-    :class="['entity-tag', { 'is-clickable': target }]"
-    :style="tagStyle"
-    :title="kindLabel"
-    @click="onClick"
-  >{{ tag.name }}</el-tag>
+  <el-tooltip :content="kindLabel" placement="top" :show-after="300" :persistent="false">
+    <el-tag
+      :size="size"
+      :effect="isWorkspace ? 'plain' : 'dark'"
+      :round="!isWorkspace"
+      :class="['entity-tag', { 'is-clickable': target }]"
+      :style="tagStyle"
+      @click="onClick"
+    >{{ tag.name }}</el-tag>
+  </el-tooltip>
 </template>
 
 <style scoped>
