@@ -24,84 +24,86 @@
         class="scope-filter"
       />
 
+      <div class="sort-row">
+        <span class="sort-label">排序</span>
+        <el-radio-group v-model="sortMode" size="small">
+          <el-radio-button value="name">按名称</el-radio-button>
+          <el-radio-button value="count">按数量</el-radio-button>
+        </el-radio-group>
+      </div>
+
       <div v-if="tagsLoading" class="left-loading">
         <el-icon class="is-loading"><Loading /></el-icon>
       </div>
       <el-empty
         v-else-if="visibleTags.length === 0"
-        :description="scopeFilter === 'all' ? '还没有标签' : '该分类下还没有标签'"
+        description="该分类下还没有标签"
         :image-size="60"
       />
       <div v-else class="tag-list">
-        <template v-if="visibleTabTags.length > 0">
-          <div v-if="scopeFilter === 'all'" class="tag-section">标签页标签</div>
-          <div
-            v-for="tag in visibleTabTags"
-            :key="tag.id"
-            class="tag-item"
-            :class="{ active: selectedTag?.id === tag.id }"
-            @click="selectTag(tag)"
-          >
-            <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
-            <span class="tag-name">{{ tag.name }}</span>
-            <div class="tag-meta">
-              <span class="tag-count" title="包含的标签页数">{{ tag.tabCount ?? 0 }}</span>
-              <div class="tag-actions">
-                <el-button
-                  class="tag-action"
-                  text
-                  size="small"
-                  :icon="Edit"
-                  title="编辑"
-                  @click.stop="openEdit(tag)"
-                />
-                <el-button
-                  class="tag-del"
-                  text
-                  size="small"
-                  :icon="Delete"
-                  title="删除"
-                  @click.stop="removeTag(tag)"
-                />
-              </div>
+        <div
+          v-for="tag in visibleTabTags"
+          :key="tag.id"
+          class="tag-item"
+          :class="{ active: selectedTag?.id === tag.id }"
+          @click="selectTag(tag)"
+        >
+          <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
+          <span class="tag-name">{{ tag.name }}</span>
+          <div class="tag-meta">
+            <span class="tag-count" title="包含的标签页数">{{ tag.tabCount ?? 0 }}</span>
+            <div class="tag-actions">
+              <el-button
+                class="tag-action"
+                text
+                size="small"
+                :icon="Edit"
+                title="编辑"
+                @click.stop="openEdit(tag)"
+              />
+              <el-button
+                class="tag-del"
+                text
+                size="small"
+                :icon="Delete"
+                title="删除"
+                @click.stop="removeTag(tag)"
+              />
             </div>
           </div>
-        </template>
+        </div>
 
-        <template v-if="visibleWorkspaceTags.length > 0">
-          <div v-if="scopeFilter === 'all'" class="tag-section">工作组标签</div>
-          <div
-            v-for="tag in visibleWorkspaceTags"
-            :key="tag.id"
-            class="tag-item"
-            :class="{ active: selectedTag?.id === tag.id }"
-            @click="selectTag(tag)"
-          >
-            <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
-            <span class="tag-name">{{ tag.name }}</span>
-            <div class="tag-meta">
-              <span class="tag-count" title="包含的工作组数">{{ workspaceCountOf(tag.id) }}</span>
-              <div class="tag-actions">
-                <el-button
-                  class="tag-action"
-                  text
-                  size="small"
-                  :icon="Edit"
-                  title="编辑"
-                  @click.stop="openEdit(tag)"
-                />
-                <el-button
-                  class="tag-del"
-                  text
-                  size="small"
-                  :icon="Delete"
-                  title="删除"
-                  @click.stop="removeTag(tag)"
-                />
-              </div>
+        <div
+          v-for="tag in visibleWorkspaceTags"
+          :key="tag.id"
+          class="tag-item"
+          :class="{ active: selectedTag?.id === tag.id }"
+          @click="selectTag(tag)"
+        >
+          <span class="tag-dot" :style="{ backgroundColor: normalizeColor(tag.color) }" />
+          <span class="tag-name">{{ tag.name }}</span>
+          <div class="tag-meta">
+            <span class="tag-count" title="包含的工作组数">{{ workspaceCountOf(tag.id) }}</span>
+            <div class="tag-actions">
+              <el-button
+                class="tag-action"
+                text
+                size="small"
+                :icon="Edit"
+                title="编辑"
+                @click.stop="openEdit(tag)"
+              />
+              <el-button
+                class="tag-del"
+                text
+                size="small"
+                :icon="Delete"
+                title="删除"
+                @click.stop="removeTag(tag)"
+              />
             </div>
           </div>
-        </template>
+        </div>
       </div>
     </div>
 
@@ -281,26 +283,43 @@ const detailLoading = ref(false)
 const tabTags = computed(() => tags.value.filter((t) => t.scope === 'tab'))
 const workspaceTags = computed(() => tags.value.filter((t) => t.scope === 'workspace'))
 
-// 左侧筛选：全部 / 标签页标签 / 工作组标签
-const scopeFilter = ref<'all' | TagScope>('all')
-const scopeOptions: Array<{ label: string; value: 'all' | TagScope }> = [
-  { label: '全部', value: 'all' },
+// 左侧筛选：标签页标签 / 工作组标签
+const scopeFilter = ref<TagScope>('tab')
+const scopeOptions: Array<{ label: string; value: TagScope }> = [
   { label: '标签页', value: 'tab' },
   { label: '工作组', value: 'workspace' },
 ]
 
+type SortMode = 'name' | 'count'
+const sortMode = ref<SortMode>('name')
+
 const visibleTabTags = computed(() =>
-  scopeFilter.value === 'workspace' ? [] : tabTags.value,
+  scopeFilter.value === 'tab' ? sortTags(tabTags.value) : [],
 )
 const visibleWorkspaceTags = computed(() =>
-  scopeFilter.value === 'tab' ? [] : workspaceTags.value,
+  scopeFilter.value === 'workspace' ? sortTags(workspaceTags.value) : [],
 )
 const visibleTags = computed(() => [...visibleTabTags.value, ...visibleWorkspaceTags.value])
+
+// 名称升序；数量降序，数量相同时按名称升序
+function sortTags(list: TagInfo[]): TagInfo[] {
+  return [...list].sort((a, b) => {
+    if (sortMode.value === 'count') {
+      const diff = tagCountOf(b) - tagCountOf(a)
+      if (diff !== 0) return diff
+    }
+    return a.name.localeCompare(b.name, 'zh-CN', { numeric: true })
+  })
+}
+
+function tagCountOf(tag: TagInfo): number {
+  return tag.scope === 'workspace' ? workspaceCountOf(tag.id) : (tag.tabCount ?? 0)
+}
 
 // 切换筛选后，若当前选中的标签不属于该分类，则清空右侧详情
 watch(scopeFilter, (scope) => {
   const tag = selectedTag.value
-  if (scope !== 'all' && tag && tag.scope !== scope) {
+  if (tag && tag.scope !== scope) {
     selectedTag.value = null
     taggedTabs.value = []
   }
@@ -507,7 +526,7 @@ function openCreate(): void {
   editingTag.value = null
   tagForm.name = ''
   tagForm.color = DEFAULT_WORKSPACE_COLOR
-  tagForm.scope = scopeFilter.value === 'all' ? (selectedTag.value?.scope ?? 'tab') : scopeFilter.value
+  tagForm.scope = scopeFilter.value
   tagForm.description = ''
   dialogVisible.value = true
 }
@@ -541,7 +560,7 @@ async function submitTag(): Promise<void> {
       const tag = tags.value.find((t) => t.id === created.id)
       if (tag) {
         // 新建的标签不在当前筛选分类时，切到对应分类再选中
-        if (scopeFilter.value !== 'all' && scopeFilter.value !== tag.scope) {
+        if (scopeFilter.value !== tag.scope) {
           scopeFilter.value = tag.scope
         }
         await selectTag(tag)
@@ -633,14 +652,19 @@ onMounted(() => {
   justify-content: center;
   color: var(--el-text-color-secondary);
 }
+.sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.sort-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
 .tag-list {
   flex: 1;
   overflow-y: auto;
-}
-.tag-section {
-  padding: 10px 10px 4px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
 }
 .tag-item {
   display: flex;
