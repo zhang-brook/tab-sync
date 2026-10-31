@@ -1,7 +1,8 @@
 import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
-import { verifyToken, getServerVersion } from '../shared/api/auth'
+import { getServerVersion } from '../shared/api/auth'
+import { verifyTokenCandidate } from '../shared/api/token-verify'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, copyWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
@@ -198,19 +199,16 @@ async function handleGetState(): Promise<MessageResponse<StateData>> {
 
 /** Token 登录 */
 async function handleLoginWithToken(token: string): Promise<MessageResponse> {
-  // 先保存 token，这样 verifyToken 发请求时 apiClient 能读到
-  await storage.set(STORAGE_KEYS.AUTH_TOKEN, token)
-
-  const res = await verifyToken(token)
+  // 先携带待校验 Token 请求服务端，通过后再写入本地；失败不触碰现有认证
+  const res = await verifyTokenCandidate(token)
 
   if (!res.ok || !res.data?.valid) {
-    // 验证失败，清除 token
-    await storage.set(STORAGE_KEYS.AUTH_TOKEN, null)
     const error = res.error || 'Token 验证失败'
     logger.warn('Token login failed:', error)
     return { success: false, error }
   }
 
+  await storage.set(STORAGE_KEYS.AUTH_TOKEN, token)
   logger.info('Token login success')
 
   // 登录成功后向后端注册当前设备

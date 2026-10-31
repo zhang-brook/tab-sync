@@ -190,7 +190,6 @@
               <!-- 认证状态 -->
               <el-form-item label="连接状态">
                 <el-tag v-if="authStatus === 'authenticated'" type="success">已认证</el-tag>
-                <el-tag v-else-if="authStatus === 'checking'" type="warning">验证中...</el-tag>
                 <el-tag v-else type="info">未认证</el-tag>
                 <el-button v-if="authStatus === 'authenticated'" size="small" type="danger" @click="handleLogout" style="margin-left: 8px">
                   注销
@@ -420,7 +419,7 @@ const extensionVersion = chrome.runtime.getManifest().version
 const extensionId = chrome.runtime.id
 
 const connectionMode = ref<'lightweight' | 'zhige'>('lightweight')
-const authStatus = ref<'unknown' | 'authenticated' | 'checking'>('unknown')
+const authStatus = ref<'unknown' | 'authenticated'>('unknown')
 const versionInfo = ref<ServerCheckInfo | null>(null)
 
 onMounted(async () => {
@@ -528,7 +527,6 @@ async function handleSetToken() {
   }
 
   tokenChecking.value = true
-  authStatus.value = 'checking'
 
   const res = await sendMessage({
     action: 'LOGIN_WITH_TOKEN',
@@ -542,8 +540,8 @@ async function handleSetToken() {
     ElMessage.success('Token 验证成功')
     tokenInput.value = ''
   } else {
-    authStatus.value = 'unknown'
-    ElMessage.error(res.error || 'Token 验证失败')
+    // 校验失败没有写入本地，当前连接状态保持不变，仅提示保存失败
+    ElMessage.error(`保存失败：${res.error || 'Token 无效'}`)
   }
 }
 
