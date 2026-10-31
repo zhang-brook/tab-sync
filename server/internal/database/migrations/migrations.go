@@ -14,6 +14,7 @@ package migrations
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"gorm.io/gorm"
@@ -91,7 +92,11 @@ func apply(db *gorm.DB, list []Migration, models ...interface{}) error {
 		if err := db.AutoMigrate(models...); err != nil {
 			return err
 		}
-		return stampAll(db, list)
+		if err := stampAll(db, list); err != nil {
+			return err
+		}
+		slog.Info("全新数据库，已按当前模型初始化表结构", "schema_version", latest)
+		return nil
 	}
 
 	var pending []Migration
@@ -106,8 +111,15 @@ func apply(db *gorm.DB, list []Migration, models ...interface{}) error {
 		pending = append(pending, m)
 	}
 	if len(pending) == 0 {
+		slog.Debug("数据库结构已是最新，无需迁移", "schema_version", maxApplied)
 		return nil
 	}
+
+	names := make([]string, len(pending))
+	for i, m := range pending {
+		names[i] = fmt.Sprintf("v%d(%s)", m.Version, m.Name)
+	}
+	slog.Info("检测到待应用的数据库结构迁移", "count", len(pending), "migrations", names)
 
 	for _, m := range pending {
 		if m.BeforeAutoMigrate == nil {
@@ -131,6 +143,7 @@ func apply(db *gorm.DB, list []Migration, models ...interface{}) error {
 		if err := db.Create(&Record{Version: m.Version, Name: m.Name, AppliedAt: time.Now()}).Error; err != nil {
 			return fmt.Errorf("记录结构迁移 v%d(%s) 失败: %w", m.Version, m.Name, err)
 		}
+		slog.Info("数据库结构迁移已应用", "version", m.Version, "name", m.Name)
 	}
 	return nil
 }
