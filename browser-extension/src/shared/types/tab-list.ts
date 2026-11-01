@@ -54,6 +54,12 @@ export interface TabListSortEvent {
   moved?: { element: TabListItem; oldIndex: number; newIndex: number }
 }
 
+/** 云端标签页排序方式：名称 / 创建时间（标签页添加时间）/ 修改时间 */
+export type TabSortMode = 'name' | 'createdAt' | 'updatedAt'
+
+/** 云端列表展示顺序：manual 为工作组内的手动排序（仅工作组成员列表提供该模式） */
+export type CloudTabSortMode = TabSortMode | 'manual'
+
 /** 云端标签页行：在统一行数据上补充所属工作组信息，供共享列表组件执行操作 */
 export interface CloudTabListItem extends TabListItem {
   workspaceId: string

@@ -122,7 +122,9 @@ type TabReference struct {
 	Description string        `json:"description,omitempty"`
 	SortOrder   int           `json:"sortOrder"`
 	AddedAt     string        `json:"addedAt"`
-	Tags        []TagResponse `json:"tags"`
+	// UpdatedAt 记录最后修改时间（重命名、编辑链接/描述/添加时间、排序等操作会更新）
+	UpdatedAt string        `json:"updatedAt"`
+	Tags      []TagResponse `json:"tags"`
 }
 
 // TagResponse 标签响应（给前端）
@@ -256,9 +258,10 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]TabsGroup, error) {
 	return groups, nil
 }
 
-// ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页与关键字搜索。
+// ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索与排序。
 // 直接聚合数据，无需先取工作组树再拍平。
-func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, page, pageSize int) (*SyncedTabPage, error) {
+// sortBy 支持 name / createdAt（标签页添加时间）/ updatedAt；order 支持 asc / desc，其余取值回退默认排序。
+func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, sortBy, order string, page, pageSize int) (*SyncedTabPage, error) {
 	q := s.db.Model(&model.Tab{}).
 		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("workspaces.is_deleted = ?", false)
@@ -275,10 +278,25 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, pa
 		return nil, err
 	}
 
+	// 排序字段与方向都走白名单，避免把查询参数直接拼进 SQL
+	orderColumn := "tabs.added_at"
+	switch sortBy {
+	case "name":
+		orderColumn = "COALESCE(NULLIF(tabs.display_name, ''), tabs.title)"
+	case "createdAt":
+		orderColumn = "tabs.added_at"
+	case "updatedAt":
+		orderColumn = "tabs.updated_at"
+	}
+	orderDirection := "DESC"
+	if order == "asc" {
+		orderDirection = "ASC"
+	}
+
 	var tabs []model.Tab
 	offset := (page - 1) * pageSize
 	if err := q.Offset(offset).Limit(pageSize).
-		Order("tabs.added_at DESC, tabs.id DESC").
+		Order(orderColumn + " " + orderDirection + ", tabs.id DESC").
 		Preload("Tags.Tag").
 		Find(&tabs).Error; err != nil {
 		return nil, err
@@ -1086,6 +1104,7 @@ func (s *WorkspaceService) CopyTab(workspaceID, tabID string) (*TabReference, er
 		Description: copied.Description,
 		SortOrder:   copied.SortOrder,
 		AddedAt:     copied.AddedAt.Format(time.RFC3339),
+		UpdatedAt:   copied.UpdatedAt.Format(time.RFC3339),
 	}, nil
 }
 
@@ -1148,6 +1167,7 @@ func (s *WorkspaceService) AddTabByURL(workspaceID string, payload AddTabByURLPa
 		FavIconURL: tab.FavIconURL,
 		SortOrder:  tab.SortOrder,
 		AddedAt:    tab.AddedAt.Format(time.RFC3339),
+		UpdatedAt:  tab.UpdatedAt.Format(time.RFC3339),
 	}, nil
 }
 
@@ -1303,6 +1323,7 @@ func toTabReferences(tabs []model.Tab) []TabReference {
 			Description: tab.Description,
 			SortOrder:   tab.SortOrder,
 			AddedAt:     tab.AddedAt.Format(time.RFC3339),
+			UpdatedAt:   tab.UpdatedAt.Format(time.RFC3339),
 			Tags:        tabTagsToResponses(tab.Tags),
 		}
 	}

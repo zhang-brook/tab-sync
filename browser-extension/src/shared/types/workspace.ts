@@ -55,6 +55,8 @@ export interface TabReference {
   sortOrder: number
   /** 加入工作组的时间 */
   addedAt: string
+  /** 记录最后修改时间（重命名、编辑链接/描述/添加时间、排序等操作会更新） */
+  updatedAt?: string
   /** 该标签页上的标签 */
   tags?: TagInfo[]
 }

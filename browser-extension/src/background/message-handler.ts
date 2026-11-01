@@ -366,12 +366,21 @@ async function handleGetWorkspaceTabs(payload: { workspaceId: string; recursive?
 }
 
 /** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平） */
-async function handleGetSyncedTabs(payload: { page?: number; pageSize?: number; keyword?: string; includeSystem?: boolean }): Promise<MessageResponse<SyncedTabPageData>> {
+async function handleGetSyncedTabs(payload: {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  includeSystem?: boolean
+  sort?: string
+  order?: string
+}): Promise<MessageResponse<SyncedTabPageData>> {
   const res = await getSyncedTabs({
     page: payload?.page ?? 1,
     pageSize: payload?.pageSize ?? 50,
     keyword: payload?.keyword ?? '',
     includeSystem: payload?.includeSystem ?? true,
+    sort: payload?.sort ?? '',
+    order: payload?.order ?? '',
   })
   if (res.ok && res.data) {
     return { success: true, data: res.data }

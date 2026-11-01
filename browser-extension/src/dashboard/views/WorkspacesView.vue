@@ -179,9 +179,12 @@
             <CloudTabListPanel
               v-model:page="tabPage"
               v-model:page-size="tabPageSize"
+              v-model:sort-mode="tabSortMode"
+              v-model:sort-asc="tabSortAsc"
               :items="pagedTabItems"
               :total="tabListItems.length"
-              :sortable="tabScope === 'current' && tagFilter == null"
+              :sortable="tabScope === 'current' && tagFilter == null && tabSortMode === 'manual'"
+              show-manual-sort
               :workspaces="workspaces"
               :empty-description="tabEmptyDescription"
               :total-text="`共 ${tabListItems.length} 个标签页`"
@@ -310,7 +313,7 @@ import {
   updateWorkspace,
 } from '@/shared/services'
 import type { Workspace, TabReference, TagInfo } from '@/shared/types'
-import type { CloudTabListItem, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
+import type { CloudTabListItem, CloudTabSortMode, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
 
 const route = useRoute()
 const router = useRouter()
@@ -554,13 +557,29 @@ const tabListItems = computed<CloudTabListItem[]>(() =>
   })),
 )
 
-// 右侧列表分页：数据一次性随工作组拉取，翻页在前端切片
+// 右侧列表分页与排序：数据一次性随工作组拉取，排序与翻页均在前端完成
 const tabPage = ref(1)
 const tabPageSize = ref(20)
+/** 默认顺序 = 工作组内的手动排序（sortOrder），拖拽排序仅在该模式下可用 */
+const tabSortMode = ref<CloudTabSortMode>('manual')
+const tabSortAsc = ref(false)
+
+/** 创建时间取标签页添加时间 addedAt（与行内展示一致），修改时间取后端下发的 updatedAt */
+const sortedTabItems = computed(() => {
+  const items = tabListItems.value
+  if (tabSortMode.value === 'manual') return items
+  const dir = tabSortAsc.value ? 1 : -1
+  if (tabSortMode.value === 'name') {
+    return [...items].sort((a, b) => dir * a.title.localeCompare(b.title, 'zh-Hans-CN'))
+  }
+  const timeOf = (item: CloudTabListItem) =>
+    Date.parse(tabSortMode.value === 'createdAt' ? item.tab.addedAt : (item.tab.updatedAt ?? '')) || 0
+  return [...items].sort((a, b) => dir * (timeOf(a) - timeOf(b)))
+})
 
 const pagedTabItems = computed(() => {
   const start = (tabPage.value - 1) * tabPageSize.value
-  return tabListItems.value.slice(start, start + tabPageSize.value)
+  return sortedTabItems.value.slice(start, start + tabPageSize.value)
 })
 
 const tabEmptyDescription = computed(() =>

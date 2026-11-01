@@ -163,6 +163,8 @@ export async function listSyncedTabs(params: {
   pageSize?: number
   keyword?: string
   includeSystem?: boolean
+  sort?: string
+  order?: string
 }): Promise<SyncedTabPageData> {
   return callService<SyncedTabPageData>({ action: 'GET_SYNCED_TABS', payload: params })
 }

@@ -218,7 +218,8 @@ func (h *WorkspaceHandler) TabsSummary(c *gin.Context) {
 }
 
 // ListSyncedTabs 「已同步标签页」页面：跨所有工作组扁平化分页返回标签页。
-// 查询参数：page/pageSize（默认 1/50）、keyword（标题/URL 模糊搜索）、includeSystem（默认 true）。
+// 查询参数：page/pageSize（默认 1/50）、keyword（标题/URL 模糊搜索）、includeSystem（默认 true）、
+// sort（name/createdAt/updatedAt，默认 addedAt 倒序）、order（asc/desc）。
 func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
@@ -230,8 +231,10 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	}
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	includeSystem := c.Query("includeSystem") != "false"
+	sortBy := strings.TrimSpace(c.Query("sort"))
+	order := strings.TrimSpace(c.Query("order"))
 
-	page_, err := h.svc.ListSyncedTabs(keyword, includeSystem, page, pageSize)
+	page_, err := h.svc.ListSyncedTabs(keyword, includeSystem, sortBy, order, page, pageSize)
 	if err != nil {
 		InternalError(c, "获取已同步标签页失败")
 		return

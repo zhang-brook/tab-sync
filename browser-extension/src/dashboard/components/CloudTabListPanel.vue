@@ -1,5 +1,58 @@
 <template>
   <div class="tab-list-panel">
+    <div class="sort-row">
+      <span class="sort-label">排序</span>
+      <div class="sort-toggle">
+        <button
+          v-if="showManualSort"
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'manual' }"
+          title="按工作组内的手动排序（可拖拽调整）"
+          @click="onSortClick('manual')"
+        >默认顺序</button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'name' }"
+          title="再次点击切换 A-Z / Z-A"
+          @click="onSortClick('name')"
+        >
+          按名称
+          <el-icon v-if="sortMode === 'name'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'createdAt' }"
+          title="再次点击切换创建时间升序 / 降序"
+          @click="onSortClick('createdAt')"
+        >
+          按创建时间
+          <el-icon v-if="sortMode === 'createdAt'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'updatedAt' }"
+          title="再次点击切换修改时间升序 / 降序"
+          @click="onSortClick('updatedAt')"
+        >
+          按修改时间
+          <el-icon v-if="sortMode === 'updatedAt'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+      </div>
+    </div>
+
     <div v-if="loading" class="panel-state">
       <el-icon class="is-loading"><Loading /></el-icon>
       <span>加载中…</span>
@@ -77,7 +130,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { Delete, Loading } from '@element-plus/icons-vue'
+import { Delete, Loading, SortDown, SortUp } from '@element-plus/icons-vue'
 import TabList from '@/shared/components/TabList.vue'
 import SelectionBar from '@/shared/components/SelectionBar.vue'
 import CloudTabDialogs, { type CloudTabDialogMode } from '@/shared/components/CloudTabDialogs.vue'
@@ -93,7 +146,7 @@ import {
   removeWorkspaceTab,
   reportServiceError,
 } from '@/shared/services'
-import type { CloudTabListItem, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
+import type { CloudTabListItem, CloudTabSortMode, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
 import type { Workspace } from '@/shared/types'
 
 const props = withDefaults(
@@ -117,6 +170,12 @@ const props = withDefaults(
     workspaces?: Workspace[]
     /** 行菜单是否提供「打开工作组」 */
     showOpenWorkspace?: boolean
+    /** 排序方式：名称 / 创建时间（标签页添加时间）/ 修改时间；manual 为组内手动顺序 */
+    sortMode?: CloudTabSortMode
+    /** 排序方向：true 为升序 */
+    sortAsc?: boolean
+    /** 是否提供「默认顺序」选项（工作组成员列表支持手动拖拽排序） */
+    showManualSort?: boolean
   }>(),
   {
     loading: false,
@@ -127,12 +186,17 @@ const props = withDefaults(
     pageSizes: () => [20, 50, 100, 200],
     workspaces: undefined,
     showOpenWorkspace: false,
+    sortMode: 'createdAt',
+    sortAsc: false,
+    showManualSort: false,
   },
 )
 
 const emit = defineEmits<{
   (e: 'update:page', page: number): void
   (e: 'update:pageSize', size: number): void
+  (e: 'update:sortMode', mode: CloudTabSortMode): void
+  (e: 'update:sortAsc', asc: boolean): void
   /** 数据已被修改，父组件需重新拉取 */
   (e: 'refresh'): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
@@ -338,6 +402,17 @@ async function onBatchMove(node: WorkspaceTreeNode) {
   if (fail > 0) ElMessage.error(`有 ${fail} 个标签页移动失败`)
 }
 
+/** 再次点击同一排序方式切换升降序；切换到新方式时名称默认 A-Z、时间默认最新在前 */
+function onSortClick(mode: CloudTabSortMode) {
+  if (props.sortMode === mode) {
+    emit('update:sortAsc', !props.sortAsc)
+  } else {
+    emit('update:sortMode', mode)
+    emit('update:sortAsc', mode === 'name')
+  }
+  emit('update:page', 1)
+}
+
 function onPageChange(page: number) {
   emit('update:page', page)
 }
@@ -354,6 +429,63 @@ function onSizeChange(size: number) {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.sort-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+.sort-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.sort-toggle {
+  display: inline-flex;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.sort-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.sort-btn + .sort-btn {
+  border-left: none;
+}
+
+.sort-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.sort-btn.active {
+  color: #fff;
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+}
+
+.sort-btn:not(.active):hover {
+  color: var(--el-color-primary);
+}
+
+.sort-dir {
+  font-size: 12px;
 }
 
 .panel-state {
