@@ -20,6 +20,11 @@
           <span class="pane-title">工作组</span>
           <span v-if="searchKeyword" class="tree-hint">搜索中暂不可拖拽</span>
           <div class="pane-title-actions">
+            <el-button size="small" text :title="treeAllExpanded ? '全部折叠' : '全部展开'" @click="toggleTreeExpanded">
+              <template #icon>
+                <TreeExpandToggleIcon :expanded="treeAllExpanded" />
+              </template>
+            </el-button>
             <el-button size="small" text :icon="Refresh" :loading="refreshing" title="刷新"
               @click="refreshTree" />
             <el-tooltip content="新建工作组" placement="top">
@@ -36,7 +41,8 @@
         <el-tree v-else ref="treeRef" :data="treeData" node-key="id" :props="treeProps" :filter-node-method="filterNode"
           :expand-on-click-node="false" highlight-current :default-expanded-keys="defaultExpandedKeys"
           :draggable="!searchKeyword" :allow-drag="allowDragNode" :allow-drop="allowDropNode"
-          @node-click="onSelectNode" @node-expand="onNodeExpand" @node-drop="onNodeDrop">
+          @node-click="onSelectNode" @node-expand="onNodeExpand" @node-collapse="syncTreeExpanded"
+          @node-drop="onNodeDrop">
           <template #default="{ data }">
             <ContextMenu @command="(cmd: string) => onNodeMenuCommand(cmd, data)" @open="() => onNodeContextMenu(data)">
               <span class="tree-node">
@@ -287,6 +293,7 @@ import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
 import CloudTabListPanel from '../components/CloudTabListPanel.vue'
+import TreeExpandToggleIcon from '../components/TreeExpandToggleIcon.vue'
 import EntityTag from '@/shared/components/EntityTag.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -294,6 +301,7 @@ import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
 import { buildWorkspaceTree, collectDescendantIds, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
+import { setTreeNodesExpanded, isTreeFullyExpanded } from '@/shared/utils/tree'
 import { copyText } from '@/shared/utils/clipboard'
 import {
   addWorkspaceTag,
@@ -405,6 +413,8 @@ const tagEditorTarget = ref<{ workspaceId: string; tabId?: string } | null>(null
 
 const treeRef = ref()
 const treeProps = { label: 'name', children: 'children' }
+/** 左侧树是否已全部展开：决定切换按钮显示「全部展开」还是「全部折叠」 */
+const treeAllExpanded = ref(false)
 
 const defaultWorkspaceId = ref('')
 
@@ -457,6 +467,7 @@ watch(treeData, async () => {
     }
   }
   walk(treeData.value)
+  syncTreeExpanded()
 })
 
 /**
@@ -473,6 +484,7 @@ function onNodeExpand(_data: WorkspaceTreeNode, node: any) {
     }
   }
   walk(node)
+  syncTreeExpanded()
 }
 
 /** 父工作组选择器：编辑时禁用自身及后代，避免形成环 */
@@ -694,6 +706,7 @@ async function revealSelected(id: string) {
   tree.setCurrentKey(id)
   // 选中项自身默认展开（设置过「默认折叠」的工作组被选中时同样展开）
   if (node.childNodes?.length > 0) node.expand()
+  syncTreeExpanded()
 }
 
 /** 是否已完成首次加载：首次加载优先定位路由指定分组，其次默认分组 */
@@ -733,6 +746,17 @@ async function loadWorkspaces(options: { silent?: boolean; withTabs?: boolean } 
     void refreshTabs(ids, isAll ? selectedId.value : undefined)
   }
   return ok
+}
+
+/** 左侧树：单个按钮在「全部展开 / 全部折叠」间切换 */
+function toggleTreeExpanded() {
+  setTreeNodesExpanded(treeRef.value, !treeAllExpanded.value)
+  syncTreeExpanded()
+}
+
+/** 同步「是否已全部展开」，用于切换按钮的图标与提示文案 */
+function syncTreeExpanded() {
+  treeAllExpanded.value = isTreeFullyExpanded(treeRef.value)
 }
 
 /** 左侧树刷新按钮：只重拉工作组分组树，右侧标签页列表保持不动 */

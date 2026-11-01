@@ -22,8 +22,15 @@
       <div class="domain-pane">
         <div class="pane-title-row">
           <span class="pane-title">域名</span>
-          <el-button size="small" text :icon="Refresh" :loading="refreshing" title="刷新"
-            @click="refreshDomainTree" />
+          <div class="pane-title-actions">
+            <el-button size="small" text :title="treeAllExpanded ? '全部折叠' : '全部展开'" @click="toggleTreeExpanded">
+              <template #icon>
+                <TreeExpandToggleIcon :expanded="treeAllExpanded" />
+              </template>
+            </el-button>
+            <el-button size="small" text :icon="Refresh" :loading="refreshing" title="刷新"
+              @click="refreshDomainTree" />
+          </div>
         </div>
         <el-tree
           ref="domainTreeRef"
@@ -32,8 +39,10 @@
           :props="domainTreeProps"
           :expand-on-click-node="false"
           highlight-current
-          :default-expanded-keys="['all']"
+          :default-expanded-keys="domainDefaultExpandedKeys"
           @node-click="onDomainClick"
+          @node-expand="syncTreeExpanded"
+          @node-collapse="syncTreeExpanded"
         >
           <template #default="{ data }">
             <ContextMenu
@@ -96,10 +105,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Collection, CopyDocument, FolderOpened, Search, Refresh } from '@element-plus/icons-vue'
 import CloudTabListPanel from '../components/CloudTabListPanel.vue'
+import TreeExpandToggleIcon from '../components/TreeExpandToggleIcon.vue'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
 import { listSyncedTabs, listTabHosts, listTags, listWorkspaces, reportServiceError } from '@/shared/services'
 import { rootDomainOf } from '@/shared/utils/domain'
 import { openTabUrls } from '@/shared/utils/tab-utils'
+import { setTreeNodesExpanded, isTreeFullyExpanded } from '@/shared/utils/tree'
 import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter, TabTagMatch } from '@/shared/types/tab-list'
 import type { TabHostsData, TagInfo, Workspace } from '@/shared/types'
 
@@ -143,7 +154,11 @@ interface DomainTreeNode {
 }
 
 const domainTreeProps = { label: 'label', children: 'children' }
+/** 初始展开根节点「(全部)」。保持引用稳定，避免重渲染时 el-tree 重新应用默认展开 */
+const domainDefaultExpandedKeys = ['all']
 const domainTreeRef = ref()
+/** 左侧树是否已全部展开：决定切换按钮显示「全部展开」还是「全部折叠」 */
+const treeAllExpanded = ref(false)
 const domainHosts = ref<TabHostsData['hosts']>([])
 const domainTotal = ref(0)
 /** 当前选中的域名节点，默认「(全部)」 */
@@ -211,7 +226,10 @@ function ensureDomainSelection() {
     selectedDomain.value = 'all'
     page.value = 1
   }
-  void nextTick(() => domainTreeRef.value?.setCurrentKey(selectedDomain.value))
+  void nextTick(() => {
+    domainTreeRef.value?.setCurrentKey(selectedDomain.value)
+    syncTreeExpanded()
+  })
 }
 
 function onDomainClick(node: DomainTreeNode) {
@@ -362,6 +380,17 @@ function onRefresh() {
   void loadHosts()
 }
 
+/** 左侧树：单个按钮在「全部展开 / 全部折叠」间切换 */
+function toggleTreeExpanded() {
+  setTreeNodesExpanded(domainTreeRef.value, !treeAllExpanded.value)
+  syncTreeExpanded()
+}
+
+/** 同步「是否已全部展开」，用于切换按钮的图标与提示文案 */
+function syncTreeExpanded() {
+  treeAllExpanded.value = isTreeFullyExpanded(domainTreeRef.value)
+}
+
 /** 左侧树刷新按钮：只重拉域名分布，右侧标签页列表保持不动 */
 async function refreshDomainTree() {
   refreshing.value = true
@@ -439,6 +468,11 @@ onMounted(() => {
   font-size: 13px;
   font-weight: 600;
   color: #909399;
+}
+.pane-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .domain-node {
   display: flex;
