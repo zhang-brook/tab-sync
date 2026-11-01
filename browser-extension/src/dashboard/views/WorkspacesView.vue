@@ -173,34 +173,20 @@
             </el-select>
           </div>
 
-          <!-- 批量操作工具条（勾选标签页后出现，操作与行右键菜单一致） -->
-          <SelectionBar v-if="selectedTabIds.length > 0" :count="selectedTabIds.length" class="batch-bar">
-            <el-button size="small" @click="openSelectedTabs">打开</el-button>
-            <el-button size="small" @click="copySelectedLinks">复制链接</el-button>
-            <el-button size="small" type="primary" @click="openBatchMoveDialog">移动到工作组</el-button>
-            <el-button size="small" type="danger" plain @click="removeSelectedTabs">移除</el-button>
-            <el-button size="small" text @click="toggleSelectAll">
-              {{ allDisplayedSelected ? '取消全选' : '全选本列表' }}
-            </el-button>
-            <el-button size="small" text @click="clearSelection">取消选择</el-button>
-          </SelectionBar>
-
-          <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标） -->
+          <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标）；
+               行菜单、批量选择与分页由共享面板统一提供 -->
           <div class="detail-body">
-            <el-empty v-if="rightTabs.length === 0" :image-size="60"
-              :description="tagFilter != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页'" />
-
-            <TabList
-              v-else
-              :items="tabListItems"
-              :menu-items="tabMenu"
+            <CloudTabListPanel
+              v-model:page="tabPage"
+              v-model:page-size="tabPageSize"
+              :items="pagedTabItems"
+              :total="tabListItems.length"
               :sortable="tabScope === 'current' && tagFilter == null"
-              selectable
-              :selected="selectedTabIds"
-              @update:selected="onTabSelectionChange"
+              :workspaces="workspaces"
+              :empty-description="tabEmptyDescription"
+              :total-text="`共 ${tabListItems.length} 个标签页`"
+              @refresh="onTabListRefresh"
               @sort="onTabSort"
-              @click="onTabClick"
-              @command="onTabMenuCommand"
             />
           </div>
         </template>
@@ -251,20 +237,9 @@
       </template>
     </el-dialog>
 
-    <!-- 标签页行操作弹窗（编辑/移动/标签） -->
-    <CloudTabDialogs v-model:mode="tabDialogMode" :target="tabDialogTarget" @saved="onTabDialogSaved" />
-
     <!-- 工作组标签编辑 -->
     <TagEditorDialog v-model="tagEditorVisible" :scope="tagEditorScope" :selected-ids="tagEditorSelectedIds"
       @confirm="onTagEditorConfirm" />
-
-    <!-- 批量移动到其他工作组 -->
-    <WorkspacePickerDialog
-      v-model="batchMovePickerVisible"
-      title="移动到工作组"
-      :disabled-ids="batchMoveDisabledIds"
-      @select="handleBatchMoveToWorkspace"
-    />
 
     <!-- 选择父工作组 -->
     <WorkspacePickerDialog v-model="parentPickerVisible" title="选择父工作组" :disabled-ids="parentDisabledIds"
@@ -296,10 +271,6 @@
 
     <!-- 工作组属性对话框 -->
     <WorkspacePropertiesDialog v-model="propertiesVisible" :workspace="propertiesTarget" :workspaces="workspaces" />
-
-    <!-- 标签页属性对话框 -->
-    <TabPropertiesDialog v-model="tabPropertiesVisible" :tab="tabPropertiesTarget?.tab ?? null"
-      :workspace-path="tabPropertiesPath" />
   </div>
 </template>
 
@@ -307,24 +278,19 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ContextMenu from '@/shared/components/ContextMenu.vue'
-import TabList, { type TabListItem, type TabListSortEvent } from '@/shared/components/TabList.vue'
-import SelectionBar from '@/shared/components/SelectionBar.vue'
-import CloudTabDialogs, { type CloudTabDialogMode } from '@/shared/components/CloudTabDialogs.vue'
 import TagEditorDialog from '@/shared/components/TagEditorDialog.vue'
 import WorkspacePickerDialog from '@/shared/components/WorkspacePickerDialog.vue'
 import NodeDropdownMenu from '../components/NodeDropdownMenu.vue'
 import WorkspacePropertiesDialog from '../components/WorkspacePropertiesDialog.vue'
-import TabPropertiesDialog from '../components/TabPropertiesDialog.vue'
+import CloudTabListPanel from '../components/CloudTabListPanel.vue'
 import EntityTag from '@/shared/components/EntityTag.vue'
 import { Search, Plus, Refresh, FolderOpened, CopyDocument, Collection, Edit, Delete, FolderAdd, MoreFilled, PriceTag, Link, Memo, Files } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useWorkspaceActions } from '@/shared/composables/useWorkspaceActions'
 import { storage, STORAGE_KEYS } from '@/shared/storage'
 import { DEFAULT_WORKSPACE_COLOR, TAG_COLOR_PALETTE } from '@/shared/constants/theme'
-import { buildWorkspaceTree, collectDescendantIds, getWorkspacePath, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
-import { openTabAfterActive } from '@/shared/utils/tab-utils'
+import { buildWorkspaceTree, collectDescendantIds, pinSystemGroups, type WorkspaceTreeNode } from '@/shared/utils/workspace-tree'
 import { copyText } from '@/shared/utils/clipboard'
-import { cloudTabMenu } from '@/shared/actions/tab-actions'
 import {
   addWorkspaceTag,
   addWorkspaceTabByUrl,
@@ -338,13 +304,13 @@ import {
   moveWorkspace,
   moveWorkspaceTab,
   openWorkspace,
-  removeWorkspaceTab,
   removeWorkspaceTag,
   reportServiceError,
   UNGROUPED_WORKSPACE_ID,
   updateWorkspace,
 } from '@/shared/services'
 import type { Workspace, TabReference, TagInfo } from '@/shared/types'
+import type { CloudTabListItem, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
 
 const route = useRoute()
 const router = useRouter()
@@ -556,13 +522,8 @@ const rightTabs = computed<RightTabItem[]>(() => {
   return result
 })
 
-interface WsTabListItem extends TabListItem {
-  tab: TabReference
-  workspaceId: string
-}
-
 /** 右侧标签页列表 → 公共列表组件数据（「包含子工作组」模式下非本组标签页带来源徽标） */
-const tabListItems = computed<WsTabListItem[]>(() =>
+const tabListItems = computed<CloudTabListItem[]>(() =>
   rightTabs.value.map((it) => ({
     id: `${it.workspaceId}-${it.tab.tabId}`,
     title: displayTitle(it.tab),
@@ -593,34 +554,33 @@ const tabListItems = computed<WsTabListItem[]>(() =>
   })),
 )
 
-const tabMenu = cloudTabMenu()
+// 右侧列表分页：数据一次性随工作组拉取，翻页在前端切片
+const tabPage = ref(1)
+const tabPageSize = ref(20)
 
-const tabDialogMode = ref<CloudTabDialogMode | null>(null)
-const tabDialogTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
+const pagedTabItems = computed(() => {
+  const start = (tabPage.value - 1) * tabPageSize.value
+  return tabListItems.value.slice(start, start + tabPageSize.value)
+})
 
-/** 标签页属性弹窗：展示所属工作组路径、标签、描述与添加时间 */
-const tabPropertiesVisible = ref(false)
-const tabPropertiesTarget = ref<{ workspaceId: string; tab: TabReference } | null>(null)
-const tabPropertiesPath = computed(() =>
-  tabPropertiesTarget.value
-    ? getWorkspacePath(workspaces.value, tabPropertiesTarget.value.workspaceId).fullPath
-    : '',
+const tabEmptyDescription = computed(() =>
+  tagFilter.value != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页',
 )
 
-function openTabDialog(mode: CloudTabDialogMode, workspaceId: string, tab: TabReference) {
-  tabDialogTarget.value = { workspaceId, tab }
-  tabDialogMode.value = mode
-}
+/** 当前页已被删除/筛选后回退到最后一个有效页 */
+const tabPageCount = computed(() => Math.max(1, Math.ceil(tabListItems.value.length / tabPageSize.value)))
+watch(tabPageCount, (max) => {
+  if (tabPage.value > max) tabPage.value = max
+})
 
-/** 行内操作已写入后端：刷新对应工作组标签页，并同步工作组标签/计数 */
-function onTabDialogSaved(workspaceId: string) {
-  void refreshTabs([workspaceId])
+/** 面板内修改了标签页：刷新当前工作组（及子树）并同步工作组计数 */
+function onTabListRefresh() {
+  const id = selectedId.value
+  if (!id) return
+  const isAll = tabScope.value === 'all'
+  const ids = isAll ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
+  void refreshTabs(ids, isAll ? id : undefined)
   void loadWorkspaces({ silent: true })
-}
-
-function onTabClick(item: TabListItem) {
-  const target = tabListItems.value.find((i) => i.id === item.id)
-  if (target) void openSingleTab(target.tab.url)
 }
 
 watch(searchKeyword, (val) => {
@@ -630,11 +590,16 @@ watch(searchKeyword, (val) => {
 // 选中工作组或切换层级范围后，右侧先展示缓存，再强制从后端拉取最新标签页列表。
 // 「包含子工作组」模式以根 id 调一次批量接口返回整棵子树，避免逐个工作组请求。
 watch([selectedId, tabScope], ([id]) => {
-  selectedTabIds.value = []
+  tabPage.value = 1
   if (!id) return
   const isAll = tabScope.value === 'all'
   const ids = isAll ? [id, ...collectDescendantIds(workspaces.value, id)] : [id]
   void refreshTabs(ids, isAll ? id : undefined)
+})
+
+// 标签筛选只影响当前缓存数据的展示，回到第一页
+watch(tagFilter, () => {
+  tabPage.value = 1
 })
 
 function filterNode(value: string, data: Record<string, unknown>) {
@@ -857,33 +822,6 @@ async function onNodeDrop(dragging: TreeDragNode, drop: TreeDragNode, type: Tree
   await loadWorkspaces()
 }
 
-/** 标签页操作菜单命令分发（行菜单与右键菜单共用一个描述） */
-function onTabMenuCommand(command: string, item: TabListItem) {
-  const target = tabListItems.value.find((i) => i.id === item.id)
-  if (!target) return
-  const { workspaceId, tab } = target
-  switch (command) {
-    case 'open':
-      openSingleTab(tab.url)
-      break
-    case 'copyTitle':
-      copyToClipboard(displayTitle(tab), '标题已复制')
-      break
-    case 'copyLink':
-      copyToClipboard(tab.url, '链接已复制')
-      break
-    case 'remove':
-      void handleRemoveTab(workspaceId, tab.tabId)
-      break
-    case 'properties':
-      tabPropertiesTarget.value = { workspaceId, tab }
-      tabPropertiesVisible.value = true
-      break
-    default:
-      openTabDialog(command as CloudTabDialogMode, workspaceId, tab)
-  }
-}
-
 /** 复制文本到剪贴板 */
 async function copyToClipboard(text: string, successMsg: string) {
   const ok = await copyText(text)
@@ -1081,40 +1019,32 @@ async function handleOpenAsTabGroup(id: string) {
   }
 }
 
-async function openSingleTab(url: string) {
-  await openTabAfterActive(url)
-}
-
-async function handleRemoveTab(workspaceId: string, tabId: string) {
-  try {
-    await removeWorkspaceTab(workspaceId, tabId)
-    ElMessage.success('标签页已从工作组移除')
-    await refreshTabs([workspaceId])
-    await loadWorkspaces({ silent: true })
-  } catch (err) {
-    reportServiceError(err, { fallback: '移除失败' })
-  }
-}
-
 /** 列表中优先展示重命名后的显示名，否则回退到原始标题 */
 function displayTitle(tab: TabReference): string {
   return tab.displayName || tab.title || '(无标题)'
 }
 
-/** 同组内拖拽排序（以当前展示列表为准，映射回原数组索引） */
+/** 同组内拖拽排序（列表已分页，需把页内位置换算成整组位置） */
 function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
   const ws = selectedWorkspace.value
-  const moved = evt.moved?.element as WsTabListItem | undefined
+  const moved = evt.moved?.element as CloudTabListItem | undefined
   if (!ws || !moved) return
   const newRelIndex = items.findIndex((i) => i.id === moved.id)
   if (newRelIndex < 0) return
+  const newIndex = (tabPage.value - 1) * tabPageSize.value + newRelIndex
   // 未筛选时本地同步展示顺序，避免依赖父数据重渲染导致拖拽后顺序回退
   if (tagFilter.value == null && tabScope.value === 'current') {
-    tabsCache.set(ws.id, items.map((i) => (i as WsTabListItem).tab))
+    const full = [...(tabsCache.get(ws.id) ?? [])]
+    const from = full.findIndex((t) => t.tabId === moved.tab.tabId)
+    if (from >= 0) {
+      const [tab] = full.splice(from, 1)
+      full.splice(newIndex, 0, tab)
+      tabsCache.set(ws.id, full)
+    }
   }
-  // newRelIndex 为被拖拽项在新列表中的位置；服务端 MoveTab 会先移除该项再插入到
+  // newIndex 为被拖拽项在整组中的新位置；服务端 MoveTab 会先移除该项再插入到
   // 剩余列表的 newIndex 处，二者语义一致，故直接以新位置作为目标索引。
-  handleMoveTab(ws.id, moved.tab.tabId, newRelIndex)
+  handleMoveTab(ws.id, moved.tab.tabId, newIndex)
 }
 
 async function handleMoveTab(targetWsId: string, tabId: string, newIndex: number) {
@@ -1146,124 +1076,6 @@ async function handleAddTabByUrl() {
   }
 }
 
-// ============ 标签页批量选择 ============
-
-const selectedTabIds = ref<Array<string | number>>([])
-
-/** TabList 回传的选中变化（其 item.id 为 `${workspaceId}-${tabId}`） */
-function onTabSelectionChange(keys: Array<string | number>) {
-  selectedTabIds.value = keys
-}
-function clearSelection() {
-  selectedTabIds.value = []
-}
-/** 当前列表是否已被全选 */
-const allDisplayedSelected = computed(
-  () => tabListItems.value.length > 0 && tabListItems.value.every((i) => selectedTabIds.value.includes(i.id)),
-)
-function toggleSelectAll() {
-  selectedTabIds.value = allDisplayedSelected.value ? [] : tabListItems.value.map((i) => i.id)
-}
-/** 选中项解析为 { workspaceId, tabId }，便于发起后台操作 */
-function selectedTabMeta(): { workspaceId: string; tabId: string }[] {
-  return tabListItems.value
-    .filter((i) => selectedTabIds.value.includes(i.id))
-    .map((i) => ({ workspaceId: i.workspaceId, tabId: i.tab.tabId }))
-}
-
-/** 打开选中的全部标签页 */
-function openSelectedTabs() {
-  for (const m of selectedTabMeta()) {
-    const tab = tabsCache.get(m.workspaceId)?.find((t) => t.tabId === m.tabId)
-    if (tab?.url) window.open(tab.url, '_blank', 'noopener')
-  }
-}
-/** 复制选中标签页的链接（换行分隔） */
-async function copySelectedLinks() {
-  const urls: string[] = []
-  for (const m of selectedTabMeta()) {
-    const tab = tabsCache.get(m.workspaceId)?.find((t) => t.tabId === m.tabId)
-    if (tab?.url) urls.push(tab.url)
-  }
-  const ok = await copyText(urls.join('\n'))
-  if (ok) ElMessage.success(`已复制 ${urls.length} 个链接`)
-  else ElMessage.error('复制失败')
-}
-/** 批量从工作组移除（移至回收站） */
-async function removeSelectedTabs() {
-  const metas = selectedTabMeta()
-  if (metas.length === 0) return
-  try {
-    await ElMessageBox.confirm(
-      `确定将选中的 ${metas.length} 个标签页移至回收站吗？`,
-      '批量移除',
-      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
-    return
-  }
-  let ok = 0
-  for (const m of metas) {
-    try {
-      await removeWorkspaceTab(m.workspaceId, m.tabId)
-      ok++
-    } catch {
-      // 单个失败不阻断其余标签页
-    }
-  }
-  if (ok > 0) {
-    ElMessage.success(`已移除 ${ok} 个标签页`)
-    await refreshTabs([...new Set(metas.map((m) => m.workspaceId))])
-    await loadWorkspaces({ silent: true })
-  }
-  clearSelection()
-}
-
-// ============ 批量移动到其他工作组 ============
-
-const batchMovePickerVisible = ref(false)
-
-/** 批量移动时禁用所有源工作组（已在新分组里的标签页无需再移入） */
-const batchMoveDisabledIds = computed<string[]>(() => [
-  ...new Set(selectedTabMeta().map((m) => m.workspaceId)),
-])
-
-function openBatchMoveDialog() {
-  if (selectedTabIds.value.length === 0) return
-  batchMovePickerVisible.value = true
-}
-
-/** 批量移动：依次将选中标签页追加到目标工作组末尾 */
-async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
-  const metas = selectedTabMeta()
-  if (metas.length === 0) return
-  let base = 0
-  try {
-    base = (await listWorkspaceTabs(node.id)).length
-  } catch (err) {
-    reportServiceError(err, { fallback: '获取目标工作组失败' })
-    return
-  }
-  let ok = 0
-  let fail = 0
-  for (const m of metas) {
-    try {
-      await moveWorkspaceTab(node.id, m.tabId, base + ok)
-      ok++
-    } catch {
-      fail++
-    }
-  }
-  if (ok > 0) {
-    ElMessage.success(`已移动 ${ok} 个标签页到「${node.name}」`)
-    const srcIds = [...new Set(metas.map((m) => m.workspaceId))]
-    await refreshTabs([...srcIds, node.id].filter(Boolean))
-    await loadWorkspaces({ silent: true })
-  }
-  if (fail > 0) ElMessage.error(`有 ${fail} 个标签页移动失败`)
-  batchMovePickerVisible.value = false
-  clearSelection()
-}
 </script>
 
 <style scoped>
@@ -1311,7 +1123,7 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   border: 1px solid #ebeef5;
   border-radius: 8px;
   padding: 16px;
-  overflow-y: auto;
+  overflow: hidden;
   background: #fff;
   display: flex;
   flex-direction: column;
@@ -1403,6 +1215,7 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .ws-description {
@@ -1466,12 +1279,11 @@ async function handleBatchMoveToWorkspace(node: WorkspaceTreeNode) {
   padding: 12px 0;
 }
 
-.batch-bar {
-  margin-bottom: 4px;
-}
-
 .detail-body {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .dialog-hint {

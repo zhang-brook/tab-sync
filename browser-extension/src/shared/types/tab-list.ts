@@ -1,4 +1,5 @@
 import type { Component } from 'vue'
+import type { TabReference } from './workspace'
 
 /** 列表行上的可点击标签（云端标签、来源工作组等） */
 export interface TabTagDisplay {
@@ -51,6 +52,12 @@ export interface TabListItem {
 /** 拖拽排序事件（vuedraggable update 事件的简化形态） */
 export interface TabListSortEvent {
   moved?: { element: TabListItem; oldIndex: number; newIndex: number }
+}
+
+/** 云端标签页行：在统一行数据上补充所属工作组信息，供共享列表组件执行操作 */
+export interface CloudTabListItem extends TabListItem {
+  workspaceId: string
+  tab: TabReference
 }
 
 /** 各端按场景为行补充的展示信息 */
