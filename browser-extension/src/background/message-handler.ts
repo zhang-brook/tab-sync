@@ -1,5 +1,4 @@
 import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, TabHostsData, DevicesData, DashboardStatsData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
-import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getServerVersion } from '../shared/api/auth'
 import { verifyTokenCandidate } from '../shared/api/token-verify'
@@ -9,7 +8,7 @@ import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, getTabHosts, createWork
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTabs, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
-import { openTabAfterActive, openTabsAfterActive } from '../shared/utils/tab-utils'
+import { mapHexToTabGroupColor, openTabAfterActive, openTabUrls } from '../shared/utils/tab-utils'
 import { DASHBOARD_URL } from '../shared/utils/pages'
 import { logger } from '../shared/utils/logger'
 
@@ -536,40 +535,6 @@ async function handleAddWorkspaceTabByUrl(
   return { success: false, error: res.error || '添加标签页失败', authError: res.status === 401 }
 }
 
-/** 将 hex 颜色映射为 Chrome 标签组颜色名称 */
-function mapHexToTabGroupColor(hex: string): chrome.tabGroups.Color {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-
-  // 计算与各 Chrome 预设颜色 (近似值) 的欧氏距离，取最接近的
-  const presetColors: Array<{ name: chrome.tabGroups.Color; r: number; g: number; b: number }> = [
-    { name: chrome.tabGroups.Color.GREY, r: 128, g: 128, b: 128 },
-    { name: chrome.tabGroups.Color.BLUE, r: 66, g: 133, b: 244 },
-    { name: chrome.tabGroups.Color.RED, r: 219, g: 68, b: 55 },
-    { name: chrome.tabGroups.Color.YELLOW, r: 244, g: 180, b: 0 },
-    { name: chrome.tabGroups.Color.GREEN, r: 15, g: 157, b: 88 },
-    { name: chrome.tabGroups.Color.PINK, r: 233, g: 30, b: 99 },
-    { name: chrome.tabGroups.Color.PURPLE, r: 154, g: 50, b: 211 },
-    { name: chrome.tabGroups.Color.CYAN, r: 82, g: 196, b: 196 },
-    { name: chrome.tabGroups.Color.ORANGE, r: 251, g: 140, b: 0 },
-  ]
-
-  let minDist = Infinity
-  let closest: chrome.tabGroups.Color = chrome.tabGroups.Color.BLUE
-  for (const preset of presetColors) {
-    const dr = r - preset.r
-    const dg = g - preset.g
-    const db = b - preset.b
-    const dist = dr * dr + dg * dg + db * db
-    if (dist < minDist) {
-      minDist = dist
-      closest = preset.name
-    }
-  }
-  return closest
-}
-
 /** 打开工作组中的标签页（带去重：已打开的直接激活，已关闭的复用原记录） */
 async function handleOpenWorkspace(
   payload: { id: string; tabIds?: string[]; newWindow?: boolean; asTabGroup?: boolean },
@@ -596,86 +561,18 @@ async function handleOpenWorkspace(
     return { success: false, error: '没有可打开的标签页' }
   }
 
-  let opened = 0
-
-  // 收集所有要归入标签组的 Chrome tabId（用于 asTabGroup 模式）
-  const allChromeTabIds: number[] = []
-
   // 工作组 tab 以后端主键标识，不与本地 chromeTabId 绑定，因此统一按"重新打开"处理
-  const toReopen: TabReference[] = tabsToOpen
-
-  // 确定标签组目标窗口 ID
-  let targetWindowId: number | undefined
-  if (asTabGroup) {
-    if (newWindow) {
-      // 新窗口模式：稍后在创建窗口后设置
-    } else {
-      // 当前窗口模式：获取当前聚焦窗口
-      try {
-        const currentWin = await chrome.windows.getLastFocused()
-        targetWindowId = currentWin.id
-      } catch {
-        // 忽略，后续分组时不指定 windowId
-      }
-    }
-  }
-
-  // 重新打开标签页
-  if (toReopen.length > 0) {
-    if (newWindow) {
-      // 新窗口模式：先用第一个标签页创建窗口，其余在该窗口中依次创建
-      const firstTab = toReopen[0]
-      const win = await chrome.windows.create({ url: firstTab.url })
-      opened++
-      if (win?.tabs?.[0]?.id != null) {
-        allChromeTabIds.push(win.tabs[0].id)
-      }
-      targetWindowId = win?.id
-
-      // 剩余标签页在该窗口中创建
-      for (let i = 1; i < toReopen.length; i++) {
-        const tab = await chrome.tabs.create({ url: toReopen[i].url, windowId: win?.id })
-        opened++
-        if (tab?.id != null) {
-          allChromeTabIds.push(tab.id)
-        }
-      }
-    } else {
-      // 当前窗口模式：批量在激活标签之后打开，内部只查询一次索引避免漂移
-      const urls = toReopen.map((t) => t.url)
-      const tabs = await openTabsAfterActive(urls)
-      for (const tab of tabs) {
-        opened++
-        if (tab?.id != null) {
-          allChromeTabIds.push(tab.id)
-        }
-      }
-    }
-  }
-
-  // 3) 创建标签组
-  if (asTabGroup && allChromeTabIds.length > 1) {
-    try {
-      const groupOptions: chrome.tabs.GroupOptions = { tabIds: allChromeTabIds as [number, ...number[]] }
-      if (targetWindowId != null) {
-        groupOptions.createProperties = { windowId: targetWindowId }
-      }
-      const groupId = await chrome.tabs.group(groupOptions)
-      await chrome.tabGroups.update(groupId, {
-        title: workspace.name,
-        color: mapHexToTabGroupColor(workspace.color),
-        collapsed: false,
-      })
-      logger.info(`Tab group created for workspace "${workspace.name}": groupId=${groupId}, tabs=${allChromeTabIds.length}`)
-    } catch (e) {
-      logger.warn('Failed to create tab group:', e)
-      // 分组失败不影响整体操作
-    }
-  }
-
-  logger.info(
-    `Workspace "${workspace.name}": opened=${opened}${asTabGroup ? ', grouped=' + allChromeTabIds.length : ''}`,
+  const opened = await openTabUrls(
+    tabsToOpen.map((t) => t.url),
+    {
+      newWindow,
+      asTabGroup,
+      groupTitle: workspace.name,
+      groupColor: mapHexToTabGroupColor(workspace.color),
+    },
   )
+
+  logger.info(`Workspace "${workspace.name}": opened=${opened}${asTabGroup ? ', asTabGroup' : ''}`)
   return {
     success: true,
     data: { opened },
