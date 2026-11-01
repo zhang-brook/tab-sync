@@ -57,7 +57,6 @@
           :loading="loading"
           :workspaces="workspaces"
           :empty-description="emptyDescription"
-          :total-text="`共 ${total} 个已同步标签页`"
           show-open-workspace
           @refresh="onRefresh"
           @open-workspace="openWorkspace"

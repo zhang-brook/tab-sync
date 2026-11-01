@@ -132,24 +132,21 @@ export function localTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntr
 export interface CloudTabMenuOptions extends BuildTabMenuOptions {
   /** 是否提供「打开工作组」项（已同步标签页视图可跳转到标签页所属工作组） */
   withOpenWorkspace?: boolean
+  /** 是否提供「移除标签」项（按标签查看标签页时可移除当前标签） */
+  withRemoveTag?: boolean
 }
 
-/** 云端标签页行菜单：工作组列表与已同步标签页共用，保证两侧操作项一致 */
+/** 云端标签页行菜单：多个云端列表共用，保证操作项一致 */
 export function cloudTabMenu(options: CloudTabMenuOptions = {}): TabListMenuEntry[] {
-  const { withOpenWorkspace, ...rest } = options
+  const { withOpenWorkspace, withRemoveTag, ...rest } = options
   const actions: TabActionId[] = ['open', 'copyTitle', 'copyLink']
   if (withOpenWorkspace) actions.push('openWorkspace')
-  actions.push('rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'copy', 'remove', 'properties')
+  actions.push('rename', 'editUrl', 'editDesc', 'editTime', 'tag', 'move', 'copy')
+  if (withRemoveTag) actions.push('removeTag')
+  actions.push('remove', 'properties')
   return buildTabMenu(actions, {
-    dividersBefore: ['copyTitle', 'rename', 'move', 'remove', 'properties'],
+    dividersBefore: ['copyTitle', 'rename', 'move', 'removeTag', 'properties'],
     ...rest,
   })
 }
 
-/** 标签页标签视图的行菜单 */
-export function taggedTabMenu(options: BuildTabMenuOptions = {}): TabListMenuEntry[] {
-  return buildTabMenu(['open', 'copyTitle', 'copyLink', 'openWorkspace', 'removeTag'], {
-    dividersBefore: ['copyTitle', 'removeTag'],
-    ...options,
-  })
-}

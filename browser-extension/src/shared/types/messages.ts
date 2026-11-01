@@ -510,14 +510,12 @@ export interface TagsData {
   tags: TagInfo[]
 }
 
-/** 标签下的云端标签页条目 */
+/** 标签下的云端标签页条目：附带所属工作组信息与完整标签页数据 */
 export interface TagTabItem {
-  tabId: number
-  url: string
-  title: string
-  favIconUrl: string
   workspaceId: string
   workspaceName: string
+  workspaceColor: string
+  tab: TabReference
 }
 
 /** GET_TAG_TABS 响应数据 */

@@ -167,29 +167,52 @@ func (s *TagService) RemoveFromWorkspace(workspaceID string, tagID uint) error {
 }
 
 // TagTabItem 表示带有某个标签的云端标签页（关联 Tab）
-// 用于「标签」页面右侧：展示该标签下包含的所有标签页
+// 用于「标签」页面右侧：展示该标签下包含的所有标签页。
+// Tab 为完整标签页数据，与管理面板其它列表共用同一套展示与操作逻辑。
 type TagTabItem struct {
-	TabID         uint   `json:"tabId"`
-	URL           string `json:"url"`
-	Title         string `json:"title"`
-	FavIconURL    string `json:"favIconUrl"`
-	WorkspaceID   string `json:"workspaceId"`
-	WorkspaceName string `json:"workspaceName"`
+	WorkspaceID    string       `json:"workspaceId"`
+	WorkspaceName  string       `json:"workspaceName"`
+	WorkspaceColor string       `json:"workspaceColor"`
+	Tab            TabReference `json:"tab"`
 }
 
 // GetTabsByTag 返回带有指定标签的云端标签页列表（基于 TabTag 关联）
 func (s *TagService) GetTabsByTag(tagID uint) ([]TagTabItem, error) {
-	items := make([]TagTabItem, 0)
-	err := s.db.
-		Table("tab_tags_rel").
-		Select("tabs.id AS tab_id, tabs.url, tabs.title, tabs.fav_icon_url, workspaces.workspace_id, workspaces.name AS workspace_name").
-		Joins("JOIN tabs ON tabs.id = tab_tags_rel.tab_id").
+	var tabs []model.Tab
+	if err := s.db.Model(&model.Tab{}).
+		Joins("JOIN tab_tags_rel ON tab_tags_rel.tab_id = tabs.id").
 		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("tab_tags_rel.tag_id = ? AND workspaces.is_deleted = ?", tagID, false).
 		Order("workspaces.name, tabs.sort_order").
-		Scan(&items).Error
-	if err != nil {
+		Preload("Tags.Tag").
+		Find(&tabs).Error; err != nil {
 		return nil, err
+	}
+
+	wsIDs := make([]string, 0, len(tabs))
+	for _, tab := range tabs {
+		wsIDs = append(wsIDs, tab.WorkspaceID)
+	}
+	wsMap := make(map[string]model.Workspace, len(wsIDs))
+	if len(wsIDs) > 0 {
+		var wsList []model.Workspace
+		if err := s.db.Where("workspace_id IN ?", wsIDs).Find(&wsList).Error; err != nil {
+			return nil, err
+		}
+		for _, ws := range wsList {
+			wsMap[ws.WorkspaceID] = ws
+		}
+	}
+
+	items := make([]TagTabItem, 0, len(tabs))
+	for _, tab := range tabs {
+		ws := wsMap[tab.WorkspaceID]
+		items = append(items, TagTabItem{
+			WorkspaceID:    tab.WorkspaceID,
+			WorkspaceName:  ws.Name,
+			WorkspaceColor: ws.Color,
+			Tab:            toTabReferences([]model.Tab{tab})[0],
+		})
 	}
 	return items, nil
 }

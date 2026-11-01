@@ -165,19 +165,13 @@
               {{ selectedTag.scope === 'workspace' ? '工作组标签' : '标签页标签' }}
             </el-tag>
           </span>
-          <span class="right-count">
-            {{ selectedTag.scope === 'workspace'
-              ? `${taggedWorkspaces.length} 个工作组`
-              : `${taggedTabs.length} 个标签页` }}
+          <span v-if="selectedTag.scope === 'workspace'" class="right-count">
+            {{ taggedWorkspaces.length }} 个工作组
           </span>
         </div>
 
-        <div v-if="detailLoading" class="right-loading">
-          <el-icon class="is-loading"><Loading /></el-icon>
-        </div>
-
         <!-- 工作组标签 -->
-        <template v-else-if="selectedTag.scope === 'workspace'">
+        <template v-if="selectedTag.scope === 'workspace'">
           <el-empty
             v-if="taggedWorkspaces.length === 0"
             description="该标签下暂无工作组"
@@ -214,21 +208,25 @@
           </div>
         </template>
 
-        <!-- 标签页标签 -->
+        <!-- 标签页标签：与「标签页」「工作组」页共用同一列表组件 -->
         <template v-else>
-          <el-empty
-            v-if="taggedTabs.length === 0"
-            description="该标签下暂无标签页"
-            :image-size="60"
+          <CloudTabListPanel
+            v-model:page="tabPage"
+            v-model:page-size="tabPageSize"
+            v-model:sort-mode="tabSortMode"
+            v-model:sort-asc="tabSortAsc"
+            v-model:scheme="tabScheme"
+            :items="pagedTagTabItems"
+            :total="filteredTagTabItems.length"
+            :loading="detailLoading"
+            :workspaces="workspaces"
+            :empty-description="tagTabEmptyDescription"
+            :remove-tag-id="selectedTag.id"
+            :show-tag-filter="false"
+            show-open-workspace
+            @refresh="onTagTabsRefresh"
+            @open-workspace="navigateToWorkspace"
           />
-          <div v-else class="tab-list">
-            <TabList
-              :items="tabItems"
-              :menu-items="tabMenu"
-              @click="openTab"
-              @command="onTabCommand"
-            />
-          </div>
         </template>
       </template>
     </div>
@@ -288,14 +286,12 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Loading, Plus, Refresh, Search, SortDown, SortUp } from '@element-plus/icons-vue'
-import TabList from '@/shared/components/TabList.vue'
-import { taggedTabMenu } from '@/shared/actions/tab-actions'
+import CloudTabListPanel from '../components/CloudTabListPanel.vue'
 import {
   deleteTag,
   listTagTabs,
   listTags,
   listWorkspaces,
-  removeTabTag,
   removeWorkspaceTag,
   createTag,
   updateTag,
@@ -303,12 +299,10 @@ import {
   type TagScope,
 } from '@/shared/services'
 import { DEFAULT_WORKSPACE_COLOR, normalizeColor } from '@/shared/constants/theme'
-import { copyText } from '@/shared/utils/clipboard'
-import { openTabAfterActive } from '@/shared/utils/tab-utils'
 import { useDashboardNavigation } from '@/shared/composables/useDashboardNavigation'
 import EntityTag from '@/shared/components/EntityTag.vue'
 import type { TagInfo, TagTabItem, Workspace } from '@/shared/types'
-import type { TabListItem } from '@/shared/types/tab-list'
+import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter } from '@/shared/types/tab-list'
 
 const route = useRoute()
 const router = useRouter()
@@ -427,23 +421,66 @@ function workspaceDepth(id: string): number {
   return workspaceDepthMap.value.get(id) ?? 0
 }
 
-const tabMenu = taggedTabMenu({ labels: { openWorkspace: '打开所在工作组' } })
+// 右侧标签页列表：与「标签页」「工作组」页共用同一面板，排序与分页在前端完成
+const tabPage = ref(1)
+const tabPageSize = ref(20)
+const tabSortMode = ref<CloudTabSortMode>('createdAt')
+const tabSortAsc = ref(false)
+const tabScheme = ref<TabSchemeFilter>('')
 
-const tabItems = computed<TabListItem[]>(() =>
-  taggedTabs.value.map((t) => ({
-    id: `${t.workspaceId}-${t.tabId}`,
-    title: t.title || t.url,
-    url: t.url,
-    favIconUrl: t.favIconUrl,
-    badgeText: t.workspaceName,
-    badgeKey: t.workspaceId,
-  })),
+function tabTitle(item: TagTabItem): string {
+  return item.tab.displayName || item.tab.title || item.tab.url
+}
+
+const tagTabEmptyDescription = computed(() =>
+  tabScheme.value ? '没有匹配筛选条件的标签页' : '该标签下暂无标签页',
 )
 
-const tabById = computed(() => {
-  const map = new Map<string, TagTabItem>()
-  for (const t of taggedTabs.value) map.set(`${t.workspaceId}-${t.tabId}`, t)
-  return map
+/** 协议筛选只影响展示，不重新请求 */
+const filteredTagTabItems = computed(() => {
+  if (!tabScheme.value) return taggedTabs.value
+  return taggedTabs.value.filter((item) =>
+    item.tab.url.toLowerCase().startsWith(`${tabScheme.value}://`),
+  )
+})
+
+/** 创建时间取标签页添加时间 addedAt，修改时间取后端下发的 updatedAt */
+const sortedTagTabItems = computed(() => {
+  const items = filteredTagTabItems.value
+  const dir = tabSortAsc.value ? 1 : -1
+  if (tabSortMode.value === 'name') {
+    return [...items].sort((a, b) => dir * tabTitle(a).localeCompare(tabTitle(b), 'zh-Hans-CN'))
+  }
+  const timeOf = (item: TagTabItem) =>
+    Date.parse(tabSortMode.value === 'createdAt' ? item.tab.addedAt : (item.tab.updatedAt ?? '')) || 0
+  return [...items].sort((a, b) => dir * (timeOf(a) - timeOf(b)))
+})
+
+const pagedTagTabItems = computed<CloudTabListItem[]>(() => {
+  const start = (tabPage.value - 1) * tabPageSize.value
+  return sortedTagTabItems.value.slice(start, start + tabPageSize.value).map((item) => ({
+    id: `${item.workspaceId}-${item.tab.tabId}`,
+    title: tabTitle(item),
+    originalTitle: item.tab.displayName ? item.tab.title : undefined,
+    url: item.tab.url,
+    favIconUrl: item.tab.favIconUrl,
+    badgeText: item.workspaceName,
+    badgeColor: item.workspaceColor,
+    badgeKey: item.workspaceId,
+    tags: (item.tab.tags ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color })),
+    description: item.tab.description,
+    addedAt: item.tab.addedAt,
+    workspaceId: item.workspaceId,
+    tab: item.tab,
+  }))
+})
+
+/** 标签页减少后回退到最后一个有效页 */
+const tabPageCount = computed(() =>
+  Math.max(1, Math.ceil(filteredTagTabItems.value.length / tabPageSize.value)),
+)
+watch(tabPageCount, (max) => {
+  if (tabPage.value > max) tabPage.value = max
 })
 
 // ============ 数据加载 ============
@@ -488,6 +525,7 @@ async function loadTagTabs(tagId: number): Promise<void> {
 
 async function applySelection(tag: TagInfo): Promise<void> {
   selectedTag.value = tag
+  tabPage.value = 1
   if (tag.scope === 'tab') {
     await loadTagTabs(tag.id)
   } else {
@@ -562,50 +600,13 @@ async function refresh(): Promise<void> {
 }
 
 // ============ 行操作 ============
-async function openTab(item: TabListItem): Promise<void> {
-  const tab = tabById.value.get(String(item.id))
-  if (tab?.url) await openTabAfterActive(tab.url)
-}
 
-async function copyWithFeedback(text: string, label: string): Promise<void> {
-  if (!text) return
-  const ok = await copyText(text)
-  if (ok) ElMessage.success(`已复制${label}`)
-  else ElMessage.error('复制失败')
-}
-
-async function onTabCommand(command: string, item: TabListItem): Promise<void> {
-  const tab = tabById.value.get(String(item.id))
-  if (!tab) return
-  switch (command) {
-    case 'open':
-      await openTab(item)
-      return
-    case 'copyTitle':
-      await copyWithFeedback(tab.title || tab.url, '标题')
-      return
-    case 'copyLink':
-      await copyWithFeedback(tab.url, '链接')
-      return
-    case 'openWorkspace':
-      navigateToWorkspace(tab.workspaceId)
-      return
-    case 'removeTag':
-      await removeTagFromTab(tab)
-      return
-  }
-}
-
-async function removeTagFromTab(tab: TagTabItem): Promise<void> {
+/** 面板内修改了标签页：刷新当前标签下的列表，并同步左侧标签计数 */
+function onTagTabsRefresh(): void {
   const tag = selectedTag.value
-  if (!tag) return
-  try {
-    await removeTabTag(tab.workspaceId, String(tab.tabId), tag.id)
-    ElMessage.success('已移除标签')
-    await Promise.all([loadTagTabs(tag.id), loadTags()])
-  } catch (err) {
-    reportServiceError(err, { fallback: '移除标签失败' })
-  }
+  if (!tag || tag.scope !== 'tab') return
+  void loadTagTabs(tag.id)
+  void loadTags()
 }
 
 async function removeTagFromWorkspace(workspaceId: string): Promise<void> {
@@ -767,8 +768,7 @@ onMounted(async () => {
 .scope-filter {
   margin-bottom: 8px;
 }
-.left-loading,
-.right-loading {
+.left-loading {
   flex: 1;
   display: flex;
   align-items: center;
@@ -939,7 +939,6 @@ onMounted(async () => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.tab-list,
 .workspace-list {
   flex: 1;
   overflow-y: auto;

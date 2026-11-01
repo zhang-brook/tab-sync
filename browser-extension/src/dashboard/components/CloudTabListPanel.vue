@@ -3,6 +3,7 @@
     <div class="filter-row">
       <span class="filter-label">筛选</span>
       <el-select
+        v-if="showTagFilter"
         class="tag-filter"
         size="small"
         placeholder="全部标签"
@@ -83,7 +84,9 @@
         <el-button size="small" @click="openSelectedTabs">打开</el-button>
         <el-button size="small" @click="copySelectedLinks">复制链接</el-button>
         <el-button size="small" type="primary" @click="batchMoveVisible = true">移动到工作组</el-button>
-        <el-button size="small" type="danger" plain @click="removeSelectedTabs">移除</el-button>
+        <el-button size="small" type="danger" plain @click="removeSelectedTabs">
+          {{ removeTagId == null ? '移除' : '移除标签' }}
+        </el-button>
         <el-button size="small" text @click="toggleSelectAll">
           {{ allSelected ? '取消全选' : '全选本页' }}
         </el-button>
@@ -104,6 +107,7 @@
         >
           <template #actions="{ item }">
             <el-button
+              v-if="removeTagId == null"
               class="row-action"
               text
               type="danger"
@@ -112,13 +116,23 @@
               :loading="removingIds.has(String(item.id))"
               @click="removeOne(item as CloudTabListItem)"
             >删除</el-button>
+            <el-button
+              v-else
+              class="row-action"
+              text
+              type="danger"
+              :icon="Delete"
+              title="移除当前标签"
+              :loading="removingIds.has(String(item.id))"
+              @click="removeTagOne(item as CloudTabListItem)"
+            >移除标签</el-button>
           </template>
         </TabList>
       </div>
     </template>
 
     <div v-if="total > 0" class="pagination">
-      <span class="total-count">{{ totalText ?? `共 ${total} 个标签页` }}</span>
+      <span class="total-count">共 {{ total }} 个标签页</span>
       <el-pagination
         layout="sizes, prev, pager, next, jumper"
         :total="total"
@@ -162,6 +176,7 @@ import { getWorkspacePath, type WorkspaceTreeNode } from '@/shared/utils/workspa
 import {
   listWorkspaceTabs,
   moveWorkspaceTab,
+  removeTabTag,
   removeWorkspaceTab,
   reportServiceError,
 } from '@/shared/services'
@@ -188,8 +203,6 @@ const props = withDefaults(
     /** 是否支持拖拽排序 */
     sortable?: boolean
     emptyDescription?: string
-    /** 分页左侧的总数文案，默认「共 N 个标签页」 */
-    totalText?: string
     pageSizes?: number[]
     /** 工作组树数据，用于属性弹窗展示完整路径 */
     workspaces?: Workspace[]
@@ -207,13 +220,16 @@ const props = withDefaults(
     tagId?: number | null
     /** 标签筛选下拉的候选项 */
     tagOptions?: TagInfo[]
+    /** 是否显示标签筛选下拉（按单个标签查看时不显示） */
+    showTagFilter?: boolean
+    /** 当前列表所属的标签 id：提供时行内操作为「移除标签」，并提供对应菜单项 */
+    removeTagId?: number | null
   }>(),
   {
     loading: false,
     selectable: true,
     sortable: false,
     emptyDescription: '暂无标签页',
-    totalText: undefined,
     pageSizes: () => [20, 50, 100, 200],
     workspaces: undefined,
     showOpenWorkspace: false,
@@ -223,6 +239,8 @@ const props = withDefaults(
     scheme: '',
     tagId: null,
     tagOptions: () => [],
+    showTagFilter: true,
+    removeTagId: null,
   },
 )
 
@@ -241,7 +259,12 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-const menuItems = computed(() => cloudTabMenu({ withOpenWorkspace: props.showOpenWorkspace }))
+const menuItems = computed(() =>
+  cloudTabMenu({
+    withOpenWorkspace: props.showOpenWorkspace,
+    withRemoveTag: props.removeTagId != null,
+  }),
+)
 
 const selectedIds = ref<Array<string | number>>([])
 
@@ -332,6 +355,9 @@ function onCommand(command: string, item: TabListItem) {
     case 'remove':
       void removeOne(target)
       return
+    case 'removeTag':
+      void removeTagOne(target)
+      return
     case 'properties':
       propertiesTarget.value = target
       propertiesVisible.value = true
@@ -370,6 +396,22 @@ async function removeOne(item: CloudTabListItem) {
   }
 }
 
+/** 按标签查看时：从标签页上移除当前标签（不影响标签页本身） */
+async function removeTagOne(item: CloudTabListItem) {
+  const tagId = props.removeTagId
+  if (tagId == null) return
+  setRemoving(String(item.id), true)
+  try {
+    await removeTabTag(item.workspaceId, item.tab.tabId, tagId)
+    ElMessage.success('已移除标签')
+    requestRefresh()
+  } catch (err) {
+    reportServiceError(err, { fallback: '移除标签失败' })
+  } finally {
+    setRemoving(String(item.id), false)
+  }
+}
+
 function openSelectedTabs() {
   const urls = selectedItems.value.map((i) => i.tab.url).filter(Boolean)
   void openTabsAfterActive(urls)
@@ -383,11 +425,15 @@ async function copySelectedLinks() {
 async function removeSelectedTabs() {
   const items = selectedItems.value
   if (items.length === 0) return
+  const tagId = props.removeTagId
+  const removingTag = tagId != null
   try {
     await ElMessageBox.confirm(
-      `确定将选中的 ${items.length} 个标签页移至回收站吗？`,
+      removingTag
+        ? `确定将选中的 ${items.length} 个标签页移除当前标签吗？`
+        : `确定将选中的 ${items.length} 个标签页移至回收站吗？`,
       '批量移除',
-      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' },
+      { confirmButtonText: removingTag ? '移除标签' : '移除', cancelButtonText: '取消', type: 'warning' },
     )
   } catch {
     return
@@ -395,14 +441,15 @@ async function removeSelectedTabs() {
   let ok = 0
   for (const item of items) {
     try {
-      await removeWorkspaceTab(item.workspaceId, item.tab.tabId)
+      if (tagId != null) await removeTabTag(item.workspaceId, item.tab.tabId, tagId)
+      else await removeWorkspaceTab(item.workspaceId, item.tab.tabId)
       ok++
     } catch {
       // 单个失败不阻断其余标签页
     }
   }
   if (ok > 0) {
-    ElMessage.success(`已移除 ${ok} 个标签页`)
+    ElMessage.success(removingTag ? `已从 ${ok} 个标签页移除标签` : `已移除 ${ok} 个标签页`)
     selectedIds.value = []
     requestRefresh()
   }

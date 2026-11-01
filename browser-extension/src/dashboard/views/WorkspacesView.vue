@@ -186,7 +186,6 @@
               show-manual-sort
               :workspaces="workspaces"
               :empty-description="tabEmptyDescription"
-              :total-text="`共 ${tabListItems.length} 个标签页`"
               @refresh="onTabListRefresh"
               @sort="onTabSort"
             />
