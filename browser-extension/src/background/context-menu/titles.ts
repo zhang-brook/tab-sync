@@ -1,4 +1,4 @@
-import { menuDefaultGroupLabel, shortcutHint } from './create'
+import { menuDefaultGroupLabel, onContextMenusRebuilt, queueMenuTask, shortcutHint } from './create'
 import {
   MENU_TAB_SAVE_AS_NEW,
   MENU_TAB_SAVE_DEFAULT,
@@ -7,6 +7,9 @@ import {
   MENU_TAB_SAVE_UNGROUPED,
 } from './constants'
 
+/** 最近一次高亮集：菜单重建会把标题重置为静态文案，重建后按它恢复 */
+let latestHighlightedTabIds: number[] = []
+
 // 标签页标题右键菜单的动态标题：Chrome 的 contextMenus 没有 onShown 事件（Firefox 的 menus
 // API 才有），菜单弹出前无法改标题，改用 tabs.onHighlighted 预先更新——
 // Ctrl+点击选中多个标签页（或取消多选）都会触发高亮集变化，此时把标题更新为
@@ -14,23 +17,43 @@ import {
 // 菜单标题全局共享：多窗口交错右键时文案可能短暂滞后，但点击行为（onClicked 中
 // resolveTabSelection）始终以实际高亮集合为准
 chrome.tabs.onHighlighted.addListener((highlightInfo) => {
-  const count = highlightInfo.tabIds.length
-  const subject = count > 1 ? `${count} 个选中的标签页` : '此标签页'
-  chrome.contextMenus.update(MENU_TAB_SAVE_DEFAULT, {
-    title: `保存 ${subject}到 ${menuDefaultGroupLabel} 并关闭${shortcutHint('save-and-close')}`,
-  })
-  chrome.contextMenus.update(MENU_TAB_SAVE_UNGROUPED, {
-    title: `保存 ${subject}到 [未分组] 并关闭${shortcutHint('save-ungrouped')}`,
-  })
-  chrome.contextMenus.update(MENU_TAB_SAVE_PICK, {
-    title: `保存 ${subject}到 选定分组…${shortcutHint('save-pick')}`,
-  })
-  chrome.contextMenus.update(MENU_TAB_SAVE_AS_NEW, {
-    title: `保存 ${subject}到 新工作组…${''/*shortcutHint('save-as-new')*/}`,
-  })
-  // 标签组菜单标题：按选中集合（高亮集）的分组状态更新
-  void updateGroupMenuTitles(highlightInfo.tabIds)
+  latestHighlightedTabIds = highlightInfo.tabIds
+  void queueHighlightedMenuSync(highlightInfo.tabIds)
 })
+
+// 菜单重建完成后按最新高亮集重新套用标题（重建期间触发的更新动作也排在本次重建之后）
+onContextMenusRebuilt(() => {
+  void queueHighlightedMenuSync(latestHighlightedTabIds)
+})
+
+/**
+ * 排队同步高亮集对应的菜单标题：
+ * 启动/重建期间触发时任务排在重建之后，菜单项创建完成后照常写入，不会被丢弃。
+ */
+function queueHighlightedMenuSync(tabIds: number[]) {
+  return queueMenuTask(async () => {
+    // 排队期间高亮集已变化：跳过旧任务，由更新的事件任务负责
+    if (tabIds !== latestHighlightedTabIds) return
+    const count = tabIds.length
+    const subject = count > 1 ? `${count} 个选中的标签页` : '此标签页'
+    await Promise.all([
+      chrome.contextMenus.update(MENU_TAB_SAVE_DEFAULT, {
+        title: `保存${subject}到 ${menuDefaultGroupLabel} 并关闭${shortcutHint('save-and-close')}`,
+      }),
+      chrome.contextMenus.update(MENU_TAB_SAVE_UNGROUPED, {
+        title: `保存${subject}到 [未分组] 并关闭${shortcutHint('save-ungrouped')}`,
+      }),
+      chrome.contextMenus.update(MENU_TAB_SAVE_PICK, {
+        title: `保存${subject}到 选定分组…${shortcutHint('save-pick')}`,
+      }),
+      chrome.contextMenus.update(MENU_TAB_SAVE_AS_NEW, {
+        title: `保存${subject}到 新工作组…${''/*shortcutHint('save-as-new')*/}`,
+      }),
+    ])
+    // 标签组菜单标题：按选中集合（高亮集）的分组状态更新
+    await applyGroupMenuState(tabIds)
+  })
+}
 
 /**
  * 更新「组保存」与「多选新建」两个菜单项的可见性与标题：
@@ -39,7 +62,7 @@ chrome.tabs.onHighlighted.addListener((highlightInfo) => {
  * 由 tabs.onHighlighted / tabs.onUpdated（groupId 变化）触发，Chrome 无菜单弹出前回调，
  * 只能预先更新；点击行为仍以点击时选中集合的实际分组为准。
  */
-async function updateGroupMenuTitles(tabIds: number[]) {
+async function applyGroupMenuState(tabIds: number[]) {
   if (tabIds.length === 0) return
   // 并行读取标签信息，已关闭的跳过
   const tabs = (
@@ -69,18 +92,18 @@ async function updateGroupMenuTitles(tabIds: number[]) {
       // 组可能已解散，保留回退标题
     }
     const groupLabel = `（含 ${count} 个页面）`
-    chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, {
+    await chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, {
       visible: true,
       title: `将所在标签组 ${groupLabel} 保存为 新工作组…`,
     })
   } else {
-    chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, { visible: false })
+    await chrome.contextMenus.update(MENU_TAB_SAVE_GROUP_NEW, { visible: false })
   }
 }
 
 // 标签页加入/移出标签组时同步更新两个菜单的可见性与标题（以该标签页为集合）
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.groupId !== undefined) {
-    void updateGroupMenuTitles([tabId])
+    void queueMenuTask(() => applyGroupMenuState([tabId]))
   }
 })

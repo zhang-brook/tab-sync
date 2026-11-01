@@ -29,6 +29,29 @@ let menuShortcutMap = new Map<string, string>()
 /** 默认分组菜单标签缓存（如「[未分组](默认分组) 」），tabs.onHighlighted 动态更新标题时复用 */
 export let menuDefaultGroupLabel = '默认分组'
 
+/**
+ * 菜单写操作串行队列：重建（removeAll + 逐项创建）与动态标题更新按入队顺序执行，
+ * 不会交叉。浏览器启动时 tabs.onHighlighted 可能比菜单重建更早触发，排队后会等
+ * 重建完成再写入，而不是因目标菜单项尚不存在被丢弃。
+ */
+let menuTaskChain: Promise<void> = Promise.resolve()
+
+/** 把菜单写操作追加到串行队列（任务失败时记录日志，不中断后续任务） */
+export function queueMenuTask(task: () => void | Promise<void>): Promise<void> {
+  const run = menuTaskChain.then(task).catch((err) => {
+    logger.error('右键菜单操作失败:', err)
+  })
+  menuTaskChain = run
+  return run
+}
+
+/** 菜单重建完成回调：重建会把动态标题重置为静态文案，调用方借此恢复最新状态 */
+const rebuildListeners = new Set<() => void>()
+
+export function onContextMenusRebuilt(listener: () => void) {
+  rebuildListeners.add(listener)
+}
+
 /** 从 chrome.commands.getAll() 读取命令名 → 快捷键映射（菜单标题提示用） */
 async function getCommandShortcutMap(): Promise<Map<string, string>> {
   const commands = await chrome.commands.getAll()
@@ -65,7 +88,12 @@ async function getDefaultWorkspaceName(): Promise<string | null> {
 }
 
 /** 创建右键菜单项（覆盖式重建，避免重复） */
-export async function createContextMenus() {
+export function createContextMenus(): Promise<void> {
+  return queueMenuTask(rebuildContextMenus)
+}
+
+/** 覆盖式重建全部菜单项（先 removeAll 再逐项创建），与动态标题更新共用串行队列 */
+async function rebuildContextMenus() {
   try {
     await chrome.contextMenus.removeAll()
     // 动态读取快捷键：用户可在 chrome://extensions/shortcuts 修改/移除绑定，标题提示需随之更新
@@ -236,6 +264,8 @@ export async function createContextMenus() {
       // ⚠ Chrome 对 action 菜单顶层自定义项上限为 6 项（ACTION_MENU_TOP_LEVEL_LIMIT，分隔符也占一项）
     }
     logger.info('右键菜单已创建')
+    // 重建会把标题重置为静态文案：通知调用方按最新高亮集恢复（任务排在本轮重建之后）
+    for (const listener of rebuildListeners) listener()
   } catch (err) {
     logger.error('创建右键菜单失败:', err)
   }
