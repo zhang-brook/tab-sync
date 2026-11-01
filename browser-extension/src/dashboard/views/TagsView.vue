@@ -762,7 +762,8 @@ onMounted(async () => {
 }
 .left-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  color: #909399;
 }
 .left-actions {
   display: flex;
