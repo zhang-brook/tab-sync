@@ -219,8 +219,8 @@ func (h *WorkspaceHandler) TabsSummary(c *gin.Context) {
 
 // ListSyncedTabs 「已同步标签页」页面：跨所有工作组扁平化分页返回标签页。
 // 查询参数：page/pageSize（默认 1/50）、keyword（标题/URL 模糊搜索）、includeSystem（默认 true）、
-// scheme（http/https，其余值不限）、domain + exact（域名筛选）、tagId（标签筛选）、
-// sort（name/createdAt/updatedAt，默认 addedAt 倒序）、order（asc/desc）。
+// scheme（http/https，其余值不限）、domain + exact（域名筛选）、tagIds（逗号分隔的标签筛选）、
+// tagMatch（any 任一标签 / all 全部标签）、sort（name/createdAt/updatedAt，默认 addedAt 倒序）、order（asc/desc）。
 func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
@@ -235,10 +235,7 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	scheme := strings.ToLower(strings.TrimSpace(c.Query("scheme")))
 	domain := strings.ToLower(strings.TrimSpace(c.Query("domain")))
 	domainExact := c.Query("exact") == "true"
-	tagID, _ := strconv.Atoi(c.Query("tagId"))
-	if tagID < 0 {
-		tagID = 0
-	}
+	tagIDs := parseTagIDs(c)
 	sortBy := strings.TrimSpace(c.Query("sort"))
 	order := strings.TrimSpace(c.Query("order"))
 
@@ -248,7 +245,8 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 		Scheme:        scheme,
 		Domain:        domain,
 		DomainExact:   domainExact,
-		TagID:         uint(tagID),
+		TagIDs:        tagIDs,
+		TagAll:        tagMatchAll(c),
 		Sort:          sortBy,
 		Order:         order,
 		Page:          page,
@@ -262,20 +260,47 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 }
 
 // ListTabHosts 标签页域名聚合（「标签页」页左侧域名树）。
-// 查询参数：scheme（http/https，其余值不限）、keyword（标题/URL 模糊搜索）、tagId（标签筛选）。
+// 查询参数：scheme（http/https，其余值不限）、keyword（标题/URL 模糊搜索）、tagIds + tagMatch（标签筛选）。
 func (h *WorkspaceHandler) ListTabHosts(c *gin.Context) {
 	scheme := strings.ToLower(strings.TrimSpace(c.Query("scheme")))
 	keyword := strings.TrimSpace(c.Query("keyword"))
-	tagID, _ := strconv.Atoi(c.Query("tagId"))
-	if tagID < 0 {
-		tagID = 0
-	}
-	data, err := h.svc.ListTabHosts(scheme, keyword, uint(tagID))
+	data, err := h.svc.ListTabHosts(scheme, keyword, parseTagIDs(c), tagMatchAll(c))
 	if err != nil {
 		InternalError(c, "获取域名分布失败")
 		return
 	}
 	Success(c, data)
+}
+
+// parseTagIDs 解析多标签筛选参数：tagIds 为逗号分隔的标签 id，忽略非法/重复值；
+// 未传 tagIds 时兼容旧版单个 tagId 参数。
+func parseTagIDs(c *gin.Context) []uint {
+	ids := make([]uint, 0)
+	seen := make(map[uint]struct{})
+	appendID := func(raw string) {
+		v, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 64)
+		if err != nil || v == 0 {
+			return
+		}
+		id := uint(v)
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	for _, part := range strings.Split(c.Query("tagIds"), ",") {
+		appendID(part)
+	}
+	if len(ids) == 0 {
+		appendID(c.Query("tagId"))
+	}
+	return ids
+}
+
+// tagMatchAll 多标签匹配方式：all 表示标签页需同时带有全部选中标签，缺省为 any（任一标签）。
+func tagMatchAll(c *gin.Context) bool {
+	return strings.EqualFold(strings.TrimSpace(c.Query("tagMatch")), "all")
 }
 
 // MoveTabRequest 移动标签页请求

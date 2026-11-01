@@ -180,11 +180,12 @@
               v-model:sort-mode="tabSortMode"
               v-model:sort-asc="tabSortAsc"
               v-model:scheme="tabScheme"
-              v-model:tag-id="tagFilter"
+              v-model:tag-ids="tagFilters"
+              v-model:tag-match="tagMatch"
               :tag-options="allTabTags"
               :items="pagedTabItems"
               :total="tabListItems.length"
-              :sortable="tabScope === 'current' && tagFilter == null && tabSortMode === 'manual'"
+              :sortable="tabScope === 'current' && tagFilters.length === 0 && tabSortMode === 'manual'"
               show-manual-sort
               :workspaces="workspaces"
               :empty-description="tabEmptyDescription"
@@ -319,6 +320,7 @@ import type {
   TabListItem,
   TabListSortEvent,
   TabSchemeFilter,
+  TabTagMatch,
 } from '@/shared/types/tab-list'
 
 const route = useRoute()
@@ -393,7 +395,8 @@ const newTabUrl = ref('')
 const addingByUrl = ref(false)
 
 // 标签相关状态
-const tagFilter = ref<number | null>(null)
+const tagFilters = ref<number[]>([])
+const tagMatch = ref<TabTagMatch>('any')
 const allTabTags = ref<TagInfo[]>([])
 const tagEditorVisible = ref(false)
 const tagEditorScope = ref<'tab' | 'workspace'>('tab')
@@ -527,8 +530,14 @@ const rightTabs = computed<RightTabItem[]>(() => {
     }
   }
   let filtered = result
-  if (tagFilter.value != null) {
-    filtered = filtered.filter((item) => item.tab.tags?.some((t) => t.id === tagFilter.value))
+  if (tagFilters.value.length > 0) {
+    const selected = new Set(tagFilters.value)
+    filtered = filtered.filter((item) => {
+      const ids = (item.tab.tags ?? []).map((t) => t.id)
+      return tagMatch.value === 'all'
+        ? tagFilters.value.every((id) => ids.includes(id))
+        : ids.some((id) => selected.has(id))
+    })
   }
   if (tabScheme.value) {
     filtered = filtered.filter((item) => item.tab.url.toLowerCase().startsWith(`${tabScheme.value}://`))
@@ -595,7 +604,7 @@ const pagedTabItems = computed(() => {
 })
 
 const tabEmptyDescription = computed(() =>
-  tagFilter.value != null || tabScheme.value ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页',
+  tagFilters.value.length > 0 || tabScheme.value ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页',
 )
 
 /** 当前页已被删除/筛选后回退到最后一个有效页 */
@@ -629,7 +638,7 @@ watch([selectedId, tabScope], ([id]) => {
 })
 
 // 标签筛选只影响当前缓存数据的展示，回到第一页
-watch(tagFilter, () => {
+watch([tagFilters, tagMatch], () => {
   tabPage.value = 1
 })
 
@@ -1077,7 +1086,7 @@ function onTabSort(items: TabListItem[], evt: TabListSortEvent) {
   if (newRelIndex < 0) return
   const newIndex = (tabPage.value - 1) * tabPageSize.value + newRelIndex
   // 未筛选时本地同步展示顺序，避免依赖父数据重渲染导致拖拽后顺序回退
-  if (tagFilter.value == null && tabScope.value === 'current') {
+  if (tagFilters.value.length === 0 && tabScope.value === 'current') {
     const full = [...(tabsCache.get(ws.id) ?? [])]
     const from = full.findIndex((t) => t.tabId === moved.tab.tabId)
     if (from >= 0) {

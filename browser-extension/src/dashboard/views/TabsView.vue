@@ -73,7 +73,8 @@
           v-model:sort-mode="sortMode"
           v-model:sort-asc="sortAsc"
           v-model:scheme="scheme"
-          v-model:tag-id="tagId"
+          v-model:tag-ids="tagIds"
+          v-model:tag-match="tagMatch"
           :tag-options="tagOptions"
           :items="items"
           :total="total"
@@ -99,7 +100,7 @@ import ContextMenu from '@/shared/components/ContextMenu.vue'
 import { listSyncedTabs, listTabHosts, listTags, listWorkspaces, reportServiceError } from '@/shared/services'
 import { rootDomainOf } from '@/shared/utils/domain'
 import { openTabUrls } from '@/shared/utils/tab-utils'
-import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter } from '@/shared/types/tab-list'
+import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter, TabTagMatch } from '@/shared/types/tab-list'
 import type { TabHostsData, TagInfo, Workspace } from '@/shared/types'
 
 const router = useRouter()
@@ -114,15 +115,21 @@ const pageSize = ref(20)
 const sortMode = ref<CloudTabSortMode>('createdAt')
 const sortAsc = ref(false)
 const scheme = ref<TabSchemeFilter>('')
-const tagId = ref<number | null>(null)
+const tagIds = ref<number[]>([])
+const tagMatch = ref<TabTagMatch>('any')
 const tagOptions = ref<TagInfo[]>([])
 /** 仅用于属性弹窗展示标签页所属工作组的完整路径 */
 const workspaces = ref<Workspace[]>([])
 
 const emptyDescription = computed(() =>
-  searchKeyword.value || scheme.value || tagId.value != null
+  searchKeyword.value || scheme.value || tagIds.value.length > 0
     ? '没有匹配的标签页'
     : '云端还没有同步的标签页',
+)
+
+/** 列表与域名树共用的标签筛选参数：未选标签时不传，匹配方式仅在多选时有意义 */
+const tagQuery = computed(() =>
+  tagIds.value.length > 0 ? { tagIds: tagIds.value, tagMatch: tagMatch.value } : {},
 )
 
 // ============ 左侧域名树 ============
@@ -175,7 +182,7 @@ async function loadHosts(): Promise<boolean> {
     const data = await listTabHosts({
       scheme: scheme.value || undefined,
       keyword: searchKeyword.value.trim() || undefined,
-      tagId: tagId.value ?? undefined,
+      ...tagQuery.value,
     })
     domainHosts.value = data.hosts
     domainTotal.value = data.total
@@ -245,7 +252,7 @@ async function collectDomainTabUrls(node: DomainTreeNode): Promise<string[]> {
       keyword: searchKeyword.value.trim(),
       includeSystem: true,
       scheme: scheme.value || undefined,
-      tagId: tagId.value ?? undefined,
+      ...tagQuery.value,
       ...domainFilterOf(node.id),
       sort: sortMode.value,
       order: sortAsc.value ? 'asc' : 'desc',
@@ -304,7 +311,7 @@ async function load() {
       keyword: searchKeyword.value.trim(),
       includeSystem: true,
       scheme: scheme.value || undefined,
-      tagId: tagId.value ?? undefined,
+      ...tagQuery.value,
       ...domainFilter(),
       // 创建时间取标签页的添加时间，与列表行展示的时间一致
       sort: sortMode.value,
@@ -370,9 +377,9 @@ function openWorkspace(workspaceId: string) {
 }
 
 // 翻页、调整每页行数、切换排序/协议/标签/域名后按新的查询参数重新拉取
-watch([page, pageSize, sortMode, sortAsc, scheme, tagId, selectedDomain], () => void load())
+watch([page, pageSize, sortMode, sortAsc, scheme, tagIds, tagMatch, selectedDomain], () => void load())
 // 筛选条件会改变域名树的计数与可见域名
-watch([scheme, tagId], () => void loadHosts())
+watch([scheme, tagIds, tagMatch], () => void loadHosts())
 
 onMounted(() => {
   void load()

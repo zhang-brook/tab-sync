@@ -1,4 +1,5 @@
 import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, TabHostsData, DevicesData, DashboardStatsData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
+import type { TabTagMatch } from '../shared/types/tab-list'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getServerVersion } from '../shared/api/auth'
 import { verifyTokenCandidate } from '../shared/api/token-verify'
@@ -376,7 +377,8 @@ async function handleGetSyncedTabs(payload: {
   scheme?: string
   domain?: string
   exact?: boolean
-  tagId?: number
+  tagIds?: number[]
+  tagMatch?: TabTagMatch
   sort?: string
   order?: string
 }): Promise<MessageResponse<SyncedTabPageData>> {
@@ -388,7 +390,8 @@ async function handleGetSyncedTabs(payload: {
     scheme: payload?.scheme ?? '',
     domain: payload?.domain ?? '',
     exact: payload?.exact ?? false,
-    tagId: payload?.tagId,
+    tagIds: payload?.tagIds,
+    tagMatch: payload?.tagMatch,
     sort: payload?.sort ?? '',
     order: payload?.order ?? '',
   })
@@ -399,11 +402,12 @@ async function handleGetSyncedTabs(payload: {
   return { success: false, error: res.error || '获取已同步标签页失败', authError: res.status === 401 }
 }
 
-async function handleGetTabHosts(payload?: { scheme?: string; keyword?: string; tagId?: number }): Promise<MessageResponse<TabHostsData>> {
+async function handleGetTabHosts(payload?: { scheme?: string; keyword?: string; tagIds?: number[]; tagMatch?: TabTagMatch }): Promise<MessageResponse<TabHostsData>> {
   const res = await getTabHosts({
     scheme: payload?.scheme ?? '',
     keyword: payload?.keyword ?? '',
-    tagId: payload?.tagId,
+    tagIds: payload?.tagIds,
+    tagMatch: payload?.tagMatch,
   })
   if (res.ok && res.data) {
     return { success: true, data: res.data }

@@ -11,6 +11,7 @@ import type {
   SyncedTabPageData,
   TabHostsData,
 } from '../types'
+import type { TabTagMatch } from '../types/tab-list'
 
 /** 「未分组」系统工作组的固定标识（见 server/internal/service/workspace.go） */
 export const UNGROUPED_WORKSPACE_ID = 'ungrouped'
@@ -167,7 +168,8 @@ export async function listSyncedTabs(params: {
   scheme?: string
   domain?: string
   exact?: boolean
-  tagId?: number
+  tagIds?: number[]
+  tagMatch?: TabTagMatch
   sort?: string
   order?: string
 }): Promise<SyncedTabPageData> {
@@ -175,7 +177,7 @@ export async function listSyncedTabs(params: {
 }
 
 /** 标签页域名聚合（「标签页」页左侧域名树） */
-export async function listTabHosts(params: { scheme?: string; keyword?: string; tagId?: number } = {}): Promise<TabHostsData> {
+export async function listTabHosts(params: { scheme?: string; keyword?: string; tagIds?: number[]; tagMatch?: TabTagMatch } = {}): Promise<TabHostsData> {
   return callService<TabHostsData>({ action: 'GET_TAB_HOSTS', payload: params })
 }
 

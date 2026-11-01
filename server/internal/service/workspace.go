@@ -268,12 +268,32 @@ type ListSyncedTabsParams struct {
 	// Domain 域名筛选；DomainExact=true 时精确匹配主机名，否则匹配该根域名及其所有子域名
 	Domain      string
 	DomainExact bool
-	// TagID 标签筛选：大于 0 时仅保留带有该标签的标签页
-	TagID    uint
+	// TagIDs 标签筛选：非空时仅保留带有所选标签的标签页
+	TagIDs []uint
+	// TagAll 为 true 时要求同时带有 TagIDs 中的全部标签，否则匹配任一标签
+	TagAll   bool
 	Sort     string
 	Order    string
 	Page     int
 	PageSize int
+}
+
+// applyTagFilter 为标签页查询追加标签筛选条件。
+// TagAll 为 true 时要求同时带有全部标签，否则匹配其中任一标签。
+func applyTagFilter(q *gorm.DB, tagIDs []uint, all bool) *gorm.DB {
+	if len(tagIDs) == 0 {
+		return q
+	}
+	if all && len(tagIDs) > 1 {
+		return q.Where(
+			"(SELECT COUNT(DISTINCT tab_tags_rel.tag_id) FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id IN ?) = ?",
+			tagIDs, len(tagIDs),
+		)
+	}
+	return q.Where(
+		"EXISTS (SELECT 1 FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id IN ?)",
+		tagIDs,
+	)
 }
 
 // ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索、协议筛选与排序。
@@ -302,9 +322,7 @@ func (s *WorkspaceService) ListSyncedTabs(p ListSyncedTabsParams) (*SyncedTabPag
 			q = q.Where("(tabs.host = ? OR tabs.host LIKE ?)", p.Domain, "%."+p.Domain)
 		}
 	}
-	if p.TagID > 0 {
-		q = q.Where("EXISTS (SELECT 1 FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id = ?)", p.TagID)
-	}
+	q = applyTagFilter(q, p.TagIDs, p.TagAll)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -378,8 +396,8 @@ type TabHostsData struct {
 }
 
 // ListTabHosts 汇总所有工作组内标签页的域名分布，供「标签页」页左侧域名树使用。
-// scheme / keyword / tagID 与已同步列表保持一致，使树上的计数与列表筛选结果对应。
-func (s *WorkspaceService) ListTabHosts(scheme, keyword string, tagID uint) (*TabHostsData, error) {
+// scheme / keyword / tagIDs / tagAll 与已同步列表保持一致，使树上的计数与列表筛选结果对应。
+func (s *WorkspaceService) ListTabHosts(scheme, keyword string, tagIDs []uint, tagAll bool) (*TabHostsData, error) {
 	build := func() *gorm.DB {
 		q := s.db.Model(&model.Tab{}).
 			Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
@@ -394,10 +412,7 @@ func (s *WorkspaceService) ListTabHosts(scheme, keyword string, tagID uint) (*Ta
 			like := "%" + keyword + "%"
 			q = q.Where("tabs.title LIKE ? OR tabs.url LIKE ?", like, like)
 		}
-		if tagID > 0 {
-			q = q.Where("EXISTS (SELECT 1 FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id = ?)", tagID)
-		}
-		return q
+		return applyTagFilter(q, tagIDs, tagAll)
 	}
 
 	var total int64

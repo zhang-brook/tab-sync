@@ -1,6 +1,7 @@
 ﻿import type { Workspace, TabReference, TagInfo } from './workspace'
 import type { Device } from './device'
 import type { AuthState } from './auth'
+import type { TabTagMatch } from './tab-list'
 
 // ============ 消息 Action 定义 ============
 
@@ -95,7 +96,8 @@ export interface GetSyncedTabsMessage {
     scheme?: string
     domain?: string
     exact?: boolean
-    tagId?: number
+    tagIds?: number[]
+    tagMatch?: TabTagMatch
     sort?: string
     order?: string
   }
@@ -104,7 +106,7 @@ export interface GetSyncedTabsMessage {
 /** 标签页域名聚合：「标签页」页左侧域名树（与列表使用相同的协议/关键字条件） */
 export interface GetTabHostsMessage {
   action: 'GET_TAB_HOSTS'
-  payload?: { scheme?: string; keyword?: string; tagId?: number }
+  payload?: { scheme?: string; keyword?: string; tagIds?: number[]; tagMatch?: TabTagMatch }
 }
 
 /** 管理面板概览统计（后端聚合数量，不返回列表） */

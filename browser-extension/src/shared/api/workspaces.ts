@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type { Workspace, TabReference, WorkspaceTabsGroup, SyncedTabPageData, TabHostsData } from '../types'
+import type { TabTagMatch } from '../types/tab-list'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
 /** 获取所有工作组。
@@ -75,7 +76,7 @@ export function getWorkspaceTabsSummary() {
 }
 
 /** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平）
- * params: page/pageSize/keyword/includeSystem/scheme/sort/order */
+ * params: page/pageSize/keyword/includeSystem/scheme/tagIds/tagMatch/sort/order */
 export function getSyncedTabs(params: {
   page?: number
   pageSize?: number
@@ -84,7 +85,8 @@ export function getSyncedTabs(params: {
   scheme?: string
   domain?: string
   exact?: boolean
-  tagId?: number
+  tagIds?: number[]
+  tagMatch?: TabTagMatch
   sort?: string
   order?: string
 }) {
@@ -98,19 +100,25 @@ export function getSyncedTabs(params: {
     query.set('domain', params.domain)
     query.set('exact', String(params.exact ?? false))
   }
-  if (params.tagId != null) query.set('tagId', String(params.tagId))
+  if (params.tagIds?.length) {
+    query.set('tagIds', params.tagIds.join(','))
+    query.set('tagMatch', params.tagMatch ?? 'any')
+  }
   if (params.sort) query.set('sort', params.sort)
   if (params.order) query.set('order', params.order)
   const qs = query.toString()
   return apiClient.get<SyncedTabPageData>(`/v1/tab-sync/tabs${qs ? `?${qs}` : ''}`)
 }
 
-/** 标签页域名聚合（「标签页」页左侧域名树），scheme/keyword/tagId 与列表筛选保持一致 */
-export function getTabHosts(params: { scheme?: string; keyword?: string; tagId?: number } = {}) {
+/** 标签页域名聚合（「标签页」页左侧域名树），scheme/keyword/tagIds/tagMatch 与列表筛选保持一致 */
+export function getTabHosts(params: { scheme?: string; keyword?: string; tagIds?: number[]; tagMatch?: TabTagMatch } = {}) {
   const query = new URLSearchParams()
   if (params.scheme) query.set('scheme', params.scheme)
   if (params.keyword) query.set('keyword', params.keyword)
-  if (params.tagId != null) query.set('tagId', String(params.tagId))
+  if (params.tagIds?.length) {
+    query.set('tagIds', params.tagIds.join(','))
+    query.set('tagMatch', params.tagMatch ?? 'any')
+  }
   const qs = query.toString()
   return apiClient.get<TabHostsData>(`/v1/tab-sync/tabs/hosts${qs ? `?${qs}` : ''}`)
 }

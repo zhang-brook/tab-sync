@@ -6,13 +6,27 @@
         v-if="showTagFilter"
         class="tag-filter"
         size="small"
+        multiple
+        collapse-tags
+        collapse-tags-tooltip
         placeholder="全部标签"
         clearable
-        :model-value="tagId ?? undefined"
+        :model-value="tagIds"
         @change="onTagChange"
       >
         <el-option v-for="tag in tagOptions" :key="tag.id" :label="tag.name" :value="tag.id" />
       </el-select>
+      <el-radio-group
+        v-if="showTagFilter && tagIds.length > 1"
+        class="tag-match"
+        size="small"
+        title="所选标签的匹配方式：任一匹配只看带其中一个标签的标签页，全部匹配要求同时带有全部选中标签"
+        :model-value="tagMatch"
+        @change="onTagMatchChange"
+      >
+        <el-radio-button value="any">任一匹配</el-radio-button>
+        <el-radio-button value="all">全部匹配</el-radio-button>
+      </el-radio-group>
       <el-radio-group class="scheme-filter" size="small" :model-value="scheme" @change="onSchemeChange">
         <el-radio-button value="">全部</el-radio-button>
         <el-radio-button value="http">HTTP</el-radio-button>
@@ -186,6 +200,7 @@ import type {
   TabListItem,
   TabListSortEvent,
   TabSchemeFilter,
+  TabTagMatch,
 } from '@/shared/types/tab-list'
 import type { TagInfo, Workspace } from '@/shared/types'
 
@@ -216,8 +231,10 @@ const props = withDefaults(
     showManualSort?: boolean
     /** 协议筛选：空字符串不限，http/https 只保留对应协议 */
     scheme?: TabSchemeFilter
-    /** 当前选中的标签 id，null 表示不限 */
-    tagId?: number | null
+    /** 当前选中的标签 id 列表，空数组表示不限 */
+    tagIds?: number[]
+    /** 多个标签的匹配方式：any 任一标签，all 需同时带有全部选中标签 */
+    tagMatch?: TabTagMatch
     /** 标签筛选下拉的候选项 */
     tagOptions?: TagInfo[]
     /** 是否显示标签筛选下拉（按单个标签查看时不显示） */
@@ -237,7 +254,8 @@ const props = withDefaults(
     sortAsc: false,
     showManualSort: false,
     scheme: '',
-    tagId: null,
+    tagIds: () => [],
+    tagMatch: 'any',
     tagOptions: () => [],
     showTagFilter: true,
     removeTagId: null,
@@ -250,7 +268,8 @@ const emit = defineEmits<{
   (e: 'update:sortMode', mode: CloudTabSortMode): void
   (e: 'update:sortAsc', asc: boolean): void
   (e: 'update:scheme', scheme: TabSchemeFilter): void
-  (e: 'update:tagId', tagId: number | null): void
+  (e: 'update:tagIds', tagIds: number[]): void
+  (e: 'update:tagMatch', tagMatch: TabTagMatch): void
   /** 数据已被修改，父组件需重新拉取 */
   (e: 'refresh'): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
@@ -496,9 +515,16 @@ function onSortClick(mode: CloudTabSortMode) {
   emit('update:page', 1)
 }
 
-function onTagChange(value: number | string | undefined | null) {
-  const next = typeof value === 'number' ? value : null
-  emit('update:tagId', next)
+function onTagChange(value: number[] | undefined | null) {
+  const next = Array.isArray(value) ? value : []
+  emit('update:tagIds', next)
+  // 不足两个标签时匹配方式无意义，复位为「任一」，避免隐藏状态下的旧选择在再次多选时生效
+  if (next.length < 2 && props.tagMatch !== 'any') emit('update:tagMatch', 'any')
+  emit('update:page', 1)
+}
+
+function onTagMatchChange(value: string | number | boolean | undefined) {
+  emit('update:tagMatch', value === 'all' ? 'all' : 'any')
   emit('update:page', 1)
 }
 
@@ -536,7 +562,7 @@ function onSizeChange(size: number) {
 }
 
 .tag-filter {
-  width: 150px;
+  width: 220px;
 }
 
 .sort-row {
