@@ -34,10 +34,31 @@
           @node-click="onDomainClick"
         >
           <template #default="{ data }">
-            <span class="domain-node">
-              <span class="domain-name" :title="data.label">{{ data.label }}</span>
-              <span class="domain-count">{{ data.count }}</span>
-            </span>
+            <ContextMenu
+              @command="(cmd: string) => onDomainMenuCommand(cmd, data)"
+              @open="() => onDomainContextMenu(data)"
+            >
+              <span class="domain-node">
+                <span class="domain-name" :title="data.label">{{ data.label }}</span>
+                <span class="domain-count">{{ data.count }}</span>
+              </span>
+              <template #menu>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="open" :icon="FolderOpened" :disabled="data.count === 0">
+                    打开所有标签页
+                    <el-text type="info" style="margin-left: 6.18px;" v-if="data.count > 0">
+                      ({{ data.count }}个标签页)
+                    </el-text>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="openNewWindow" :icon="CopyDocument" :disabled="data.count === 0">
+                    打开所有标签页（新窗口）
+                  </el-dropdown-item>
+                  <el-dropdown-item command="openAsGroup" :icon="Collection" :disabled="data.count === 0">
+                    打开所有标签页（打开为标签组）
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </ContextMenu>
           </template>
         </el-tree>
       </div>
@@ -69,10 +90,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Collection, CopyDocument, FolderOpened, Search, Refresh } from '@element-plus/icons-vue'
 import CloudTabListPanel from '../components/CloudTabListPanel.vue'
+import ContextMenu from '@/shared/components/ContextMenu.vue'
 import { listSyncedTabs, listTabHosts, listTags, listWorkspaces, reportServiceError } from '@/shared/services'
 import { rootDomainOf } from '@/shared/utils/domain'
+import { openTabUrls } from '@/shared/utils/tab-utils'
 import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter } from '@/shared/types/tab-list'
 import type { TabHostsData, TagInfo, Workspace } from '@/shared/types'
 
@@ -183,12 +207,74 @@ function onDomainClick(node: DomainTreeNode) {
   page.value = 1
 }
 
-/** 当前域名节点对应的服务端筛选参数 */
-function domainFilter(): { domain?: string; exact?: boolean } {
-  const value = selectedDomain.value
-  if (value.startsWith('d:')) return { domain: value.slice(2), exact: false }
-  if (value.startsWith('h:')) return { domain: value.slice(2), exact: true }
+/** 域名节点对应的服务端筛选参数：d: 根域名（包含子域名）、h: 完整主机名 */
+function domainFilterOf(id: string): { domain?: string; exact?: boolean } {
+  if (id.startsWith('d:')) return { domain: id.slice(2), exact: false }
+  if (id.startsWith('h:')) return { domain: id.slice(2), exact: true }
   return {}
+}
+
+/** 当前选中域名节点对应的服务端筛选参数 */
+function domainFilter(): { domain?: string; exact?: boolean } {
+  return domainFilterOf(selectedDomain.value)
+}
+
+/** 右键节点：选中该节点并同步高亮，由 ContextMenu 负责打开操作菜单 */
+function onDomainContextMenu(node: DomainTreeNode) {
+  if (selectedDomain.value !== node.id) {
+    selectedDomain.value = node.id
+    page.value = 1
+  }
+  void nextTick(() => domainTreeRef.value?.setCurrentKey(node.id))
+}
+
+/** 收集节点在当前筛选条件下的全部标签页 URL（分页拉取，不受右侧列表当前页限制） */
+async function collectDomainTabUrls(node: DomainTreeNode): Promise<string[]> {
+  const urls: string[] = []
+  const pageSize = 200
+  for (let pageNo = 1; ; pageNo++) {
+    const data = await listSyncedTabs({
+      page: pageNo,
+      pageSize,
+      keyword: searchKeyword.value.trim(),
+      includeSystem: true,
+      scheme: scheme.value || undefined,
+      tagId: tagId.value ?? undefined,
+      ...domainFilterOf(node.id),
+      sort: sortMode.value,
+      order: sortAsc.value ? 'asc' : 'desc',
+    })
+    urls.push(...data.items.map((item) => item.tab.url).filter(Boolean))
+    if (data.items.length === 0 || pageNo * pageSize >= data.total) break
+  }
+  return urls
+}
+
+/** 域名树右键菜单：与工作组树一致，按当前筛选条件打开该节点下的全部标签页 */
+async function onDomainMenuCommand(command: string, node: DomainTreeNode) {
+  if (node.count === 0) return
+  let urls: string[]
+  try {
+    urls = await collectDomainTabUrls(node)
+  } catch (err) {
+    reportServiceError(err, { fallback: '获取标签页失败' })
+    return
+  }
+  if (urls.length === 0) {
+    ElMessage.warning('没有可打开的标签页')
+    return
+  }
+  const asTabGroup = command === 'openAsGroup'
+  try {
+    const opened = await openTabUrls(urls, {
+      newWindow: command === 'openNewWindow',
+      asTabGroup,
+      groupTitle: node.id === 'all' ? '全部标签页' : node.label,
+    })
+    ElMessage.success(asTabGroup ? `已打开 ${opened} 个标签页并归入标签组` : `已打开 ${opened} 个标签页`)
+  } catch (err) {
+    reportServiceError(err, { fallback: '打开失败' })
+  }
 }
 
 // ============ 列表数据 ============
