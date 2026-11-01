@@ -268,10 +268,12 @@ type ListSyncedTabsParams struct {
 	// Domain 域名筛选；DomainExact=true 时精确匹配主机名，否则匹配该根域名及其所有子域名
 	Domain      string
 	DomainExact bool
-	Sort        string
-	Order       string
-	Page        int
-	PageSize    int
+	// TagID 标签筛选：大于 0 时仅保留带有该标签的标签页
+	TagID    uint
+	Sort     string
+	Order    string
+	Page     int
+	PageSize int
 }
 
 // ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索、协议筛选与排序。
@@ -299,6 +301,9 @@ func (s *WorkspaceService) ListSyncedTabs(p ListSyncedTabsParams) (*SyncedTabPag
 		} else {
 			q = q.Where("(tabs.host = ? OR tabs.host LIKE ?)", p.Domain, "%."+p.Domain)
 		}
+	}
+	if p.TagID > 0 {
+		q = q.Where("EXISTS (SELECT 1 FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id = ?)", p.TagID)
 	}
 
 	var total int64
@@ -373,8 +378,8 @@ type TabHostsData struct {
 }
 
 // ListTabHosts 汇总所有工作组内标签页的域名分布，供「标签页」页左侧域名树使用。
-// scheme / keyword 与已同步列表保持一致，使树上的计数与列表筛选结果对应。
-func (s *WorkspaceService) ListTabHosts(scheme, keyword string) (*TabHostsData, error) {
+// scheme / keyword / tagID 与已同步列表保持一致，使树上的计数与列表筛选结果对应。
+func (s *WorkspaceService) ListTabHosts(scheme, keyword string, tagID uint) (*TabHostsData, error) {
 	build := func() *gorm.DB {
 		q := s.db.Model(&model.Tab{}).
 			Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
@@ -388,6 +393,9 @@ func (s *WorkspaceService) ListTabHosts(scheme, keyword string) (*TabHostsData, 
 		if keyword != "" {
 			like := "%" + keyword + "%"
 			q = q.Where("tabs.title LIKE ? OR tabs.url LIKE ?", like, like)
+		}
+		if tagID > 0 {
+			q = q.Where("EXISTS (SELECT 1 FROM tab_tags_rel WHERE tab_tags_rel.tab_id = tabs.id AND tab_tags_rel.tag_id = ?)", tagID)
 		}
 		return q
 	}

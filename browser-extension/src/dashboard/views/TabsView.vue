@@ -50,6 +50,8 @@
           v-model:sort-mode="sortMode"
           v-model:sort-asc="sortAsc"
           v-model:scheme="scheme"
+          v-model:tag-id="tagId"
+          :tag-options="tagOptions"
           :items="items"
           :total="total"
           :loading="loading"
@@ -70,10 +72,10 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import CloudTabListPanel from '../components/CloudTabListPanel.vue'
-import { listSyncedTabs, listTabHosts, listWorkspaces, reportServiceError } from '@/shared/services'
+import { listSyncedTabs, listTabHosts, listTags, listWorkspaces, reportServiceError } from '@/shared/services'
 import { rootDomainOf } from '@/shared/utils/domain'
 import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter } from '@/shared/types/tab-list'
-import type { TabHostsData, Workspace } from '@/shared/types'
+import type { TabHostsData, TagInfo, Workspace } from '@/shared/types'
 
 const router = useRouter()
 
@@ -86,11 +88,15 @@ const pageSize = ref(20)
 const sortMode = ref<CloudTabSortMode>('createdAt')
 const sortAsc = ref(false)
 const scheme = ref<TabSchemeFilter>('')
+const tagId = ref<number | null>(null)
+const tagOptions = ref<TagInfo[]>([])
 /** 仅用于属性弹窗展示标签页所属工作组的完整路径 */
 const workspaces = ref<Workspace[]>([])
 
 const emptyDescription = computed(() =>
-  searchKeyword.value ? '没有匹配的标签页' : '云端还没有同步的标签页',
+  searchKeyword.value || scheme.value || tagId.value != null
+    ? '没有匹配的标签页'
+    : '云端还没有同步的标签页',
 )
 
 // ============ 左侧域名树 ============
@@ -142,6 +148,7 @@ async function loadHosts() {
     const data = await listTabHosts({
       scheme: scheme.value || undefined,
       keyword: searchKeyword.value.trim() || undefined,
+      tagId: tagId.value ?? undefined,
     })
     domainHosts.value = data.hosts
     domainTotal.value = data.total
@@ -206,6 +213,7 @@ async function load() {
       keyword: searchKeyword.value.trim(),
       includeSystem: true,
       scheme: scheme.value || undefined,
+      tagId: tagId.value ?? undefined,
       ...domainFilter(),
       // 创建时间取标签页的添加时间，与列表行展示的时间一致
       sort: sortMode.value,
@@ -242,6 +250,14 @@ async function load() {
   }
 }
 
+async function loadTagOptions() {
+  try {
+    tagOptions.value = await listTags('tab')
+  } catch {
+    tagOptions.value = []
+  }
+}
+
 /** 列表或域名树数据可能都已变化（刷新、面板内编辑） */
 function onRefresh() {
   void load()
@@ -252,14 +268,15 @@ function openWorkspace(workspaceId: string) {
   void router.push({ path: '/workspaces', query: { workspaceId } })
 }
 
-// 翻页、调整每页行数、切换排序/协议/域名后按新的查询参数重新拉取
-watch([page, pageSize, sortMode, sortAsc, scheme, selectedDomain], () => void load())
-// 协议筛选会改变域名树的计数与可见域名
-watch(scheme, () => void loadHosts())
+// 翻页、调整每页行数、切换排序/协议/标签/域名后按新的查询参数重新拉取
+watch([page, pageSize, sortMode, sortAsc, scheme, tagId, selectedDomain], () => void load())
+// 筛选条件会改变域名树的计数与可见域名
+watch([scheme, tagId], () => void loadHosts())
 
 onMounted(() => {
   void load()
   void loadHosts()
+  void loadTagOptions()
   void listWorkspaces({ includeSystem: true })
     .then((list) => {
       workspaces.value = list

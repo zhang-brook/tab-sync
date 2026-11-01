@@ -1,63 +1,75 @@
 <template>
   <div class="tab-list-panel">
     <div class="filter-row">
-      <div class="sort-row">
-        <span class="sort-label">排序</span>
-        <div class="sort-toggle">
-          <button
-            v-if="showManualSort"
-            type="button"
-            class="sort-btn"
-            :class="{ active: sortMode === 'manual' }"
-            title="按工作组内的手动排序（可拖拽调整）"
-            @click="onSortClick('manual')"
-          >默认顺序</button>
-          <button
-            type="button"
-            class="sort-btn"
-            :class="{ active: sortMode === 'name' }"
-            title="再次点击切换 A-Z / Z-A"
-            @click="onSortClick('name')"
-          >
-            按名称
-            <el-icon v-if="sortMode === 'name'" class="sort-dir">
-              <SortUp v-if="sortAsc" />
-              <SortDown v-else />
-            </el-icon>
-          </button>
-          <button
-            type="button"
-            class="sort-btn"
-            :class="{ active: sortMode === 'createdAt' }"
-            title="再次点击切换创建时间升序 / 降序"
-            @click="onSortClick('createdAt')"
-          >
-            按创建时间
-            <el-icon v-if="sortMode === 'createdAt'" class="sort-dir">
-              <SortUp v-if="sortAsc" />
-              <SortDown v-else />
-            </el-icon>
-          </button>
-          <button
-            type="button"
-            class="sort-btn"
-            :class="{ active: sortMode === 'updatedAt' }"
-            title="再次点击切换修改时间升序 / 降序"
-            @click="onSortClick('updatedAt')"
-          >
-            按修改时间
-            <el-icon v-if="sortMode === 'updatedAt'" class="sort-dir">
-              <SortUp v-if="sortAsc" />
-              <SortDown v-else />
-            </el-icon>
-          </button>
-        </div>
-      </div>
+      <span class="filter-label">筛选</span>
+      <el-select
+        class="tag-filter"
+        size="small"
+        placeholder="全部标签"
+        clearable
+        :model-value="tagId ?? undefined"
+        @change="onTagChange"
+      >
+        <el-option v-for="tag in tagOptions" :key="tag.id" :label="tag.name" :value="tag.id" />
+      </el-select>
       <el-radio-group class="scheme-filter" size="small" :model-value="scheme" @change="onSchemeChange">
         <el-radio-button value="">全部</el-radio-button>
         <el-radio-button value="http">HTTP</el-radio-button>
         <el-radio-button value="https">HTTPS</el-radio-button>
       </el-radio-group>
+    </div>
+
+    <div class="sort-row">
+      <span class="sort-label">排序</span>
+      <div class="sort-toggle">
+        <button
+          v-if="showManualSort"
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'manual' }"
+          title="按工作组内的手动排序（可拖拽调整）"
+          @click="onSortClick('manual')"
+        >默认顺序</button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'name' }"
+          title="再次点击切换 A-Z / Z-A"
+          @click="onSortClick('name')"
+        >
+          按名称
+          <el-icon v-if="sortMode === 'name'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'createdAt' }"
+          title="再次点击切换创建时间升序 / 降序"
+          @click="onSortClick('createdAt')"
+        >
+          按创建时间
+          <el-icon v-if="sortMode === 'createdAt'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+        <button
+          type="button"
+          class="sort-btn"
+          :class="{ active: sortMode === 'updatedAt' }"
+          title="再次点击切换修改时间升序 / 降序"
+          @click="onSortClick('updatedAt')"
+        >
+          按修改时间
+          <el-icon v-if="sortMode === 'updatedAt'" class="sort-dir">
+            <SortUp v-if="sortAsc" />
+            <SortDown v-else />
+          </el-icon>
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="panel-state">
@@ -160,7 +172,7 @@ import type {
   TabListSortEvent,
   TabSchemeFilter,
 } from '@/shared/types/tab-list'
-import type { Workspace } from '@/shared/types'
+import type { TagInfo, Workspace } from '@/shared/types'
 
 const props = withDefaults(
   defineProps<{
@@ -191,6 +203,10 @@ const props = withDefaults(
     showManualSort?: boolean
     /** 协议筛选：空字符串不限，http/https 只保留对应协议 */
     scheme?: TabSchemeFilter
+    /** 当前选中的标签 id，null 表示不限 */
+    tagId?: number | null
+    /** 标签筛选下拉的候选项 */
+    tagOptions?: TagInfo[]
   }>(),
   {
     loading: false,
@@ -205,6 +221,8 @@ const props = withDefaults(
     sortAsc: false,
     showManualSort: false,
     scheme: '',
+    tagId: null,
+    tagOptions: () => [],
   },
 )
 
@@ -214,6 +232,7 @@ const emit = defineEmits<{
   (e: 'update:sortMode', mode: CloudTabSortMode): void
   (e: 'update:sortAsc', asc: boolean): void
   (e: 'update:scheme', scheme: TabSchemeFilter): void
+  (e: 'update:tagId', tagId: number | null): void
   /** 数据已被修改，父组件需重新拉取 */
   (e: 'refresh'): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
@@ -430,6 +449,12 @@ function onSortClick(mode: CloudTabSortMode) {
   emit('update:page', 1)
 }
 
+function onTagChange(value: number | string | undefined | null) {
+  const next = typeof value === 'number' ? value : null
+  emit('update:tagId', next)
+  emit('update:page', 1)
+}
+
 function onSchemeChange(value: string | number | boolean | undefined) {
   const next: TabSchemeFilter = value === 'http' || value === 'https' ? value : ''
   emit('update:scheme', next)
@@ -457,19 +482,25 @@ function onSizeChange(size: number) {
 .filter-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
   flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.tag-filter {
+  width: 150px;
 }
 
 .sort-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
+.filter-label,
 .sort-label {
   font-size: 12px;
   color: var(--el-text-color-secondary);

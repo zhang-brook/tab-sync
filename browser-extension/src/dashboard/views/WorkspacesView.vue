@@ -167,10 +167,6 @@
               <el-radio-button value="current">仅本层级</el-radio-button>
               <el-radio-button value="all">包含子工作组</el-radio-button>
             </el-radio-group>
-            <el-select v-model="tagFilter" placeholder="按标签筛选" clearable size="small"
-              style="width: 160px; margin-left: 12px">
-              <el-option v-for="t in allTabTags" :key="t.id" :label="t.name" :value="t.id" />
-            </el-select>
           </div>
 
           <!-- 标签页列表（仅本层级支持拖拽排序；包含子工作组时只读并带来源徽标）；
@@ -182,6 +178,8 @@
               v-model:sort-mode="tabSortMode"
               v-model:sort-asc="tabSortAsc"
               v-model:scheme="tabScheme"
+              v-model:tag-id="tagFilter"
+              :tag-options="allTabTags"
               :items="pagedTabItems"
               :total="tabListItems.length"
               :sortable="tabScope === 'current' && tagFilter == null && tabSortMode === 'manual'"

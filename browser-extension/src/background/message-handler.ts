@@ -377,6 +377,7 @@ async function handleGetSyncedTabs(payload: {
   scheme?: string
   domain?: string
   exact?: boolean
+  tagId?: number
   sort?: string
   order?: string
 }): Promise<MessageResponse<SyncedTabPageData>> {
@@ -388,6 +389,7 @@ async function handleGetSyncedTabs(payload: {
     scheme: payload?.scheme ?? '',
     domain: payload?.domain ?? '',
     exact: payload?.exact ?? false,
+    tagId: payload?.tagId,
     sort: payload?.sort ?? '',
     order: payload?.order ?? '',
   })
@@ -398,8 +400,12 @@ async function handleGetSyncedTabs(payload: {
   return { success: false, error: res.error || '获取已同步标签页失败', authError: res.status === 401 }
 }
 
-async function handleGetTabHosts(payload?: { scheme?: string; keyword?: string }): Promise<MessageResponse<TabHostsData>> {
-  const res = await getTabHosts({ scheme: payload?.scheme ?? '', keyword: payload?.keyword ?? '' })
+async function handleGetTabHosts(payload?: { scheme?: string; keyword?: string; tagId?: number }): Promise<MessageResponse<TabHostsData>> {
+  const res = await getTabHosts({
+    scheme: payload?.scheme ?? '',
+    keyword: payload?.keyword ?? '',
+    tagId: payload?.tagId,
+  })
   if (res.ok && res.data) {
     return { success: true, data: res.data }
   }

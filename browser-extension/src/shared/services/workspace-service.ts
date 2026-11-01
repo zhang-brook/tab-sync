@@ -167,6 +167,7 @@ export async function listSyncedTabs(params: {
   scheme?: string
   domain?: string
   exact?: boolean
+  tagId?: number
   sort?: string
   order?: string
 }): Promise<SyncedTabPageData> {
@@ -174,7 +175,7 @@ export async function listSyncedTabs(params: {
 }
 
 /** 标签页域名聚合（「标签页」页左侧域名树） */
-export async function listTabHosts(params: { scheme?: string; keyword?: string } = {}): Promise<TabHostsData> {
+export async function listTabHosts(params: { scheme?: string; keyword?: string; tagId?: number } = {}): Promise<TabHostsData> {
   return callService<TabHostsData>({ action: 'GET_TAB_HOSTS', payload: params })
 }
 
