@@ -5,9 +5,12 @@ import {
   MENU_MORE,
   MENU_MORE_RELOAD,
   MENU_MORE_SHORTCUTS,
-  MENU_OPEN_EXTENSIONS,
+  // MENU_OPEN_EXTENSIONS, // 「管理扩展」菜单项当前注释保留（action 顶层 6 项已达上限）
+  MENU_OPEN_RECYCLEBIN,
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
+  MENU_OPEN_TABS,
+  MENU_OPEN_TAGS,
   MENU_OPEN_WORKSPACES,
   MENU_SAVE_AS_NEW,
   MENU_SAVE_DEFAULT,
@@ -201,16 +204,36 @@ export async function createContextMenus() {
 
     {
       const ctx = chrome.contextMenus.ContextType.ACTION
+      // 管理面板板块直达：与侧边栏菜单的「标签页 / 工作组 / 标签 / 回收站」一一对应
+      const dashboardPages: Array<[string, string]> = [
+        [MENU_OPEN_TABS, '标签页'],
+        [MENU_OPEN_WORKSPACES, '工作组'],
+        [MENU_OPEN_TAGS, '标签'],
+        [MENU_OPEN_RECYCLEBIN, '回收站'],
+      ]
+      for (const [menuId, title] of dashboardPages) {
+        chrome.contextMenus.create({
+          id: `${menuId}-${ctx}`,
+          title,
+          contexts: [ctx],
+        })
+      }
       chrome.contextMenus.create({
-        id: MENU_OPEN_EXTENSIONS,
-        title: '管理扩展',
+        id: `tab-sync-sep-action-${ctx}`,
+        type: 'separator',
         contexts: [ctx],
       })
+      // chrome.contextMenus.create({
+      //   id: MENU_OPEN_EXTENSIONS,
+      //   title: '管理扩展',
+      //   contexts: [ctx],
+      // })
       chrome.contextMenus.create({
         id: `${MENU_MORE_RELOAD}-${ctx}`,
         title: '重启扩展',
         contexts: [ctx],
       })
+      // ⚠ Chrome 对 action 菜单顶层自定义项上限为 6 项（ACTION_MENU_TOP_LEVEL_LIMIT，分隔符也占一项）
     }
     logger.info('右键菜单已创建')
   } catch (err) {

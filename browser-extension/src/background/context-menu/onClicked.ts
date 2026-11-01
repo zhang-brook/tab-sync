@@ -3,6 +3,7 @@ import { extensionManageUrl } from '../../shared/utils/pages'
 import {
   handleSaveGroupClick,
   lastFocusedWindowId,
+  openDashboardPage,
   openPickerWindow,
   openSettingsPage,
   openSidePanel,
@@ -15,8 +16,11 @@ import {
   MENU_MORE_RELOAD,
   MENU_MORE_SHORTCUTS,
   MENU_OPEN_EXTENSIONS,
+  MENU_OPEN_RECYCLEBIN,
   MENU_OPEN_SETTINGS,
   MENU_OPEN_SIDEPANEL,
+  MENU_OPEN_TABS,
+  MENU_OPEN_TAGS,
   MENU_OPEN_WORKSPACES,
   MENU_SAVE_AS_NEW,
   MENU_SAVE_DEFAULT,
@@ -42,6 +46,18 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     } else if (lastFocusedWindowId != null) {
       openSidePanel(lastFocusedWindowId)
     }
+    return
+  }
+  if (String(id).startsWith(MENU_OPEN_TABS + '-')) {
+    await openDashboardPage('#/tabs')
+    return
+  }
+  if (String(id).startsWith(MENU_OPEN_TAGS + '-')) {
+    await openDashboardPage('#/tags')
+    return
+  }
+  if (String(id).startsWith(MENU_OPEN_RECYCLEBIN + '-')) {
+    await openDashboardPage('#/recyclebin')
     return
   }
   if (String(id).startsWith(MENU_OPEN_WORKSPACES + '-')) {

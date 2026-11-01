@@ -42,16 +42,16 @@ export function openSidePanel(windowId: number) {
 
 /** 打开 Dashboard 设置页（已打开则激活并切换到设置路由，否则新建标签页） */
 export async function openSettingsPage() {
-  await openPage('#/settings')
+  await openDashboardPage('#/settings')
 }
 
 /** 打开 Dashboard 工作组页（已打开则激活并切换到工作组路由，否则新建标签页） */
 export async function openWorkspacesPage() {
-  await openPage('#/workspaces')
+  await openDashboardPage('#/workspaces')
 }
 
-/** 打开页（已打开则激活并切换到指定页的路由，否则新建标签页） */
-async function openPage(page: string) {
+/** 打开 Dashboard 指定路由页（已打开则激活并切换路由，否则新建标签页） */
+export async function openDashboardPage(page: string) {
   const baseUrl = DASHBOARD_URL
   const pageUrl = baseUrl + page
   // match pattern 不匹配 URL fragment，带 hash 的现有 Dashboard 标签页也能查到

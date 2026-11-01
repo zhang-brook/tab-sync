@@ -50,7 +50,8 @@ export default defineManifest({
     default_path: 'src/sidepanel/index.html',
   },
   "options_ui": {
-    "page": "src/dashboard/index.html",
+    // 扩展选项统一落到管理面板的设置页（Dashboard 路由由 hash 切换）
+    "page": "src/dashboard/index.html#/settings",
     "open_in_tab": true,   // 是否在新标签页打开
   },
   // docs: https://developer.chrome.com/docs/extensions/reference/manifest/icons?hl=zh-cn
