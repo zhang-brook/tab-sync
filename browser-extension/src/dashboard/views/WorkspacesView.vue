@@ -181,6 +181,7 @@
               v-model:page-size="tabPageSize"
               v-model:sort-mode="tabSortMode"
               v-model:sort-asc="tabSortAsc"
+              v-model:scheme="tabScheme"
               :items="pagedTabItems"
               :total="tabListItems.length"
               :sortable="tabScope === 'current' && tagFilter == null && tabSortMode === 'manual'"
@@ -313,7 +314,13 @@ import {
   updateWorkspace,
 } from '@/shared/services'
 import type { Workspace, TabReference, TagInfo } from '@/shared/types'
-import type { CloudTabListItem, CloudTabSortMode, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
+import type {
+  CloudTabListItem,
+  CloudTabSortMode,
+  TabListItem,
+  TabListSortEvent,
+  TabSchemeFilter,
+} from '@/shared/types/tab-list'
 
 const route = useRoute()
 const router = useRouter()
@@ -519,10 +526,14 @@ const rightTabs = computed<RightTabItem[]>(() => {
       if (w) result.push(...collect(w.id, w.name, w.color))
     }
   }
+  let filtered = result
   if (tagFilter.value != null) {
-    return result.filter((item) => item.tab.tags?.some((t) => t.id === tagFilter.value))
+    filtered = filtered.filter((item) => item.tab.tags?.some((t) => t.id === tagFilter.value))
   }
-  return result
+  if (tabScheme.value) {
+    filtered = filtered.filter((item) => item.tab.url.toLowerCase().startsWith(`${tabScheme.value}://`))
+  }
+  return filtered
 })
 
 /** 右侧标签页列表 → 公共列表组件数据（「包含子工作组」模式下非本组标签页带来源徽标） */
@@ -563,6 +574,7 @@ const tabPageSize = ref(20)
 /** 默认顺序 = 工作组内的手动排序（sortOrder），拖拽排序仅在该模式下可用 */
 const tabSortMode = ref<CloudTabSortMode>('manual')
 const tabSortAsc = ref(false)
+const tabScheme = ref<TabSchemeFilter>('')
 
 /** 创建时间取标签页添加时间 addedAt（与行内展示一致），修改时间取后端下发的 updatedAt */
 const sortedTabItems = computed(() => {
@@ -583,7 +595,7 @@ const pagedTabItems = computed(() => {
 })
 
 const tabEmptyDescription = computed(() =>
-  tagFilter.value != null ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页',
+  tagFilter.value != null || tabScheme.value ? '没有匹配筛选条件的标签页' : '工作组内暂无标签页',
 )
 
 /** 当前页已被删除/筛选后回退到最后一个有效页 */

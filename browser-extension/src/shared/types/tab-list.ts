@@ -54,6 +54,9 @@ export interface TabListSortEvent {
   moved?: { element: TabListItem; oldIndex: number; newIndex: number }
 }
 
+/** 协议筛选：空字符串表示不限，http/https 仅保留对应协议的标签页 */
+export type TabSchemeFilter = '' | 'http' | 'https'
+
 /** 云端标签页排序方式：名称 / 创建时间（标签页添加时间）/ 修改时间 */
 export type TabSortMode = 'name' | 'createdAt' | 'updatedAt'
 

@@ -86,7 +86,15 @@ export interface GetWorkspaceTabsMessage {
 /** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平） */
 export interface GetSyncedTabsMessage {
   action: 'GET_SYNCED_TABS'
-  payload: { page?: number; pageSize?: number; keyword?: string; includeSystem?: boolean; sort?: string; order?: string }
+  payload: {
+    page?: number
+    pageSize?: number
+    keyword?: string
+    includeSystem?: boolean
+    scheme?: string
+    sort?: string
+    order?: string
+  }
 }
 
 /** 管理面板概览统计（后端聚合数量，不返回列表） */

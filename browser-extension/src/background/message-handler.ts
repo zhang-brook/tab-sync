@@ -371,6 +371,7 @@ async function handleGetSyncedTabs(payload: {
   pageSize?: number
   keyword?: string
   includeSystem?: boolean
+  scheme?: string
   sort?: string
   order?: string
 }): Promise<MessageResponse<SyncedTabPageData>> {
@@ -379,6 +380,7 @@ async function handleGetSyncedTabs(payload: {
     pageSize: payload?.pageSize ?? 50,
     keyword: payload?.keyword ?? '',
     includeSystem: payload?.includeSystem ?? true,
+    scheme: payload?.scheme ?? '',
     sort: payload?.sort ?? '',
     order: payload?.order ?? '',
   })

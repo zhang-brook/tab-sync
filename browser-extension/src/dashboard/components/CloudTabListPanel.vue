@@ -1,56 +1,63 @@
 <template>
   <div class="tab-list-panel">
-    <div class="sort-row">
-      <span class="sort-label">排序</span>
-      <div class="sort-toggle">
-        <button
-          v-if="showManualSort"
-          type="button"
-          class="sort-btn"
-          :class="{ active: sortMode === 'manual' }"
-          title="按工作组内的手动排序（可拖拽调整）"
-          @click="onSortClick('manual')"
-        >默认顺序</button>
-        <button
-          type="button"
-          class="sort-btn"
-          :class="{ active: sortMode === 'name' }"
-          title="再次点击切换 A-Z / Z-A"
-          @click="onSortClick('name')"
-        >
-          按名称
-          <el-icon v-if="sortMode === 'name'" class="sort-dir">
-            <SortUp v-if="sortAsc" />
-            <SortDown v-else />
-          </el-icon>
-        </button>
-        <button
-          type="button"
-          class="sort-btn"
-          :class="{ active: sortMode === 'createdAt' }"
-          title="再次点击切换创建时间升序 / 降序"
-          @click="onSortClick('createdAt')"
-        >
-          按创建时间
-          <el-icon v-if="sortMode === 'createdAt'" class="sort-dir">
-            <SortUp v-if="sortAsc" />
-            <SortDown v-else />
-          </el-icon>
-        </button>
-        <button
-          type="button"
-          class="sort-btn"
-          :class="{ active: sortMode === 'updatedAt' }"
-          title="再次点击切换修改时间升序 / 降序"
-          @click="onSortClick('updatedAt')"
-        >
-          按修改时间
-          <el-icon v-if="sortMode === 'updatedAt'" class="sort-dir">
-            <SortUp v-if="sortAsc" />
-            <SortDown v-else />
-          </el-icon>
-        </button>
+    <div class="filter-row">
+      <div class="sort-row">
+        <span class="sort-label">排序</span>
+        <div class="sort-toggle">
+          <button
+            v-if="showManualSort"
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'manual' }"
+            title="按工作组内的手动排序（可拖拽调整）"
+            @click="onSortClick('manual')"
+          >默认顺序</button>
+          <button
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'name' }"
+            title="再次点击切换 A-Z / Z-A"
+            @click="onSortClick('name')"
+          >
+            按名称
+            <el-icon v-if="sortMode === 'name'" class="sort-dir">
+              <SortUp v-if="sortAsc" />
+              <SortDown v-else />
+            </el-icon>
+          </button>
+          <button
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'createdAt' }"
+            title="再次点击切换创建时间升序 / 降序"
+            @click="onSortClick('createdAt')"
+          >
+            按创建时间
+            <el-icon v-if="sortMode === 'createdAt'" class="sort-dir">
+              <SortUp v-if="sortAsc" />
+              <SortDown v-else />
+            </el-icon>
+          </button>
+          <button
+            type="button"
+            class="sort-btn"
+            :class="{ active: sortMode === 'updatedAt' }"
+            title="再次点击切换修改时间升序 / 降序"
+            @click="onSortClick('updatedAt')"
+          >
+            按修改时间
+            <el-icon v-if="sortMode === 'updatedAt'" class="sort-dir">
+              <SortUp v-if="sortAsc" />
+              <SortDown v-else />
+            </el-icon>
+          </button>
+        </div>
       </div>
+      <el-radio-group class="scheme-filter" size="small" :model-value="scheme" @change="onSchemeChange">
+        <el-radio-button value="">全部</el-radio-button>
+        <el-radio-button value="http">HTTP</el-radio-button>
+        <el-radio-button value="https">HTTPS</el-radio-button>
+      </el-radio-group>
     </div>
 
     <div v-if="loading" class="panel-state">
@@ -146,7 +153,13 @@ import {
   removeWorkspaceTab,
   reportServiceError,
 } from '@/shared/services'
-import type { CloudTabListItem, CloudTabSortMode, TabListItem, TabListSortEvent } from '@/shared/types/tab-list'
+import type {
+  CloudTabListItem,
+  CloudTabSortMode,
+  TabListItem,
+  TabListSortEvent,
+  TabSchemeFilter,
+} from '@/shared/types/tab-list'
 import type { Workspace } from '@/shared/types'
 
 const props = withDefaults(
@@ -176,6 +189,8 @@ const props = withDefaults(
     sortAsc?: boolean
     /** 是否提供「默认顺序」选项（工作组成员列表支持手动拖拽排序） */
     showManualSort?: boolean
+    /** 协议筛选：空字符串不限，http/https 只保留对应协议 */
+    scheme?: TabSchemeFilter
   }>(),
   {
     loading: false,
@@ -189,6 +204,7 @@ const props = withDefaults(
     sortMode: 'createdAt',
     sortAsc: false,
     showManualSort: false,
+    scheme: '',
   },
 )
 
@@ -197,6 +213,7 @@ const emit = defineEmits<{
   (e: 'update:pageSize', size: number): void
   (e: 'update:sortMode', mode: CloudTabSortMode): void
   (e: 'update:sortAsc', asc: boolean): void
+  (e: 'update:scheme', scheme: TabSchemeFilter): void
   /** 数据已被修改，父组件需重新拉取 */
   (e: 'refresh'): void
   (e: 'sort', items: TabListItem[], evt: TabListSortEvent): void
@@ -413,6 +430,12 @@ function onSortClick(mode: CloudTabSortMode) {
   emit('update:page', 1)
 }
 
+function onSchemeChange(value: string | number | boolean | undefined) {
+  const next: TabSchemeFilter = value === 'http' || value === 'https' ? value : ''
+  emit('update:scheme', next)
+  emit('update:page', 1)
+}
+
 function onPageChange(page: number) {
   emit('update:page', page)
 }
@@ -431,12 +454,20 @@ function onSizeChange(size: number) {
   flex-direction: column;
 }
 
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .sort-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-  margin-bottom: 8px;
 }
 
 .sort-label {

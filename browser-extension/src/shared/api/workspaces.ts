@@ -75,12 +75,13 @@ export function getWorkspaceTabsSummary() {
 }
 
 /** 已同步标签页页面：跨所有工作组扁平化分页返回（单独聚合接口，无需经由工作组树拍平）
- * params: page/pageSize/keyword/includeSystem/sort/order */
+ * params: page/pageSize/keyword/includeSystem/scheme/sort/order */
 export function getSyncedTabs(params: {
   page?: number
   pageSize?: number
   keyword?: string
   includeSystem?: boolean
+  scheme?: string
   sort?: string
   order?: string
 }) {
@@ -89,6 +90,7 @@ export function getSyncedTabs(params: {
   if (params.pageSize != null) query.set('pageSize', String(params.pageSize))
   if (params.keyword) query.set('keyword', params.keyword)
   if (params.includeSystem != null) query.set('includeSystem', String(params.includeSystem))
+  if (params.scheme) query.set('scheme', params.scheme)
   if (params.sort) query.set('sort', params.sort)
   if (params.order) query.set('order', params.order)
   const qs = query.toString()

@@ -24,6 +24,7 @@
         v-model:page-size="pageSize"
         v-model:sort-mode="sortMode"
         v-model:sort-asc="sortAsc"
+        v-model:scheme="scheme"
         :items="items"
         :total="total"
         :loading="loading"
@@ -44,7 +45,7 @@ import { useRouter } from 'vue-router'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import CloudTabListPanel from '../components/CloudTabListPanel.vue'
 import { listSyncedTabs, listWorkspaces, reportServiceError } from '@/shared/services'
-import type { CloudTabListItem, CloudTabSortMode } from '@/shared/types/tab-list'
+import type { CloudTabListItem, CloudTabSortMode, TabSchemeFilter } from '@/shared/types/tab-list'
 import type { Workspace } from '@/shared/types'
 
 const router = useRouter()
@@ -57,6 +58,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const sortMode = ref<CloudTabSortMode>('createdAt')
 const sortAsc = ref(false)
+const scheme = ref<TabSchemeFilter>('')
 /** 仅用于属性弹窗展示标签页所属工作组的完整路径 */
 const workspaces = ref<Workspace[]>([])
 
@@ -80,6 +82,7 @@ async function load() {
       pageSize: pageSize.value,
       keyword: searchKeyword.value.trim(),
       includeSystem: true,
+      scheme: scheme.value || undefined,
       // 创建时间取标签页的添加时间，与列表行展示的时间一致
       sort: sortMode.value,
       order: sortAsc.value ? 'asc' : 'desc',
@@ -119,8 +122,8 @@ function openWorkspace(workspaceId: string) {
   void router.push({ path: '/workspaces', query: { workspaceId } })
 }
 
-// 翻页、调整每页行数或切换排序后按新的查询参数重新拉取（服务端分页与排序）
-watch([page, pageSize, sortMode, sortAsc], () => void load())
+// 翻页、调整每页行数、切换排序或协议筛选后按新的查询参数重新拉取（服务端分页与筛选）
+watch([page, pageSize, sortMode, sortAsc, scheme], () => void load())
 
 onMounted(() => {
   void load()

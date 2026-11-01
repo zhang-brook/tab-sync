@@ -258,19 +258,36 @@ func (s *WorkspaceService) GetTabsTree(id string) ([]TabsGroup, error) {
 	return groups, nil
 }
 
-// ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索与排序。
+// ListSyncedTabsParams 已同步标签页列表的查询参数
+type ListSyncedTabsParams struct {
+	Keyword       string
+	IncludeSystem bool
+	// Scheme 协议筛选：http / https，其余值表示不限
+	Scheme string
+	Sort   string
+	Order  string
+	Page   int
+	PageSize int
+}
+
+// ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索、协议筛选与排序。
 // 直接聚合数据，无需先取工作组树再拍平。
-// sortBy 支持 name / createdAt（标签页添加时间）/ updatedAt；order 支持 asc / desc，其余取值回退默认排序。
-func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, sortBy, order string, page, pageSize int) (*SyncedTabPage, error) {
+// Sort 支持 name / createdAt（标签页添加时间）/ updatedAt；Order 支持 asc / desc，其余取值回退默认排序。
+func (s *WorkspaceService) ListSyncedTabs(p ListSyncedTabsParams) (*SyncedTabPage, error) {
 	q := s.db.Model(&model.Tab{}).
 		Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
 		Where("workspaces.is_deleted = ?", false)
-	if !includeSystem {
+	if !p.IncludeSystem {
 		q = q.Where("workspaces.is_system = ?", false)
 	}
-	if keyword != "" {
-		like := "%" + keyword + "%"
+	if p.Keyword != "" {
+		like := "%" + p.Keyword + "%"
 		q = q.Where("tabs.title LIKE ? OR tabs.url LIKE ?", like, like)
+	}
+	if p.Scheme == "http" {
+		q = q.Where("tabs.url LIKE ?", "http://%")
+	} else if p.Scheme == "https" {
+		q = q.Where("tabs.url LIKE ?", "https://%")
 	}
 
 	var total int64
@@ -280,7 +297,7 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, so
 
 	// 排序字段与方向都走白名单，避免把查询参数直接拼进 SQL
 	orderColumn := "tabs.added_at"
-	switch sortBy {
+	switch p.Sort {
 	case "name":
 		orderColumn = "COALESCE(NULLIF(tabs.display_name, ''), tabs.title)"
 	case "createdAt":
@@ -289,13 +306,13 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, so
 		orderColumn = "tabs.updated_at"
 	}
 	orderDirection := "DESC"
-	if order == "asc" {
+	if p.Order == "asc" {
 		orderDirection = "ASC"
 	}
 
 	var tabs []model.Tab
-	offset := (page - 1) * pageSize
-	if err := q.Offset(offset).Limit(pageSize).
+	offset := (p.Page - 1) * p.PageSize
+	if err := q.Offset(offset).Limit(p.PageSize).
 		Order(orderColumn + " " + orderDirection + ", tabs.id DESC").
 		Preload("Tags.Tag").
 		Find(&tabs).Error; err != nil {
@@ -328,7 +345,7 @@ func (s *WorkspaceService) ListSyncedTabs(keyword string, includeSystem bool, so
 			Tab:         toTabReferences([]model.Tab{t})[0],
 		})
 	}
-	return &SyncedTabPage{Items: items, Total: total, Page: page, PageSize: pageSize}, nil
+	return &SyncedTabPage{Items: items, Total: total, Page: p.Page, PageSize: p.PageSize}, nil
 }
 
 // Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
