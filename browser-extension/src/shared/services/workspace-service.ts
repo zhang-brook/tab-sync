@@ -9,6 +9,7 @@ import type {
   WorkspaceTabsGroup,
   WorkspaceTabsSummaryData,
   SyncedTabPageData,
+  TabHostsData,
 } from '../types'
 
 /** 「未分组」系统工作组的固定标识（见 server/internal/service/workspace.go） */
@@ -164,10 +165,17 @@ export async function listSyncedTabs(params: {
   keyword?: string
   includeSystem?: boolean
   scheme?: string
+  domain?: string
+  exact?: boolean
   sort?: string
   order?: string
 }): Promise<SyncedTabPageData> {
   return callService<SyncedTabPageData>({ action: 'GET_SYNCED_TABS', payload: params })
+}
+
+/** 标签页域名聚合（「标签页」页左侧域名树） */
+export async function listTabHosts(params: { scheme?: string; keyword?: string } = {}): Promise<TabHostsData> {
+  return callService<TabHostsData>({ action: 'GET_TAB_HOSTS', payload: params })
 }
 
 export async function getWorkspaceTabsSummary(): Promise<WorkspaceTabsSummaryData['summaries']> {

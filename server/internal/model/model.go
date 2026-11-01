@@ -90,6 +90,8 @@ type Tab struct {
 	ID          uint   `gorm:"primaryKey;autoIncrement"`
 	WorkspaceID string `gorm:"index;size:64;not null"` // 所属工作组 UUID
 	URL         string `gorm:"size:2048;not null"`
+	// Host URL 主机名（小写、不含端口），用于按域名筛选与聚合
+	Host        string `gorm:"size:255;index"`
 	Title       string `gorm:"size:500"`
 	DisplayName string `gorm:"size:500"` // 用户自定义显示名（重命名），为空时使用 Title
 	FavIconURL  string `gorm:"size:2048"`

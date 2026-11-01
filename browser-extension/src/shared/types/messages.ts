@@ -27,6 +27,7 @@ export type MessageAction =
   | 'GET_DASHBOARD_STATS'
   | 'DEREGISTER_DEVICE'
   | 'GET_WORKSPACE_TABS_SUMMARY'
+  | 'GET_TAB_HOSTS'
   | 'CHECK_VERSION'
   | 'SET_CONNECTION_MODE'
   | 'GET_TAGS'
@@ -95,6 +96,12 @@ export interface GetSyncedTabsMessage {
     sort?: string
     order?: string
   }
+}
+
+/** 标签页域名聚合：「标签页」页左侧域名树（与列表使用相同的协议/关键字条件） */
+export interface GetTabHostsMessage {
+  action: 'GET_TAB_HOSTS'
+  payload?: { scheme?: string; keyword?: string }
 }
 
 /** 管理面板概览统计（后端聚合数量，不返回列表） */
@@ -384,6 +391,7 @@ export type ExtensionMessage =
   | GetDashboardStatsMessage
   | DeregisterDeviceMessage
   | GetWorkspaceTabsSummaryMessage
+  | GetTabHostsMessage
   | GetTagsMessage
   | CreateTagMessage
   | UpdateTagMessage
@@ -455,6 +463,12 @@ export interface SyncedTabItem {
   name: string
   color: string
   tab: TabReference
+}
+
+/** GET_TAB_HOSTS 响应数据：各主机名下的标签页数量，total 为筛选后的标签页总数 */
+export interface TabHostsData {
+  hosts: Array<{ host: string; count: number }>
+  total: number
 }
 
 /** GET_SYNCED_TABS 响应数据 */

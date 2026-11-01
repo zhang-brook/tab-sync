@@ -12,6 +12,7 @@ import (
 
 	"github.com/spidermemos/tab-sync/server/internal/database"
 	"github.com/spidermemos/tab-sync/server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/urlx"
 )
 
 // 工作组相关错误
@@ -119,9 +120,9 @@ type TabReference struct {
 	DisplayName string `json:"displayName,omitempty"`
 	FavIconURL  string `json:"favIconUrl"`
 	// Description 标签页描述（可选，仅用户主动设置时存在）
-	Description string        `json:"description,omitempty"`
-	SortOrder   int           `json:"sortOrder"`
-	AddedAt     string        `json:"addedAt"`
+	Description string `json:"description,omitempty"`
+	SortOrder   int    `json:"sortOrder"`
+	AddedAt     string `json:"addedAt"`
 	// UpdatedAt 记录最后修改时间（重命名、编辑链接/描述/添加时间、排序等操作会更新）
 	UpdatedAt string        `json:"updatedAt"`
 	Tags      []TagResponse `json:"tags"`
@@ -264,10 +265,13 @@ type ListSyncedTabsParams struct {
 	IncludeSystem bool
 	// Scheme 协议筛选：http / https，其余值表示不限
 	Scheme string
-	Sort   string
-	Order  string
-	Page   int
-	PageSize int
+	// Domain 域名筛选；DomainExact=true 时精确匹配主机名，否则匹配该根域名及其所有子域名
+	Domain      string
+	DomainExact bool
+	Sort        string
+	Order       string
+	Page        int
+	PageSize    int
 }
 
 // ListSyncedTabs 「已同步标签页」页面专用：跨所有工作组扁平化返回标签页，支持分页、关键字搜索、协议筛选与排序。
@@ -288,6 +292,13 @@ func (s *WorkspaceService) ListSyncedTabs(p ListSyncedTabsParams) (*SyncedTabPag
 		q = q.Where("tabs.url LIKE ?", "http://%")
 	} else if p.Scheme == "https" {
 		q = q.Where("tabs.url LIKE ?", "https://%")
+	}
+	if p.Domain != "" {
+		if p.DomainExact {
+			q = q.Where("tabs.host = ?", p.Domain)
+		} else {
+			q = q.Where("(tabs.host = ? OR tabs.host LIKE ?)", p.Domain, "%."+p.Domain)
+		}
 	}
 
 	var total int64
@@ -346,6 +357,56 @@ func (s *WorkspaceService) ListSyncedTabs(p ListSyncedTabsParams) (*SyncedTabPag
 		})
 	}
 	return &SyncedTabPage{Items: items, Total: total, Page: p.Page, PageSize: p.PageSize}, nil
+}
+
+// TabHostCount 单个主机名下的标签页数量
+type TabHostCount struct {
+	Host  string `json:"host"`
+	Count int64  `json:"count"`
+}
+
+// TabHostsData 域名聚合结果：Hosts 按主机名分组，Total 为筛选后的标签页总数
+// （含无法解析出主机名的页面，如 chrome://、about: 等，它们只出现在「全部」下）
+type TabHostsData struct {
+	Hosts []TabHostCount `json:"hosts"`
+	Total int64          `json:"total"`
+}
+
+// ListTabHosts 汇总所有工作组内标签页的域名分布，供「标签页」页左侧域名树使用。
+// scheme / keyword 与已同步列表保持一致，使树上的计数与列表筛选结果对应。
+func (s *WorkspaceService) ListTabHosts(scheme, keyword string) (*TabHostsData, error) {
+	build := func() *gorm.DB {
+		q := s.db.Model(&model.Tab{}).
+			Joins("JOIN workspaces ON workspaces.workspace_id = tabs.workspace_id").
+			Where("workspaces.is_deleted = ?", false)
+		switch scheme {
+		case "http":
+			q = q.Where("tabs.url LIKE ?", "http://%")
+		case "https":
+			q = q.Where("tabs.url LIKE ?", "https://%")
+		}
+		if keyword != "" {
+			like := "%" + keyword + "%"
+			q = q.Where("tabs.title LIKE ? OR tabs.url LIKE ?", like, like)
+		}
+		return q
+	}
+
+	var total int64
+	if err := build().Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	hosts := make([]TabHostCount, 0)
+	if err := build().
+		Select("tabs.host AS host, COUNT(*) AS count").
+		Where("tabs.host <> ''").
+		Group("tabs.host").
+		Order("tabs.host ASC").
+		Scan(&hosts).Error; err != nil {
+		return nil, err
+	}
+	return &TabHostsData{Hosts: hosts, Total: total}, nil
 }
 
 // Create 创建工作区（不含标签页，标签页由后续更新/加入操作添加）
@@ -443,6 +504,7 @@ func (s *WorkspaceService) Update(id string, payload UpdateWorkspacePayload) (*W
 					}
 				}
 				tab.URL = sanitizeString(tabData.URL, 2048)
+				tab.Host = urlx.HostOf(tab.URL)
 				tab.Title = sanitizeString(tabData.Title, 500)
 				tab.FavIconURL = sanitizeFavIconURL(tabData.FavIconURL)
 				tab.SortOrder = i
@@ -684,6 +746,7 @@ func (s *WorkspaceService) Duplicate(id string) (*CreateResult, error) {
 				tab := model.Tab{
 					WorkspaceID: newWSID,
 					URL:         srcTab.URL,
+					Host:        urlx.HostOf(srcTab.URL),
 					Title:       srcTab.Title,
 					DisplayName: srcTab.DisplayName,
 					FavIconURL:  srcTab.FavIconURL,
@@ -1074,6 +1137,7 @@ func (s *WorkspaceService) CopyTab(workspaceID, tabID string) (*TabReference, er
 		copied = model.Tab{
 			WorkspaceID: workspaceID,
 			URL:         src.URL,
+			Host:        urlx.HostOf(src.URL),
 			Title:       src.Title,
 			DisplayName: src.DisplayName,
 			FavIconURL:  src.FavIconURL,
@@ -1154,6 +1218,7 @@ func (s *WorkspaceService) AddTabByURL(workspaceID string, payload AddTabByURLPa
 	tab := model.Tab{
 		WorkspaceID: workspaceID,
 		URL:         sanitizeString(payload.URL, 2048),
+		Host:        urlx.HostOf(payload.URL),
 		Title:       sanitizeString(title, 500),
 		FavIconURL:  "",
 		SortOrder:   0,
@@ -1233,7 +1298,9 @@ func (s *WorkspaceService) UpdateTab(workspaceID, tabID string, payload UpdateTa
 		updates["display_name"] = sanitizeString(*payload.DisplayName, 500)
 	}
 	if payload.URL != nil {
-		updates["url"] = sanitizeString(*payload.URL, 2048)
+		url := sanitizeString(*payload.URL, 2048)
+		updates["url"] = url
+		updates["host"] = urlx.HostOf(url)
 	}
 	if payload.Title != nil {
 		updates["title"] = sanitizeString(*payload.Title, 500)

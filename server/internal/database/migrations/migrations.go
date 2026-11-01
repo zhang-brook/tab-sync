@@ -46,6 +46,7 @@ func All() []Migration {
 	return []Migration{
 		migrationV1TabsRename,
 		migrationV2AssociationTableRename,
+		migrationV3TabHost,
 	}
 }
 

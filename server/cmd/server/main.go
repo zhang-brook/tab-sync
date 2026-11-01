@@ -122,6 +122,7 @@ func main() {
 			auth.GET("/workspaces", handlers.Workspace.List)
 			auth.GET("/workspaces/:id/tabs", handlers.Workspace.GetTabs)
 			auth.GET("/tabs", handlers.Workspace.ListSyncedTabs)
+			auth.GET("/tabs/hosts", handlers.Workspace.ListTabHosts)
 			auth.POST("/workspaces", handlers.Workspace.Create)
 			auth.POST("/workspaces/:id/duplicate", handlers.Workspace.Duplicate)
 			auth.PUT("/workspaces/:id", handlers.Workspace.Update)

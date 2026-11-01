@@ -9,6 +9,7 @@ import (
 
 	"github.com/spidermemos/tab-sync/server/internal/database"
 	"github.com/spidermemos/tab-sync/server/internal/model"
+	"github.com/spidermemos/tab-sync/server/internal/urlx"
 )
 
 // RecycleBinService 标签页回收站服务：
@@ -159,6 +160,7 @@ func (s *RecycleBinService) Restore(ids []uint, workspaceID string) (int, error)
 			newTab := model.Tab{
 				WorkspaceID: ws.WorkspaceID,
 				URL:         item.URL,
+				Host:        urlx.HostOf(item.URL),
 				Title:       item.Title,
 				DisplayName: item.DisplayName,
 				FavIconURL:  item.FavIconURL,

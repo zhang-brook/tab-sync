@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Workspace, TabReference, WorkspaceTabsGroup, SyncedTabPageData } from '../types'
+import type { Workspace, TabReference, WorkspaceTabsGroup, SyncedTabPageData, TabHostsData } from '../types'
 import type { WorkspaceTabsSummaryData, WorkspaceTabPayload } from '../types'
 
 /** 获取所有工作组。
@@ -82,6 +82,8 @@ export function getSyncedTabs(params: {
   keyword?: string
   includeSystem?: boolean
   scheme?: string
+  domain?: string
+  exact?: boolean
   sort?: string
   order?: string
 }) {
@@ -91,10 +93,23 @@ export function getSyncedTabs(params: {
   if (params.keyword) query.set('keyword', params.keyword)
   if (params.includeSystem != null) query.set('includeSystem', String(params.includeSystem))
   if (params.scheme) query.set('scheme', params.scheme)
+  if (params.domain) {
+    query.set('domain', params.domain)
+    query.set('exact', String(params.exact ?? false))
+  }
   if (params.sort) query.set('sort', params.sort)
   if (params.order) query.set('order', params.order)
   const qs = query.toString()
   return apiClient.get<SyncedTabPageData>(`/v1/tab-sync/tabs${qs ? `?${qs}` : ''}`)
+}
+
+/** 标签页域名聚合（「标签页」页左侧域名树），scheme/keyword 与列表筛选保持一致 */
+export function getTabHosts(params: { scheme?: string; keyword?: string } = {}) {
+  const query = new URLSearchParams()
+  if (params.scheme) query.set('scheme', params.scheme)
+  if (params.keyword) query.set('keyword', params.keyword)
+  const qs = query.toString()
+  return apiClient.get<TabHostsData>(`/v1/tab-sync/tabs/hosts${qs ? `?${qs}` : ''}`)
 }
 
 /** 移动标签页到指定工作组的目标位置（支持同组排序和跨组移动） */

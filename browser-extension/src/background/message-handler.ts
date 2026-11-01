@@ -1,11 +1,11 @@
-import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, DevicesData, DashboardStatsData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
+import type { ExtensionMessage, MessageResponse, StateData, WorkspacesData, WorkspaceTabsData, WorkspaceTabsGroupsData, SyncedTabPageData, TabHostsData, DevicesData, DashboardStatsData, TagsData, TagInfo, TagTabsData, RecycleBinData, GetRecycleBinMessage, WorkspaceTabsChangedMessage } from '../shared/types'
 import type { TabReference } from '../shared/types'
 import { storage, STORAGE_KEYS } from '../shared/storage'
 import { getServerVersion } from '../shared/api/auth'
 import { verifyTokenCandidate } from '../shared/api/token-verify'
 import { getDevices, registerDevice, deregisterDevice } from '../shared/api/devices'
 import { getDashboardStats } from '../shared/api/stats'
-import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, copyWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
+import { getWorkspaces, getWorkspaceTabs, getSyncedTabs, getTabHosts, createWorkspace, updateWorkspace, moveWorkspace, deleteWorkspace, duplicateWorkspace, getWorkspaceTabsSummary, moveWorkspaceTab, copyWorkspaceTab, updateWorkspaceTab, addWorkspaceTabByUrl, deleteWorkspaceTab } from '../shared/api/workspaces'
 import { getTags, createTag, updateTag, deleteTag, addTabTag, removeTabTag, addWorkspaceTag, removeWorkspaceTag, getTagTabs } from '../shared/api/tags'
 import { getRecycleBin, restoreRecycleBinTabs, deleteRecycleBinTab, emptyRecycleBin } from '../shared/api/recyclebin'
 import { getBrowserInfo, getOSInfo, getOrCreateDeviceId, getDeviceName } from '../shared/utils/device-fingerprint'
@@ -83,6 +83,9 @@ async function dispatchMessage(message: ExtensionMessage): Promise<MessageRespon
 
     case 'GET_SYNCED_TABS':
       return handleGetSyncedTabs(message.payload)
+
+    case 'GET_TAB_HOSTS':
+      return handleGetTabHosts(message.payload)
 
     case 'CREATE_WORKSPACE':
       return handleCreateWorkspace(message.payload)
@@ -372,6 +375,8 @@ async function handleGetSyncedTabs(payload: {
   keyword?: string
   includeSystem?: boolean
   scheme?: string
+  domain?: string
+  exact?: boolean
   sort?: string
   order?: string
 }): Promise<MessageResponse<SyncedTabPageData>> {
@@ -381,6 +386,8 @@ async function handleGetSyncedTabs(payload: {
     keyword: payload?.keyword ?? '',
     includeSystem: payload?.includeSystem ?? true,
     scheme: payload?.scheme ?? '',
+    domain: payload?.domain ?? '',
+    exact: payload?.exact ?? false,
     sort: payload?.sort ?? '',
     order: payload?.order ?? '',
   })
@@ -389,6 +396,15 @@ async function handleGetSyncedTabs(payload: {
   }
   logger.warn('getSyncedTabs API failed:', res.error)
   return { success: false, error: res.error || '获取已同步标签页失败', authError: res.status === 401 }
+}
+
+async function handleGetTabHosts(payload?: { scheme?: string; keyword?: string }): Promise<MessageResponse<TabHostsData>> {
+  const res = await getTabHosts({ scheme: payload?.scheme ?? '', keyword: payload?.keyword ?? '' })
+  if (res.ok && res.data) {
+    return { success: true, data: res.data }
+  }
+  logger.warn('getTabHosts API failed:', res.error)
+  return { success: false, error: res.error || '获取域名分布失败', authError: res.status === 401 }
 }
 
 /** 创建工作组（通过后端 API，不含标签页） */

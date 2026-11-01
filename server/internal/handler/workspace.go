@@ -219,7 +219,7 @@ func (h *WorkspaceHandler) TabsSummary(c *gin.Context) {
 
 // ListSyncedTabs 「已同步标签页」页面：跨所有工作组扁平化分页返回标签页。
 // 查询参数：page/pageSize（默认 1/50）、keyword（标题/URL 模糊搜索）、includeSystem（默认 true）、
-// scheme（http/https，其余值不限）、sort（name/createdAt/updatedAt，默认 addedAt 倒序）、order（asc/desc）。
+// scheme（http/https，其余值不限）、domain + exact（域名筛选）、sort（name/createdAt/updatedAt，默认 addedAt 倒序）、order（asc/desc）。
 func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
@@ -232,6 +232,8 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	includeSystem := c.Query("includeSystem") != "false"
 	scheme := strings.ToLower(strings.TrimSpace(c.Query("scheme")))
+	domain := strings.ToLower(strings.TrimSpace(c.Query("domain")))
+	domainExact := c.Query("exact") == "true"
 	sortBy := strings.TrimSpace(c.Query("sort"))
 	order := strings.TrimSpace(c.Query("order"))
 
@@ -239,6 +241,8 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 		Keyword:       keyword,
 		IncludeSystem: includeSystem,
 		Scheme:        scheme,
+		Domain:        domain,
+		DomainExact:   domainExact,
 		Sort:          sortBy,
 		Order:         order,
 		Page:          page,
@@ -249,6 +253,19 @@ func (h *WorkspaceHandler) ListSyncedTabs(c *gin.Context) {
 		return
 	}
 	Success(c, page_)
+}
+
+// ListTabHosts 标签页域名聚合（「标签页」页左侧域名树）。
+// 查询参数：scheme（http/https，其余值不限）、keyword（与列表一致的标题/URL 模糊搜索）。
+func (h *WorkspaceHandler) ListTabHosts(c *gin.Context) {
+	scheme := strings.ToLower(strings.TrimSpace(c.Query("scheme")))
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	data, err := h.svc.ListTabHosts(scheme, keyword)
+	if err != nil {
+		InternalError(c, "获取域名分布失败")
+		return
+	}
+	Success(c, data)
 }
 
 // MoveTabRequest 移动标签页请求
