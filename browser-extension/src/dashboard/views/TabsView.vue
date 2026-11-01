@@ -22,6 +22,8 @@
       <div class="domain-pane">
         <div class="pane-title-row">
           <span class="pane-title">域名</span>
+          <el-button size="small" text :icon="Refresh" :loading="refreshing" title="刷新"
+            @click="refreshDomainTree" />
         </div>
         <el-tree
           ref="domainTreeRef"
@@ -103,6 +105,7 @@ import type { TabHostsData, TagInfo, Workspace } from '@/shared/types'
 const router = useRouter()
 
 const loading = ref(false)
+const refreshing = ref(false)
 const searchKeyword = ref('')
 const items = ref<CloudTabListItem[]>([])
 const total = ref(0)
@@ -166,7 +169,8 @@ const domainTree = computed<DomainTreeNode[]>(() => {
   return [{ id: 'all', label: '(全部)', count: domainTotal.value, children }]
 })
 
-async function loadHosts() {
+async function loadHosts(): Promise<boolean> {
+  let ok = true
   try {
     const data = await listTabHosts({
       scheme: scheme.value || undefined,
@@ -176,11 +180,13 @@ async function loadHosts() {
     domainHosts.value = data.hosts
     domainTotal.value = data.total
   } catch (err) {
+    ok = false
     domainHosts.value = []
     domainTotal.value = 0
     reportServiceError(err, { fallback: '获取域名分布失败' })
   }
   ensureDomainSelection()
+  return ok
 }
 
 function findDomainNode(nodes: DomainTreeNode[], id: string): DomainTreeNode | undefined {
@@ -349,6 +355,16 @@ function onRefresh() {
   void loadHosts()
 }
 
+/** 左侧树刷新按钮：只重拉域名分布，右侧标签页列表保持不动 */
+async function refreshDomainTree() {
+  refreshing.value = true
+  try {
+    if (await loadHosts()) ElMessage.success('已刷新')
+  } finally {
+    refreshing.value = false
+  }
+}
+
 function openWorkspace(workspaceId: string) {
   void router.push({ path: '/workspaces', query: { workspaceId } })
 }
@@ -407,6 +423,9 @@ onMounted(() => {
   overflow-y: auto;
 }
 .pane-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
 .pane-title {

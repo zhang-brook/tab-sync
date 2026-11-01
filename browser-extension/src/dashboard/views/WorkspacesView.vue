@@ -20,6 +20,8 @@
           <span class="pane-title">工作组</span>
           <span v-if="searchKeyword" class="tree-hint">搜索中暂不可拖拽</span>
           <div class="pane-title-actions">
+            <el-button size="small" text :icon="Refresh" :loading="refreshing" title="刷新"
+              @click="refreshTree" />
             <el-tooltip content="新建工作组" placement="top">
               <el-button size="small" text type="primary" @click="showCreateDialog('')">
                 <el-icon>
@@ -324,6 +326,7 @@ const router = useRouter()
 
 const workspaces = ref<Workspace[]>([])
 const loading = ref(true)
+const refreshing = ref(false)
 const searchKeyword = ref('')
 
 // 标签页按需缓存：workspaceId -> 该工作组本层级的标签页列表。
@@ -687,11 +690,13 @@ async function revealSelected(id: string) {
 /** 是否已完成首次加载：首次加载优先定位路由指定分组，其次默认分组 */
 let initialized = false
 
-async function loadWorkspaces(options: { silent?: boolean } = {}) {
+async function loadWorkspaces(options: { silent?: boolean; withTabs?: boolean } = {}): Promise<boolean> {
   if (!options.silent) loading.value = true
+  let ok = true
   try {
     workspaces.value = await listWorkspaces({ includeSystem: true })
   } catch (err) {
+    ok = false
     reportServiceError(err, { fallback: '获取工作组失败' })
   } finally {
     if (!options.silent) loading.value = false
@@ -713,10 +718,21 @@ async function loadWorkspaces(options: { silent?: boolean } = {}) {
   await nextTick()
   if (selectedId.value) await revealSelected(selectedId.value)
   // 工作组树仅含元信息（不含标签页），此处按需从后端拉取当前选中工作组（及后代）的标签页
-  if (selectedId.value) {
+  if (options.withTabs !== false && selectedId.value) {
     const isAll = tabScope.value === 'all'
     const ids = isAll ? [selectedId.value, ...collectDescendantIds(workspaces.value, selectedId.value)] : [selectedId.value]
     void refreshTabs(ids, isAll ? selectedId.value : undefined)
+  }
+  return ok
+}
+
+/** 左侧树刷新按钮：只重拉工作组分组树，右侧标签页列表保持不动 */
+async function refreshTree() {
+  refreshing.value = true
+  try {
+    if (await loadWorkspaces({ silent: true, withTabs: false })) ElMessage.success('已刷新')
+  } finally {
+    refreshing.value = false
   }
 }
 
