@@ -474,6 +474,14 @@ onMounted(() => {
   align-items: center;
   gap: 2px;
 }
+/* 树标题栏的按钮组较密：清掉相邻按钮默认外边距，并收紧文字按钮的左右留白 */
+.pane-title-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.pane-title-actions :deep(.el-button.is-text) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
 .domain-node {
   display: flex;
   align-items: center;
