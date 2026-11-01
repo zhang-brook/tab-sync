@@ -13,7 +13,14 @@
             title="刷新"
             @click="refresh"
           />
-          <el-button size="small" type="primary" :icon="Plus" @click="openCreate">新建</el-button>
+          <el-tooltip content="新建标签" placement="top">
+            <el-button size="small" text type="primary" @click="openCreate">
+              <el-icon>
+                <Plus />
+              </el-icon>
+              <span>新建</span>
+            </el-button>
+          </el-tooltip>
         </div>
       </div>
 
@@ -760,7 +767,15 @@ onMounted(async () => {
 .left-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+}
+/* 标题栏按钮组较密：清掉相邻按钮默认外边距，并收紧文字按钮的左右留白 */
+.left-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.left-actions :deep(.el-button.is-text) {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .tag-search {
   margin-bottom: 8px;
